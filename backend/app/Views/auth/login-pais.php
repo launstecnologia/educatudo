@@ -138,6 +138,6 @@
             navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(function() {});
         }
     </script>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>

@@ -4228,7 +4228,7 @@ class ExamController extends BaseController
             'provas_bloco' => $modoBloco ? $provasBloco : null,
             'current_page' => 'provas',
             'additional_css' => '',
-            'additional_js' => '<script src="' . (defined('URL') ? URL : '') . '/public/static/js/csp-mathjax-config.js"></script>'
+            'additional_js' => \App\Core\CspPolitica::tagScriptEstatico('js/csp-mathjax-config.js', false)
                 . '<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>'
                 . '<script>'
                 . '(function(){function run(){if(window.MathJax&&window.MathJax.typesetPromise){MathJax.typesetPromise().catch (\function(e){console.warn("MathJax:",e);});}}'
@@ -6401,7 +6401,7 @@ class ExamController extends BaseController
             'realizacao' => $realizacao,
             'current_page' => 'provas',
             'additional_css' => '',
-            'additional_js' => '<script src="' . (defined('URL') ? URL : '') . '/public/static/js/csp-mathjax-config.js"></script>'
+            'additional_js' => \App\Core\CspPolitica::tagScriptEstatico('js/csp-mathjax-config.js', false)
                 . '<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>'
                 . '<script>(function(){function run(){if(window.MathJax&&window.MathJax.typesetPromise)MathJax.typesetPromise().catch (\function(e){console.warn("MathJax:",e);});}run();setTimeout(run,300);setTimeout(run,1000);})();</script>',
         ];

@@ -163,6 +163,6 @@ $system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
             localStorage.removeItem('educatudo_auth_user');
         } catch (e) {}
     </script>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>

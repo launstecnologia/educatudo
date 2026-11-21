@@ -2716,10 +2716,10 @@
     </script>
     <?php endif; ?>
 
-    <script src="<?= URL ?>/public/static/js/csp-service-worker-register.js" data-sw-url="<?= URL ?>/service-worker.js" defer></script>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagScriptEstatico('js/csp-service-worker-register.js', true, ['data-sw-url' => (defined('URL') ? URL : '') . '/service-worker.js']) ?>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
     <!-- MathJax v3: renderização de fórmulas matemáticas (LaTeX) na Jornada do Aluno -->
-    <script src="<?= URL ?>/public/static/js/csp-mathjax-config.js"></script>
+    <?= \App\Core\CspPolitica::tagScriptEstatico('js/csp-mathjax-config.js', false) ?>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
     <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
       (function() {

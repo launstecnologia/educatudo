@@ -111,6 +111,6 @@
 
     <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
     <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>

@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 final class Sec02CspPoliticaTest extends TestCase
 {
     private ?string $envBackup = null;
+    private ?string $allowBackup = null;
 
     protected function setUp(): void
     {
@@ -18,8 +19,13 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->envBackup = getenv('CSP_STRICT_ENFORCEMENT') !== false
             ? (string) getenv('CSP_STRICT_ENFORCEMENT')
             : null;
+        $this->allowBackup = getenv('CSP_STRICT_ALLOW') !== false
+            ? (string) getenv('CSP_STRICT_ALLOW')
+            : null;
         putenv('CSP_STRICT_ENFORCEMENT');
         $_ENV['CSP_STRICT_ENFORCEMENT'] = '';
+        putenv('CSP_STRICT_ALLOW');
+        $_ENV['CSP_STRICT_ALLOW'] = '';
     }
 
     protected function tearDown(): void
@@ -30,6 +36,13 @@ final class Sec02CspPoliticaTest extends TestCase
         } else {
             putenv('CSP_STRICT_ENFORCEMENT=' . $this->envBackup);
             $_ENV['CSP_STRICT_ENFORCEMENT'] = $this->envBackup;
+        }
+        if ($this->allowBackup === null) {
+            putenv('CSP_STRICT_ALLOW');
+            unset($_ENV['CSP_STRICT_ALLOW']);
+        } else {
+            putenv('CSP_STRICT_ALLOW=' . $this->allowBackup);
+            $_ENV['CSP_STRICT_ALLOW'] = $this->allowBackup;
         }
         CspPolitica::reiniciarParaTeste();
     }
@@ -149,5 +162,35 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringContainsString("html += '<button onclick=\"removerModulo(1)\">X</button>';", $out);
         $this->assertStringContainsString('function abrirModalGerarIA(){ return true; }', $out);
         $this->assertStringNotContainsString('data-csp-on-id=removerModulo', $out);
+    }
+
+    public function testUrlAssetEstaticoUsaStaticSemPublicEComCacheBust(): void
+    {
+        $url = CspPolitica::urlAssetEstatico('js/csp-event-delegation.js');
+        $this->assertStringContainsString('/static/js/csp-event-delegation.js?v=', $url);
+        $this->assertStringNotContainsString('/public/static/', $url);
+    }
+
+    public function testTagDelegacaoEventosTemNonceDeferEDataCspClickScript(): void
+    {
+        $tag = CspPolitica::tagDelegacaoEventos();
+        $this->assertStringContainsString('csp-event-delegation.js?v=', $tag);
+        $this->assertStringContainsString('nonce="', $tag);
+        $this->assertStringContainsString(' defer', $tag);
+        $this->assertStringNotContainsString('/public/static/', $tag);
+    }
+
+    public function testStrictNoHeaderExigeDoisFlags(): void
+    {
+        putenv('CSP_STRICT_ENFORCEMENT=true');
+        $_ENV['CSP_STRICT_ENFORCEMENT'] = 'true';
+        putenv('CSP_STRICT_ALLOW');
+        $_ENV['CSP_STRICT_ALLOW'] = '';
+        $this->assertTrue(CspPolitica::modoRestritoAtivo());
+        $this->assertFalse(CspPolitica::allowStrictNoHeader());
+
+        putenv('CSP_STRICT_ALLOW=true');
+        $_ENV['CSP_STRICT_ALLOW'] = 'true';
+        $this->assertTrue(CspPolitica::allowStrictNoHeader());
     }
 }

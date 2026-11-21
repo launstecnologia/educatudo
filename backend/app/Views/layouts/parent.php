@@ -134,8 +134,8 @@
         });
     </script>
     <?php if (isset($additional_js)): ?><?= $additional_js ?><?php endif; ?>
-    <script src="<?= URL ?>/public/static/js/csp-service-worker-register.js" data-sw-url="<?= URL ?>/service-worker.js" defer></script>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagScriptEstatico('js/csp-service-worker-register.js', true, ['data-sw-url' => (defined('URL') ? URL : '') . '/service-worker.js']) ?>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
     <?php
     $base_url = defined('URL') ? URL : '';
     $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));

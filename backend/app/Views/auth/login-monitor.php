@@ -56,6 +56,6 @@ $system_title = \App\Core\LayoutHelper::getSystemTitle();
             </div>
         </div>
     </div>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>

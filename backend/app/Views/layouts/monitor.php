@@ -35,6 +35,6 @@
         <?= $content ?? '' ?>
     </main>
     <?php if (!empty($additional_js)): ?><?= $additional_js ?><?php endif; ?>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>

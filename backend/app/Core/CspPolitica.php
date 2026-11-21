@@ -85,21 +85,85 @@ final class CspPolitica
     }
 
     /**
-     * CSP_STRICT_ENFORCEMENT=true|1 ativa enforcement restritivo (homologação).
-     * Padrão: false (produção segura até validação manual).
+     * Lê flag booleana de env (env() ou getenv).
      */
-    public static function modoRestritoAtivo(): bool
+    private static function envFlag(string $key): bool
     {
         $raw = null;
         if (function_exists('env')) {
-            $raw = env('CSP_STRICT_ENFORCEMENT', null);
+            $raw = env($key, null);
         }
         if ($raw === null || $raw === '') {
-            $fromEnv = getenv('CSP_STRICT_ENFORCEMENT');
+            $fromEnv = getenv($key);
             $raw = ($fromEnv !== false) ? $fromEnv : '';
         }
         $v = strtolower(trim((string) $raw));
         return $v === '1' || $v === 'true' || $v === 'yes' || $v === 'on';
+    }
+
+    /**
+     * CSP_STRICT_ENFORCEMENT=true|1 marca desejo de enforcement restritivo.
+     * Padrão: false (produção segura até validação manual).
+     */
+    public static function modoRestritoAtivo(): bool
+    {
+        return self::envFlag('CSP_STRICT_ENFORCEMENT');
+    }
+
+    /**
+     * Segundo cadeado: enforcement restritivo no header só com CSP_STRICT_ALLOW=true.
+     * Evita que CSP_STRICT_ENFORCEMENT sozinho quebre JS em produção (data-csp-click etc.).
+     */
+    public static function allowStrictNoHeader(): bool
+    {
+        return self::envFlag('CSP_STRICT_ALLOW');
+    }
+
+    /**
+     * URL canônica de asset em public/static/ (sem /public/ no path — docroot já é public/).
+     * Inclui ?v=filemtime para furar cache CDN (Cloudflare) após deploy.
+     */
+    public static function urlAssetEstatico(string $pathRelativo): string
+    {
+        $path = ltrim(str_replace('\\', '/', $pathRelativo), '/');
+        if (str_starts_with($path, 'public/static/')) {
+            $path = substr($path, strlen('public/static/'));
+        } elseif (str_starts_with($path, 'static/')) {
+            $path = substr($path, strlen('static/'));
+        }
+        $fs = dirname(__DIR__, 2) . '/public/static/' . $path;
+        $v = is_file($fs) ? (string) filemtime($fs) : (string) time();
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        return $base . '/static/' . $path . '?v=' . rawurlencode($v);
+    }
+
+    /**
+     * Tag <script src> com nonce + path canônico /static/... + cache-bust.
+     * Ponto único para csp-event-delegation e demais helpers CSP.
+     *
+     * @param array<string, string> $extraAttrs
+     */
+    public static function tagScriptEstatico(string $pathRelativo, bool $defer = true, array $extraAttrs = []): string
+    {
+        $src = htmlspecialchars(self::urlAssetEstatico($pathRelativo), ENT_QUOTES, 'UTF-8');
+        $parts = ['src="' . $src . '"', self::attrNonce()];
+        if ($defer) {
+            $parts[] = 'defer';
+        }
+        foreach ($extraAttrs as $name => $value) {
+            $n = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $name);
+            if ($n === '') {
+                continue;
+            }
+            $parts[] = $n . '="' . htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') . '"';
+        }
+        return '<script ' . implode(' ', $parts) . '></script>';
+    }
+
+    /** Script de delegação data-csp-click / data-csp-action (obrigatório em todo layout). */
+    public static function tagDelegacaoEventos(): string
+    {
+        return self::tagScriptEstatico('js/csp-event-delegation.js', true);
     }
 
     public static function aplicarNonceEmHtml(string $html): string
@@ -286,8 +350,10 @@ final class CspPolitica
         }
         header('Permissions-Policy: geolocation=(), payment=(), usb=()');
 
-        if (self::modoRestritoAtivo()) {
-            // Homologação: só enforcement restritivo (já é a candidata).
+        // Enforcement restritivo exige DOIS flags (STRICT + ALLOW).
+        // Só CSP_STRICT_ENFORCEMENT=true em produção derrubava data-csp-click
+        // (script legado em cache + strict-dynamic sem unsafe-inline).
+        if (self::modoRestritoAtivo() && self::allowStrictNoHeader()) {
             header('Content-Security-Policy: ' . self::politicaRestrita(true));
             return;
         }

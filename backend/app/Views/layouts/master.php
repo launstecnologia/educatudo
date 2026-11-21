@@ -159,6 +159,6 @@ $master_iniciais = \App\Services\MasterAvatarService::iniciais($master_nome);
     })();
     </script>
     <?php include __DIR__ . '/components/row_actions_dropdown_js.php'; ?>
-    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
+    <?= \App\Core\CspPolitica::tagDelegacaoEventos() ?>
 </body>
 </html>
