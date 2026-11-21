@@ -170,7 +170,21 @@ if (!function_exists('educatudo_responder_host_desconhecido')) {
     }
 }
 
-// Rotas /master e domínio MASTER continuam no fluxo original (sempre abrem o MASTER).
+// Produção: /master só no domínio administrativo (MASTER_DOMAIN). Selecionar a
+// conexão master não concede privilégios — auth continua em master_user_id —
+// mas evita abrir o banco master a partir do host de uma escola.
+$appEnv = defined('ENVIRONMENT') ? (string) ENVIRONMENT : 'production';
+if (
+    $isMasterPath
+    && !$isMasterDomain
+    && $appEnv === 'production'
+    && defined('MASTER_DOMAIN')
+    && MASTER_DOMAIN !== ''
+) {
+    educatudo_responder_host_desconhecido($host !== '' ? $host : 'desconhecido');
+}
+
+// Rotas /master (dev/local) e domínio MASTER abrem o banco MASTER.
 if ($isMasterPath || $isMasterDomain) {
     $masterPdo = Database::createMasterPdo();
     $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
@@ -182,10 +196,11 @@ if ($isMasterPath || $isMasterDomain) {
 $fastPathAplicado = false;
 try {
     $tenantCache = TenantResolver::cachedTenantFromRequest();
-    if (is_array($tenantCache) && isset($tenantCache['id'], $tenantCache['slug'])) {
+    // cachedTenantFromRequest já exige ativo=1 e identidade coerente com o Host.
+    if (is_array($tenantCache) && isset($tenantCache['id'], $tenantCache['slug']) && (int) ($tenantCache['ativo'] ?? 0) === 1) {
         $escolaId = (int) $tenantCache['id'];
         $configCache = $escolaId > 0 ? DatabaseManager::cachedConfig($escolaId) : null;
-        if (is_array($configCache)) {
+        if (is_array($configCache) && DatabaseManager::configTenantValida($configCache)) {
             $manager = new DatabaseManager(null);
             $tenantDb = $manager->createConnectionFromConfig($configCache, $escolaId);
             Database::setCurrentInstance($tenantDb);

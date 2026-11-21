@@ -82,6 +82,32 @@ class TenantResolver
     }
 
     /**
+     * Remove cache de resolução e de config de banco para a escola (todos os hosts conhecidos).
+     * Usar ao ativar/desativar ou alterar domínio — não depende só do TTL.
+     *
+     * @param array{id?:int|string,slug?:string,dominio?:string} $escola
+     */
+    public static function invalidarCacheEscola(array $escola): void
+    {
+        $id = (int) ($escola['id'] ?? 0);
+        $slug = strtolower(trim((string) ($escola['slug'] ?? '')));
+        $dominio = strtolower(trim((string) ($escola['dominio'] ?? '')));
+        if ($dominio !== '' && strpos($dominio, ':') !== false) {
+            $dominio = explode(':', $dominio, 2)[0];
+        }
+
+        if ($id > 0) {
+            RedisCache::delete('tenant_config_' . $id);
+        }
+        if ($dominio !== '') {
+            RedisCache::delete('tenant_' . $dominio);
+            if ($slug !== '') {
+                RedisCache::delete('tenant_' . $dominio . '_' . $slug);
+            }
+        }
+    }
+
+    /**
      * Resolve metadados mesmo quando a escola esta inativa.
      * Usado para responder uma pagina controlada em vez de excecao no bootstrap.
      *
@@ -115,21 +141,72 @@ class TenantResolver
 
     /**
      * Metadados do tenant já cacheados no Redis, sem consultar o MASTER.
+     * Fail closed: exige ativo=1 e identidade coerente com Host/X-Tenant.
+     * Cache legado sem `ativo` ou com identidade divergente é descartado.
      *
-     * @return array{id:int,slug:string,dominio:?string}|null
+     * @return array{id:int,slug:string,dominio:?string,ativo:int}|null
      */
     public static function cachedTenantFromRequest(): ?array
     {
-        $cached = RedisCache::get(self::cacheKeyFromRequest());
+        $cacheKey = self::cacheKeyFromRequest();
+        $cached = RedisCache::get($cacheKey);
         if ($cached === null) {
             return null;
         }
         $decoded = json_decode($cached, true);
-        if (is_array($decoded) && isset($decoded['id'], $decoded['slug']) && (int) $decoded['id'] > 0) {
-            $decoded['id'] = (int) $decoded['id'];
-            return $decoded;
+        $tenant = self::validarTenantCacheado(
+            is_array($decoded) ? $decoded : null,
+            self::hostFromRequest(),
+            self::slugFromHeader()
+        );
+        if ($tenant === null) {
+            RedisCache::delete($cacheKey);
+            return null;
         }
-        return null;
+        return $tenant;
+    }
+
+    /**
+     * Valida payload de cache de tenant (fail closed).
+     * Exposto para testes unitários sem Redis.
+     *
+     * @param array<string,mixed>|null $decoded
+     * @return array{id:int,slug:string,dominio:?string,ativo:int}|null
+     */
+    public static function validarTenantCacheado(?array $decoded, string $host, ?string $slugHeader): ?array
+    {
+        if ($decoded === null || !isset($decoded['id'], $decoded['slug']) || (int) $decoded['id'] <= 0) {
+            return null;
+        }
+        if (!array_key_exists('ativo', $decoded) || (int) $decoded['ativo'] !== 1) {
+            return null;
+        }
+
+        $slugCached = strtolower(trim((string) $decoded['slug']));
+        if ($slugHeader !== null) {
+            if ($slugCached === '' || $slugCached !== strtolower(trim($slugHeader))) {
+                return null;
+            }
+        } else {
+            $dominioCached = strtolower(trim((string) ($decoded['dominio'] ?? '')));
+            if ($dominioCached !== '' && strpos($dominioCached, ':') !== false) {
+                $dominioCached = explode(':', $dominioCached, 2)[0];
+            }
+            $host = strtolower(trim($host));
+            if ($host !== '' && strpos($host, ':') !== false) {
+                $host = explode(':', $host, 2)[0];
+            }
+            if ($host === '' || $dominioCached === '' || $dominioCached !== $host) {
+                return null;
+            }
+        }
+
+        return [
+            'id' => (int) $decoded['id'],
+            'slug' => (string) $decoded['slug'],
+            'dominio' => isset($decoded['dominio']) ? (string) $decoded['dominio'] : null,
+            'ativo' => 1,
+        ];
     }
 
     public static function hostFromRequest(): string
@@ -162,7 +239,7 @@ class TenantResolver
     private function resolveBySlug(string $slug): ?array
     {
         $stmt = $this->masterPdo->prepare(
-            "SELECT id, slug, dominio FROM escolas WHERE slug = :slug AND ativo = 1 LIMIT 1"
+            "SELECT id, slug, dominio, ativo FROM escolas WHERE slug = :slug AND ativo = 1 LIMIT 1"
         );
         $stmt->execute(['slug' => $slug]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -173,13 +250,14 @@ class TenantResolver
             'id' => (int) $row['id'],
             'slug' => (string) ($row['slug'] ?? ''),
             'dominio' => isset($row['dominio']) ? (string) $row['dominio'] : null,
+            'ativo' => 1,
         ];
     }
 
     private function resolveByDominio(string $dominio): ?array
     {
         $stmt = $this->masterPdo->prepare(
-            "SELECT id, slug, dominio FROM escolas WHERE dominio = :dominio AND ativo = 1 LIMIT 1"
+            "SELECT id, slug, dominio, ativo FROM escolas WHERE dominio = :dominio AND ativo = 1 LIMIT 1"
         );
         $stmt->execute(['dominio' => $dominio]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -190,6 +268,7 @@ class TenantResolver
             'id' => (int) $row['id'],
             'slug' => (string) ($row['slug'] ?? ''),
             'dominio' => isset($row['dominio']) ? (string) $row['dominio'] : null,
+            'ativo' => 1,
         ];
     }
 

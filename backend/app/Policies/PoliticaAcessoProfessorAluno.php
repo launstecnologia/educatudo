@@ -73,8 +73,12 @@ class PoliticaAcessoProfessorAluno
     {
         $ids = [];
 
+        if (!$this->professorEstaAtivo($professorId)) {
+            return [];
+        }
+
         $professor = $this->db->fetch(
-            'SELECT turmas FROM professores WHERE id = :id AND (ativo = 1 OR ativo IS NULL) LIMIT 1',
+            'SELECT turmas FROM professores WHERE id = :id AND ativo = 1 LIMIT 1',
             ['id' => $professorId]
         );
         if ($professor) {
@@ -116,6 +120,11 @@ class PoliticaAcessoProfessorAluno
             return false;
         }
 
+        // Fail closed: professor inativo nunca autoriza vínculo (jornada ou JSON turmas).
+        if (!$this->professorEstaAtivo($professorId)) {
+            return false;
+        }
+
         $aluno = $this->db->fetch(
             'SELECT a.id, a.turma_id, a.ativo
              FROM alunos a
@@ -141,6 +150,17 @@ class PoliticaAcessoProfessorAluno
         }
 
         return $this->professorLecionaTurmaPorCadastro($professorId, $turmaId);
+    }
+
+    /** Exige ativo = 1 (mesmo critério do login). */
+    private function professorEstaAtivo(int $professorId): bool
+    {
+        $professor = $this->db->fetch(
+            'SELECT id FROM professores WHERE id = :id AND ativo = 1 LIMIT 1',
+            ['id' => $professorId]
+        );
+
+        return (bool) $professor;
     }
 
     /**
@@ -194,7 +214,7 @@ class PoliticaAcessoProfessorAluno
     private function professorLecionaTurmaPorCadastro(int $professorId, int $turmaId): bool
     {
         $professor = $this->db->fetch(
-            'SELECT turmas FROM professores WHERE id = :id AND (ativo = 1 OR ativo IS NULL) LIMIT 1',
+            'SELECT turmas FROM professores WHERE id = :id AND ativo = 1 LIMIT 1',
             ['id' => $professorId]
         );
         if (!$professor) {

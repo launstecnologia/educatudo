@@ -153,4 +153,47 @@ final class PoliticaAcessoProfessorAlunoTest extends TestCase
 
         $this->assertSame([619], $ids);
     }
+
+    public function testProfessorInativoComJornadaAtivaNaoAcessa(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo) VALUES (10, 5, 1)");
+        $pdo->exec("INSERT INTO professores (id, turmas, ativo) VALUES (7, '[]', 0)");
+        $pdo->exec("INSERT INTO jornadas (id, professor_id, turma_id, ativo) VALUES (1, 7, 5, 1)");
+
+        $politica = new PoliticaAcessoProfessorAluno($this->db($pdo));
+        $this->assertFalse($politica->podeAcessar(7, 10));
+    }
+
+    public function testProfessorInativoComTurmasJsonNaoAcessa(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo) VALUES (619, 24, 1)");
+        $pdo->exec("INSERT INTO professores (id, turmas, ativo) VALUES (56, '[24]', 0)");
+
+        $politica = new PoliticaAcessoProfessorAluno($this->db($pdo));
+        $this->assertFalse($politica->podeAcessar(56, 619));
+    }
+
+    public function testAlunoInativoNaoAcessa(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo) VALUES (619, 24, 0)");
+        $pdo->exec("INSERT INTO professores (id, turmas, ativo) VALUES (56, '[24]', 1)");
+
+        $politica = new PoliticaAcessoProfessorAluno($this->db($pdo));
+        $this->assertFalse($politica->podeAcessar(56, 619));
+    }
+
+    public function testListarAlunosVinculadosProfessorInativoRetornaVazio(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec("INSERT INTO turmas (id, nome) VALUES (24, '1A')");
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo, nome, ra) VALUES (619, 24, 1, 'Aluno A', 'RA1')");
+        $pdo->exec("INSERT INTO professores (id, turmas, ativo) VALUES (56, '[24]', 0)");
+        $pdo->exec("INSERT INTO jornadas (id, professor_id, turma_id, ativo) VALUES (1, 56, 24, 1)");
+
+        $politica = new PoliticaAcessoProfessorAluno($this->db($pdo));
+        $this->assertSame([], $politica->listarAlunosVinculados(56));
+    }
 }

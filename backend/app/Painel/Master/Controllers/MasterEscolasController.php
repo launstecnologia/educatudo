@@ -18,7 +18,7 @@ use App\Core\MasterTenantConnection;
 use App\Services\MediaStorageService;
 use App\Core\ModuloCatalogo;
 use App\Core\MysqlProvisioningService;
-use App\Core\RedisCache;
+use App\Core\TenantResolver;
 if (!class_exists(__NAMESPACE__ . '\\MasterEscolasController', false)) {
 
 class MasterEscolasController extends BaseController
@@ -83,22 +83,7 @@ class MasterEscolasController extends BaseController
 
     private function invalidarCacheResolucaoTenant(array $escola): void
     {
-        $id = (int) ($escola['id'] ?? 0);
-        $slug = strtolower(trim((string) ($escola['slug'] ?? '')));
-        $dominio = strtolower(trim((string) ($escola['dominio'] ?? '')));
-        if ($dominio !== '' && strpos($dominio, ':') !== false) {
-            $dominio = explode(':', $dominio, 2)[0];
-        }
-
-        if ($id > 0) {
-            RedisCache::delete('tenant_config_' . $id);
-        }
-        if ($dominio !== '') {
-            RedisCache::delete('tenant_' . $dominio);
-            if ($slug !== '') {
-                RedisCache::delete('tenant_' . $dominio . '_' . $slug);
-            }
-        }
+        TenantResolver::invalidarCacheEscola($escola);
     }
 
     private function getLayoutConfig(int $escolaId): array

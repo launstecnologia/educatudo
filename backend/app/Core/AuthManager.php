@@ -519,6 +519,12 @@ class AuthManager
             $this->logout();
             return false;
         }
+
+        // Não confiar só na sessão: cadastro desativado encerra o acesso na próxima checagem.
+        if (!$this->cadastroAindaAtivoNoBanco()) {
+            $this->logout();
+            return false;
+        }
         
         // Verificar se sessão expirou
         if (isset($_SESSION['last_activity']) && time() - $_SESSION['last_activity'] > $this->config['session']['lifetime']) {
@@ -530,6 +536,65 @@ class AuthManager
         $_SESSION['last_activity'] = time();
         
         return true;
+    }
+
+    /**
+     * Revalida ativo no banco do tenant atual (fail closed em erro/ausência).
+     * Cobre professor, aluno, admin, monitor e responsável com sessão já aberta.
+     */
+    private function cadastroAindaAtivoNoBanco(): bool
+    {
+        $tipo = (string) ($_SESSION['user_type'] ?? '');
+        $id = (int) ($_SESSION['user_id'] ?? 0);
+        if ($id <= 0 || $tipo === '') {
+            return false;
+        }
+
+        try {
+            switch ($tipo) {
+                case 'admin':
+                case 'admin_escola':
+                    $row = $this->db->fetch(
+                        "SELECT ativo FROM usuarios WHERE id = :id AND tipo = 'admin_escola' LIMIT 1",
+                        ['id' => $id]
+                    );
+                    break;
+                case 'aluno':
+                    $row = $this->db->fetch(
+                        'SELECT ativo FROM alunos WHERE id = :id LIMIT 1',
+                        ['id' => $id]
+                    );
+                    break;
+                case 'professor':
+                    $row = $this->db->fetch(
+                        'SELECT ativo FROM professores WHERE id = :id LIMIT 1',
+                        ['id' => $id]
+                    );
+                    break;
+                case 'monitor':
+                    $row = $this->db->fetch(
+                        'SELECT ativo FROM monitores WHERE id = :id LIMIT 1',
+                        ['id' => $id]
+                    );
+                    break;
+                case 'pai':
+                    $row = $this->db->fetch(
+                        'SELECT ativo FROM responsaveis WHERE id = :id LIMIT 1',
+                        ['id' => $id]
+                    );
+                    break;
+                default:
+                    return false;
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        if (!is_array($row)) {
+            return false;
+        }
+
+        return (int) ($row['ativo'] ?? 0) === 1;
     }
     
     /**

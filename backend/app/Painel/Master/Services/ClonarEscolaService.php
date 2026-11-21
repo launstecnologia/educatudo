@@ -12,7 +12,7 @@ use App\Core\LayoutHelper;
 use App\Core\MasterSecretVault;
 use App\Dominio\Escola\Services\DominioEscolaService;
 use App\Core\MysqlProvisioningService;
-use App\Core\RedisCache;
+use App\Core\TenantResolver;
 
 class ClonarEscolaService
 {
@@ -947,20 +947,7 @@ class ClonarEscolaService
         $st = $pdo->prepare('SELECT id, slug, dominio FROM escolas WHERE id = :id LIMIT 1');
         $st->execute(['id' => $escolaId]);
         $escola = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
-        if ($escolaId > 0) {
-            RedisCache::delete('tenant_config_' . $escolaId);
-        }
-        $slug = strtolower(trim((string) ($escola['slug'] ?? '')));
-        $dominio = strtolower(trim((string) ($escola['dominio'] ?? '')));
-        if ($dominio !== '' && strpos($dominio, ':') !== false) {
-            $dominio = explode(':', $dominio, 2)[0];
-        }
-        if ($dominio !== '') {
-            RedisCache::delete('tenant_' . $dominio);
-            if ($slug !== '') {
-                RedisCache::delete('tenant_' . $dominio . '_' . $slug);
-            }
-        }
+        TenantResolver::invalidarCacheEscola(is_array($escola) ? $escola : ['id' => $escolaId]);
         LayoutHelper::invalidateCacheDaEscola($escolaId);
     }
 

@@ -45,7 +45,7 @@ class ChatController extends BaseController
             return null;
         }
         $professor = $this->db->fetch(
-            'SELECT * FROM professores WHERE id = :user_id LIMIT 1',
+            'SELECT * FROM professores WHERE id = :user_id AND ativo = 1 LIMIT 1',
             ['user_id' => (int) $user['id']]
         );
         return $professor ?: null;
@@ -61,7 +61,7 @@ class ChatController extends BaseController
             'SELECT a.*, t.nome as turma_nome
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
-             WHERE a.id = :user_id
+             WHERE a.id = :user_id AND a.ativo = 1
              LIMIT 1',
             ['user_id' => (int) $user['id']]
         );
@@ -96,10 +96,11 @@ class ChatController extends BaseController
             return;
         }
         
-        $professor = $this->db->fetch(
-            "SELECT * FROM professores WHERE id = :user_id",
-            ['user_id' => $user['id']]
-        );
+        $professor = $this->professorDaSessao();
+        if (!$professor) {
+            $this->negarAcessoChat('/professor');
+            return;
+        }
         
         // Conversas do professor — só alunos com vínculo escolar ainda válido
         $conversasBrutas = $this->db->fetchAll(
@@ -286,7 +287,7 @@ class ChatController extends BaseController
                     error_log("=== chatProfessor - Stack trace: " . $e->getTraceAsString() . " ===");
                 }
             }
-            $_SESSION['error_message'] = 'Erro ao carregar chat: ' . $e->getMessage();
+            $_SESSION['error_message'] = 'Erro ao carregar chat.';
             $this->redirect('/professor/chat');
             return;
         }
@@ -379,7 +380,11 @@ class ChatController extends BaseController
             $this->json(['success' => true, 'mensagem' => $mensagem_criada]);
             
         } catch (\Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
+            $msg = $e->getMessage();
+            $seguro = in_array($msg, ['Aluno e mensagem são obrigatórios', 'Token inválido'], true)
+                ? $msg
+                : 'Não foi possível enviar a mensagem.';
+            $this->json(['error' => $seguro], 400);
         }
     }
     
@@ -400,7 +405,8 @@ class ChatController extends BaseController
             $ultima_mensagem_id = (int) ($_GET['ultima_mensagem_id'] ?? 0);
             
             if ($alunoId <= 0) {
-                throw new \Exception('Aluno é obrigatório');
+                $this->json(['error' => 'Aluno é obrigatório'], 400);
+                return;
             }
             
             $professor = $this->professorDaSessao();
@@ -468,7 +474,7 @@ class ChatController extends BaseController
             $this->json(['success' => true, 'mensagens' => $mensagens]);
             
         } catch (\Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
+            $this->json(['error' => 'Não foi possível buscar as mensagens.'], 400);
         }
     }
     
@@ -526,7 +532,7 @@ class ChatController extends BaseController
         // Professores da turma: mesma regra da política (jornada e/ou JSON turmas)
         $candidatos = $this->db->fetchAll(
             "SELECT p.* FROM professores p
-             WHERE (p.ativo = 1 OR p.ativo IS NULL)
+             WHERE p.ativo = 1
              ORDER BY p.nome ASC"
         );
         $professores_turma = [];
@@ -575,7 +581,7 @@ class ChatController extends BaseController
         }
         
         $professor = $this->db->fetch(
-            "SELECT * FROM professores WHERE id = :prof_id AND (ativo = 1 OR ativo IS NULL)",
+            "SELECT * FROM professores WHERE id = :prof_id AND ativo = 1",
             ['prof_id' => $professorId]
         );
         
@@ -737,7 +743,11 @@ class ChatController extends BaseController
             $this->json(['success' => true, 'mensagem' => $mensagem_criada]);
             
         } catch (\Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
+            $msg = $e->getMessage();
+            $seguro = in_array($msg, ['Professor e mensagem são obrigatórios', 'Token inválido'], true)
+                ? $msg
+                : 'Não foi possível enviar a mensagem.';
+            $this->json(['error' => $seguro], 400);
         }
     }
     
@@ -758,7 +768,8 @@ class ChatController extends BaseController
             $ultima_mensagem_id = (int) ($_GET['ultima_mensagem_id'] ?? 0);
             
             if ($professorId <= 0) {
-                throw new \Exception('Professor é obrigatório');
+                $this->json(['error' => 'Professor é obrigatório'], 400);
+                return;
             }
             
             $aluno = $this->alunoDaSessao();
@@ -825,7 +836,7 @@ class ChatController extends BaseController
             $this->json(['success' => true, 'mensagens' => $mensagens]);
             
         } catch (\Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
+            $this->json(['error' => 'Não foi possível buscar as mensagens.'], 400);
         }
     }
     
