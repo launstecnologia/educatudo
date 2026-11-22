@@ -143,7 +143,7 @@ $veBannerOrigem = true;
                     class="ve-pill px-3 py-1.5 rounded-full <?= $veAba === $chave ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
                     data-ve-aba="<?= $esc($chave) ?>"
                     <?php if (!empty($meta['perm_key'])): ?>data-perm-key="<?= $esc($meta['perm_key']) ?>" data-perm-action="visualizar"<?php endif; ?>
-                    data-csp-click="selecionarVeAba" data-csp-arg="&lt;?= $esc($chave) ?&gt;">
+                    data-csp-click="selecionarVeAba" data-csp-arg="<?= $esc($chave) ?>">
                 <i class="fa-solid <?= $esc($meta['icon']) ?> mr-1 text-xs"></i><?= $esc($meta['label']) ?>
             </button>
         <?php endforeach; ?>
