@@ -164,6 +164,28 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringNotContainsString('data-csp-on-id=removerModulo', $out);
     }
 
+    public function testMigrarOnIgnoraFechamentoDoBodyDentroDeScript(): void
+    {
+        $scriptOriginal = <<<'HTML'
+<script>
+function imprimir() {
+    win.document.write('</body></html>');
+    win.document.close();
+}
+</script>
+HTML;
+        $fragmento = '<button onclick="imprimir()">Imprimir</button>' . $scriptOriginal;
+        $fechamento = '</body></html>';
+        $pagina = '<!DOCTYPE html><html><body>' . $fragmento . $fechamento;
+
+        $saidaFragmento = CspPolitica::migrarAtributosOnParaScriptNonce($fragmento);
+        $saidaPagina = CspPolitica::migrarAtributosOnParaScriptNonce($pagina);
+
+        $this->assertStringContainsString($scriptOriginal . '<script ' . CspPolitica::attrNonce() . '>', $saidaFragmento);
+        $this->assertStringEndsWith('</script>', $saidaFragmento);
+        $this->assertSame('<!DOCTYPE html><html><body>' . $saidaFragmento . $fechamento, $saidaPagina);
+    }
+
     public function testUrlAssetEstaticoUsaStaticSemPublicEComCacheBust(): void
     {
         $url = CspPolitica::urlAssetEstatico('js/csp-event-delegation.js');

@@ -245,12 +245,8 @@ final class CspPolitica
             $protegido
         );
 
-        if ($slots !== []) {
-            $protegido = str_replace(array_keys($slots), array_values($slots), $protegido);
-        }
-
         if ($handlers === []) {
-            return $protegido;
+            return strtr($protegido, $slots);
         }
 
         $jsParts = ["(function(){"];
@@ -269,10 +265,14 @@ final class CspPolitica
         $jsParts[] = "})();";
         $script = '<script ' . self::attrNonce() . '>' . implode('', $jsParts) . '</script>';
 
-        if (stripos($protegido, '</body>') !== false) {
-            return (string) preg_replace('/<\/body>/i', $script . '</body>', $protegido, 1);
-        }
-        return $protegido . $script;
+        // Procura o fechamento do body antes de restaurar os blocos protegidos,
+        // que podem conter HTML em strings JavaScript (por exemplo, para impressão).
+        $fimBody = stripos($protegido, '</body>');
+        $protegido = $fimBody === false
+            ? $protegido . $script
+            : substr_replace($protegido, $script, $fimBody, 0);
+
+        return strtr($protegido, $slots);
     }
 
     /** Pipeline completo para HTML de views (nonce em <script> + migração on*). */
