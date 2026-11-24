@@ -8179,6 +8179,15 @@ $boletimWizardSteps = [
         return !!(c && (c.codigo === 'media_sem' || c.layout_type === 'media_sem'));
     }
 
+    /**
+     * No Colag, S1–S8 já saem no bloco N/Q da prova semanal.
+     * Não repetir como coluna solta no fim do demonstrativo.
+     */
+    function codigoEhSemanaSoltaColag(codigo) {
+        if (!ehQuadroPecasColag()) return false;
+        return /^s[1-8]$/.test(String(codigo || '').toLowerCase());
+    }
+
     function ordenarColunasLista(cols) {
         // Preferência: ordem dos chips nos cabeçalhos (linhas_layout) + soltas.
         var ordem = ordemColunasApartirDoLayout();
@@ -8325,7 +8334,7 @@ $boletimWizardSteps = [
 
     function mesclarColunasExtrasDoEstado(cols) {
         cols = (cols || []).slice().filter(function (c) {
-            return c && c.codigo && !colunaOculta(c.codigo);
+            return c && c.codigo && !colunaOculta(c.codigo) && !codigoEhSemanaSoltaColag(c.codigo);
         });
         var vistos = {};
         var vivos = codigosVivosDoRascunho();
@@ -8371,7 +8380,7 @@ $boletimWizardSteps = [
         });
         function add(codigo, nome, tipo) {
             codigo = String(codigo || '');
-            if (!codigo || vistos[codigo] || colunaOculta(codigo)) return;
+            if (!codigo || vistos[codigo] || colunaOculta(codigo) || codigoEhSemanaSoltaColag(codigo)) return;
             var low = String(codigo).toLowerCase();
             var ehCalc = (estado.blocos_calc || []).indexOf(codigo) >= 0
                 || (estado.blocos_calc || []).indexOf(low) >= 0
