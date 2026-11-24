@@ -51,6 +51,8 @@ $rotulosOrigem = [
     'jornada_reuso' => 'Reutilizada',
     'banco_questoes' => 'Banco de questões',
     'banco_manual' => 'Criada no banco',
+    'banco_ia' => 'Gerada pela Tudinha',
+    'banco_transcricao' => 'Transcrita',
     'prova_manual' => 'Criada na prova',
     'api_externa' => 'Catálogo externo',
 ];
@@ -64,6 +66,11 @@ $rotulosNivel = ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difíci
 $badgeNivel = ['facil' => 'ativo', 'medio' => 'pendente', 'dificil' => 'erro'];
 
 ob_start();
+?>
+<button type="button" data-csp-click="abrirModalNovaQuestao" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700">
+    Nova questão
+</button>
+<?php
 $ui_btn_variant = 'filtro';
 $ui_btn_label = 'Filtros';
 $ui_btn_icon = 'fa-solid fa-filter';
@@ -88,8 +95,18 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
     </div>
 <?php endif; ?>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-4">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Nova questão</h2>
+<div id="modal-nova-questao" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" style="display: none;">
+    <div class="bg-white rounded-xl shadow-2xl p-4 md:p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Nova questão</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <?php if (\App\Core\CreditosModuleRegistry::gerarExercicioProvaLiberado()): ?>
+                <button type="button" data-csp-click="abrirModalGerarIaBanco" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Gerar com a Tudinha</button>
+                <?php endif; ?>
+                <button type="button" data-csp-click="abrirModalTranscreverBanco" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">Transcrever</button>
+                <button type="button" data-csp-click="fecharModalNovaQuestao" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+        </div>
     <form id="form-nova-questao" method="post" action="<?= URL ?>/professor/questoes/criar" class="questao-form space-y-4">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
         <input type="hidden" name="enunciado" id="banco-enunciado">
@@ -148,6 +165,68 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         </div>
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Adicionar Questão</button>
     </form>
+    </div>
+</div>
+
+<div id="modal-gerar-ia-banco" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[60]" style="display: none;">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-900">Gerar com a Tudinha</h3>
+            <button type="button" data-csp-click="fecharModalGerarIaBanco" class="text-gray-400 hover:text-gray-600" aria-label="Fechar"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form id="form-gerar-ia-banco" class="space-y-4">
+            <div>
+                <label for="ia-materia" class="block text-sm font-medium text-gray-700 mb-1.5">Matéria</label>
+                <input id="ia-materia" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex.: Biologia">
+            </div>
+            <div>
+                <label for="ia-contexto" class="block text-sm font-medium text-gray-700 mb-1.5">Contexto</label>
+                <textarea id="ia-contexto" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Tema, objetivos ou o que a questão deve cobrar"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="ia-tipo" class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
+                    <select id="ia-tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                        <option value="alternativas">Múltipla Escolha</option>
+                        <option value="verdadeiro_falso">Verdadeiro ou Falso</option>
+                        <option value="dissertativa">Dissertativa</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="ia-serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                    <input id="ia-serie" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex.: 1ª série EM">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label class="text-sm text-gray-700">Fácil<input id="ia-facil" type="number" min="0" max="20" value="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"></label>
+                <label class="text-sm text-gray-700">Médio<input id="ia-medio" type="number" min="0" max="20" value="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"></label>
+                <label class="text-sm text-gray-700">Difícil<input id="ia-dificil" type="number" min="0" max="20" value="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"></label>
+                <label class="text-sm text-gray-700">Desafio<input id="ia-desafio" type="number" min="0" max="20" value="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"></label>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" data-csp-click="fecharModalGerarIaBanco" class="px-4 py-2 bg-gray-500 text-white rounded-lg">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Gerar questões</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modal-transcrever-banco" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[60]" style="display: none;">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-900">Transcrever</h3>
+            <button type="button" data-csp-click="fecharModalTranscreverBanco" class="text-gray-400 hover:text-gray-600" aria-label="Fechar"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <form id="form-transcrever-banco" class="space-y-4" enctype="multipart/form-data">
+            <p class="text-sm text-gray-600">Envie o PDF ou a imagem da questão. O texto, as alternativas e o gabarito entram no banco.</p>
+            <input id="arquivo-transcrever-banco" name="imagem" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" class="block w-full text-sm text-gray-700">
+            <p id="transcrever-status" class="hidden text-sm text-green-700">Lendo o arquivo e separando as questões...</p>
+            <div class="flex justify-end gap-3">
+                <button type="button" data-csp-click="fecharModalTranscreverBanco" class="px-4 py-2 bg-gray-500 text-white rounded-lg">Cancelar</button>
+                <button type="submit" id="btn-transcrever-banco" class="px-4 py-2 bg-green-600 text-white rounded-lg">Transcrever</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <form id="form-questoes" method="post" class="space-y-4">
@@ -470,6 +549,147 @@ include $ui . '/offcanvas.php';
 </div>
 
 <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
+var tokenBanco = <?= json_encode((string) ($csrf_token ?? '')) ?>;
+var urlStatusJob = <?= json_encode(rtrim((string) URL, '/') . '/professor/ai-job/') ?>;
+function abrirModal(id) {
+    var modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+function fecharModal(id) {
+    var modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+}
+function abrirModalNovaQuestao() { abrirModal('modal-nova-questao'); }
+function fecharModalNovaQuestao() { fecharModal('modal-nova-questao'); }
+function abrirModalGerarIaBanco() { abrirModal('modal-gerar-ia-banco'); }
+function fecharModalGerarIaBanco() { fecharModal('modal-gerar-ia-banco'); }
+function abrirModalTranscreverBanco() { abrirModal('modal-transcrever-banco'); }
+function fecharModalTranscreverBanco() { fecharModal('modal-transcrever-banco'); }
+function esperarJob(jobId) {
+    var tentativas = 0;
+    return new Promise(function (resolve, reject) {
+        function consultar() {
+            tentativas++;
+            if (tentativas > 90) {
+                reject(new Error('A operação demorou demais. Tente de novo.'));
+                return;
+            }
+            fetch(urlStatusJob + jobId + '/status', { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (resposta) { return resposta.json(); })
+                .then(function (data) {
+                    if (data.status === 'done') {
+                        resolve(data);
+                        return;
+                    }
+                    if (data.status === 'failed' || data.status === 'error' || data.status === 'not_found') {
+                        reject(new Error(data.error || 'Não foi possível concluir.'));
+                        return;
+                    }
+                    setTimeout(consultar, 2000);
+                })
+                .catch(reject);
+        }
+        consultar();
+    });
+}
+document.getElementById('form-gerar-ia-banco')?.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var pedidos = {
+        'Fácil': parseInt(document.getElementById('ia-facil').value, 10) || 0,
+        'Médio': parseInt(document.getElementById('ia-medio').value, 10) || 0,
+        'Difícil': parseInt(document.getElementById('ia-dificil').value, 10) || 0,
+        'Desafio': parseInt(document.getElementById('ia-desafio').value, 10) || 0
+    };
+    var total = pedidos['Fácil'] + pedidos['Médio'] + pedidos['Difícil'] + pedidos['Desafio'];
+    if (total <= 0) {
+        alert('Informe a quantidade em pelo menos um nível.');
+        return;
+    }
+    var botao = event.submitter;
+    if (botao) botao.disabled = true;
+    fetch(<?= json_encode(rtrim((string) URL, '/') . '/professor/questoes/gerar-ia') ?>, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({
+            _token: tokenBanco,
+            materia: document.getElementById('ia-materia').value,
+            contexto: document.getElementById('ia-contexto').value,
+            tipo: document.getElementById('ia-tipo').value,
+            serie: document.getElementById('ia-serie').value,
+            quantidades_por_nivel: pedidos
+        })
+    }).then(function (resposta) { return resposta.json(); })
+        .then(function (data) {
+            if (!data.success || !data.job_id) throw new Error(data.error || 'Não foi possível gerar.');
+            return esperarJob(data.job_id).then(function () {
+                return fetch(<?= json_encode(rtrim((string) URL, '/') . '/professor/questoes/importar-ia') ?>, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ _token: tokenBanco, job_id: data.job_id })
+                }).then(function (resposta) { return resposta.json(); });
+            });
+        })
+        .then(function (data) {
+            if (!data.success) throw new Error(data.error || 'Não foi possível salvar as questões.');
+            window.location.href = <?= json_encode(rtrim((string) URL, '/') . '/professor/questoes?success=') ?> + encodeURIComponent(data.message || 'Questões adicionadas ao banco.');
+        })
+        .catch(function (erro) {
+            alert(erro.message || 'Não foi possível gerar as questões.');
+            if (botao) botao.disabled = false;
+        });
+});
+document.getElementById('form-transcrever-banco')?.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var arquivo = document.getElementById('arquivo-transcrever-banco');
+    if (!arquivo || !arquivo.files || !arquivo.files[0]) {
+        alert('Selecione um PDF ou uma imagem.');
+        return;
+    }
+    var dados = new FormData();
+    dados.append('_token', tokenBanco);
+    dados.append('imagem', arquivo.files[0]);
+    var materia = document.getElementById('banco-materia');
+    var status = document.getElementById('transcrever-status');
+    var botao = document.getElementById('btn-transcrever-banco');
+    if (status) status.classList.remove('hidden');
+    if (botao) botao.disabled = true;
+    fetch(<?= json_encode(rtrim((string) URL, '/') . '/professor/questoes/transcrever') ?>, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: dados
+    }).then(function (resposta) { return resposta.json(); })
+        .then(function (data) {
+            if (!data.success || !data.job_id) throw new Error(data.error || 'Não foi possível transcrever.');
+            return esperarJob(data.job_id).then(function () {
+                return fetch(<?= json_encode(rtrim((string) URL, '/') . '/professor/questoes/importar-transcricao') ?>, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({
+                        _token: tokenBanco,
+                        job_id: data.job_id,
+                        materia: materia ? materia.value : ''
+                    })
+                }).then(function (resposta) { return resposta.json(); });
+            });
+        })
+        .then(function (data) {
+            if (!data.success) throw new Error(data.error || 'Não foi possível salvar a transcrição.');
+            window.location.href = <?= json_encode(rtrim((string) URL, '/') . '/professor/questoes?success=') ?> + encodeURIComponent(data.message || 'Questões transcritas no banco.');
+        })
+        .catch(function (erro) {
+            alert(erro.message || 'Não foi possível transcrever.');
+            if (status) status.classList.add('hidden');
+            if (botao) botao.disabled = false;
+        });
+});
 var bancoOpcoes = 0;
 var bancoLetras = ['A', 'B', 'C', 'D', 'E'];
 function fmtBancoEnunciado(cmd) {

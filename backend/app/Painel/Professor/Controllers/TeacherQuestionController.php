@@ -279,6 +279,251 @@ class TeacherQuestionController extends BaseController
         $this->redirect('/professor/questoes?success=' . urlencode('Questão adicionada ao banco.'));
     }
 
+    public function gerarIa(): void
+    {
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        $body = $this->corpoJson();
+        if (!$this->verifyCsrfToken((string) ($body['_token'] ?? ''))) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 403);
+            return;
+        }
+        $materia = trim((string) ($body['materia'] ?? ''));
+        $contexto = trim((string) ($body['contexto'] ?? ''));
+        $serie = trim((string) ($body['serie'] ?? ''));
+        $tipo = (string) ($body['tipo'] ?? 'alternativas');
+        if (!in_array($tipo, ['alternativas', 'verdadeiro_falso', 'dissertativa'], true)) {
+            $tipo = 'alternativas';
+        }
+        $pedidos = is_array($body['quantidades_por_nivel'] ?? null) ? $body['quantidades_por_nivel'] : [];
+        $total = 0;
+        $partes = [];
+        foreach (['Fácil', 'Médio', 'Difícil', 'Desafio'] as $nivel) {
+            $qtd = max(0, (int) ($pedidos[$nivel] ?? 0));
+            if ($qtd > 20) {
+                $qtd = 20;
+            }
+            if ($qtd > 0) {
+                $total += $qtd;
+                $partes[] = $qtd . ' ' . $nivel;
+            }
+        }
+        if ($total <= 0) {
+            $this->json(['error' => 'Informe a quantidade em pelo menos um nível.'], 400);
+            return;
+        }
+        if ($materia === '' && $contexto === '') {
+            $this->json(['error' => 'Informe a matéria ou o contexto da questão.'], 400);
+            return;
+        }
+        $contextoPedido = $contexto;
+        if ($partes !== []) {
+            $contextoPedido = trim($contextoPedido . "\nQuantidades por nível: " . implode(', ', $partes) . '.');
+        }
+        $referencia = null;
+        try {
+            $referencia = $this->reservarCreditoIa($user, 'gerar_ia_banco');
+            $jobId = \App\Services\AIJobService::enqueue('gerar_prova', [
+                'destino' => 'banco_professor',
+                'professor_id' => $professorId,
+                'tema' => $materia !== '' ? $materia : 'Questões',
+                'materia' => $materia !== '' ? $materia : 'Geral',
+                'quantidade' => $total,
+                'nivel' => implode(', ', array_map(static function (string $parte): string {
+                    return preg_replace('/^\d+\s+/', '', $parte) ?: $parte;
+                }, $partes)),
+                'contexto_adicional' => $contextoPedido,
+                'tipo' => $tipo,
+                'serie' => $serie,
+                'com_imagens' => !empty($body['com_imagens']),
+                'credits_ref' => $referencia,
+                'credits_modulo' => $referencia !== null ? 'gerar_exercicio_ia_professor' : null,
+            ], $professorId, 'professor');
+        } catch (\Throwable $e) {
+            if ($referencia !== null) {
+                try {
+                    (new \App\Services\CreditosService())->estornarPorReferencia('gerar_exercicio_ia_professor', $referencia);
+                } catch (\Throwable $estorno) {
+                    error_log('Estorno da geração do banco: ' . $estorno->getMessage());
+                }
+            }
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+        $this->json(['success' => true, 'job_id' => $jobId]);
+    }
+
+    public function importarIa(): void
+    {
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        $body = $this->corpoJson();
+        if (!$this->verifyCsrfToken((string) ($body['_token'] ?? ''))) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 403);
+            return;
+        }
+        $job = $this->jobDoProfessor((int) ($body['job_id'] ?? 0), $professorId, 'gerar_prova');
+        if ($job === null) {
+            $this->json(['error' => 'A geração não foi encontrada.'], 404);
+            return;
+        }
+        if ((string) ($job['status'] ?? '') !== 'done') {
+            $this->json(['error' => 'A geração ainda não terminou.'], 409);
+            return;
+        }
+        $referencia = 'job:' . (int) $job['id'];
+        if ($this->jaImportou($professorId, $referencia)) {
+            $this->json(['success' => true, 'message' => 'As questões já estavam no banco.']);
+            return;
+        }
+        $resultado = json_decode((string) ($job['result'] ?? ''), true);
+        $exercicios = is_array($resultado) ? ($resultado['exercicios'] ?? $resultado['questoes'] ?? []) : [];
+        $payload = json_decode((string) ($job['payload'] ?? ''), true);
+        $materia = is_array($payload) ? (string) ($payload['materia'] ?? '') : '';
+        $tipoPedido = is_array($payload) ? (string) ($payload['tipo'] ?? 'alternativas') : 'alternativas';
+        $salvas = $this->gravarQuestoesGeradas($professorId, is_array($exercicios) ? $exercicios : [], $materia, $tipoPedido, $referencia, 'banco_ia');
+        if ($salvas <= 0) {
+            $this->json(['error' => 'A Tudinha não devolveu questões que pudessem entrar no banco.'], 422);
+            return;
+        }
+        $this->json(['success' => true, 'message' => $salvas . ' questão(ões) adicionada(s) ao banco.']);
+    }
+
+    public function transcrever(): void
+    {
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        if (!$this->verifyCsrfToken((string) ($_POST['_token'] ?? ''))) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 403);
+            return;
+        }
+        $arquivo = null;
+        $referencia = null;
+        try {
+            if (empty($_FILES['imagem']) || (int) ($_FILES['imagem']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new \RuntimeException('Envie um PDF ou uma imagem da questão.');
+            }
+            $imagem = $_FILES['imagem'];
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? (string) finfo_file($finfo, (string) $imagem['tmp_name']) : '';
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            $permitidos = [
+                'image/png' => 'png',
+                'image/jpeg' => 'jpg',
+                'image/jpg' => 'jpg',
+                'image/webp' => 'webp',
+                'application/pdf' => 'pdf',
+            ];
+            if (!isset($permitidos[$mime])) {
+                throw new \RuntimeException('Use PDF, PNG, JPG ou WEBP.');
+            }
+            if ((int) $imagem['size'] > 15 * 1024 * 1024) {
+                throw new \RuntimeException('Arquivo muito grande. Tamanho máximo: 15MB.');
+            }
+            $slug = defined('TENANT_SLUG') ? strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG)) : '';
+            if ($slug === '') {
+                throw new \RuntimeException('Não foi possível preparar o arquivo desta escola.');
+            }
+            $dir = dirname(__DIR__, 4) . '/storage/tmp/questao_transcricao/' . $slug;
+            if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+                throw new \RuntimeException('Não foi possível preparar o arquivo.');
+            }
+            $path = $dir . '/questao-' . $professorId . '-' . bin2hex(random_bytes(8)) . '.' . $permitidos[$mime];
+            if (!move_uploaded_file((string) $imagem['tmp_name'], $path)) {
+                throw new \RuntimeException('Não foi possível guardar o arquivo.');
+            }
+            @chmod($path, 0600);
+            $arquivo = $path;
+            $referencia = $this->reservarCreditoIa($user, 'transcrever_banco');
+            $jobId = \App\Services\AIJobService::enqueue('transcrever_questao_arquivo', [
+                'destino' => 'banco_professor',
+                'professor_id' => $professorId,
+                'arquivo' => [
+                    'path' => $path,
+                    'slug' => $slug,
+                    'mime' => $mime,
+                    'paginas_json' => '',
+                ],
+                'usuario_id' => $professorId,
+                'credits_ref' => $referencia,
+                'credits_modulo' => $referencia !== null ? 'gerar_exercicio_ia_professor' : null,
+            ], $professorId, 'professor');
+            $this->json([
+                'success' => true,
+                'job_id' => $jobId,
+                'message' => 'Arquivo enviado. A transcrição está em andamento.',
+            ]);
+        } catch (\Throwable $e) {
+            if ($arquivo !== null && is_file($arquivo)) {
+                @unlink($arquivo);
+            }
+            if ($referencia !== null) {
+                try {
+                    (new \App\Services\CreditosService())->estornarPorReferencia('gerar_exercicio_ia_professor', $referencia);
+                } catch (\Throwable $estorno) {
+                    error_log('Estorno da transcrição do banco: ' . $estorno->getMessage());
+                }
+            }
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function importarTranscricao(): void
+    {
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        $body = $this->corpoJson();
+        if (!$this->verifyCsrfToken((string) ($body['_token'] ?? ''))) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 403);
+            return;
+        }
+        $job = $this->jobDoProfessor((int) ($body['job_id'] ?? 0), $professorId, 'transcrever_questao_arquivo');
+        if ($job === null) {
+            $this->json(['error' => 'A transcrição não foi encontrada.'], 404);
+            return;
+        }
+        if ((string) ($job['status'] ?? '') !== 'done') {
+            $this->json(['error' => 'A transcrição ainda não terminou.'], 409);
+            return;
+        }
+        $referencia = 'job:' . (int) $job['id'];
+        if ($this->jaImportou($professorId, $referencia)) {
+            $this->json(['success' => true, 'message' => 'As questões já estavam no banco.']);
+            return;
+        }
+        $resultado = json_decode((string) ($job['result'] ?? ''), true);
+        $questoes = is_array($resultado) ? ($resultado['questoes'] ?? []) : [];
+        $salvas = 0;
+        $servico = new \App\Modulos\Provas\Services\BancoQuestaoProfessorService($this->db);
+        foreach (is_array($questoes) ? $questoes : [] as $questao) {
+            if (!is_array($questao)) {
+                continue;
+            }
+            $gravada = $servico->criarManual($professorId, [
+                'enunciado' => (string) ($questao['enunciado'] ?? ''),
+                'tipo' => (string) ($questao['tipo'] ?? 'multipla_escolha'),
+                'nivel' => 'medio',
+                'valor' => (float) ($questao['valor'] ?? 1),
+                'materia' => (string) ($body['materia'] ?? ''),
+                'alternativas' => is_array($questao['alternativas'] ?? null) ? $questao['alternativas'] : [],
+                'origem' => 'banco_transcricao',
+                'prefixo' => 'banco_transcricao',
+                'origem_referencia' => $referencia,
+                'resolucao' => (string) ($questao['explicacao'] ?? ''),
+            ]);
+            if (!empty($gravada['ok'])) {
+                $salvas++;
+            }
+        }
+        if ($salvas <= 0) {
+            $this->json(['error' => 'A transcrição não devolveu questões para o banco.'], 422);
+            return;
+        }
+        $this->json(['success' => true, 'message' => $salvas . ' questão(ões) transcrita(s) no banco.']);
+    }
+
     public function importarApi()
     {
         if (!$this->integracaoApiExternaAtiva()) {
@@ -601,6 +846,143 @@ class TeacherQuestionController extends BaseController
         }
 
         return $decoded;
+    }
+
+    /** @return array<string,mixed> */
+    private function corpoJson(): array
+    {
+        $bruto = json_decode((string) file_get_contents('php://input'), true);
+
+        return is_array($bruto) ? $bruto : $_POST;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function jobDoProfessor(int $jobId, int $professorId, string $tipo): ?array
+    {
+        if ($jobId <= 0) {
+            return null;
+        }
+        $job = \App\Services\AIJobService::getJob($jobId);
+        if (!is_array($job) || (int) ($job['user_id'] ?? 0) !== $professorId || (string) ($job['job_type'] ?? '') !== $tipo) {
+            return null;
+        }
+        $payload = json_decode((string) ($job['payload'] ?? ''), true);
+        if (!is_array($payload) || (string) ($payload['destino'] ?? '') !== 'banco_professor') {
+            return null;
+        }
+
+        return $job;
+    }
+
+    private function jaImportou(int $professorId, string $referencia): bool
+    {
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total
+               FROM professor_questoes_api
+              WHERE professor_id = :professor_id
+                AND origem_referencia = :referencia",
+            ['professor_id' => $professorId, 'referencia' => $referencia]
+        );
+
+        return (int) ($row['total'] ?? 0) > 0;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $exercicios
+     */
+    private function gravarQuestoesGeradas(int $professorId, array $exercicios, string $materia, string $tipoPedido, string $referencia, string $origem): int
+    {
+        $mapaTipo = [
+            'alternativas' => 'multipla_escolha',
+            'multipla_escolha' => 'multipla_escolha',
+            'verdadeiro_falso' => 'verdadeiro_falso',
+            'dissertativa' => 'dissertativa',
+        ];
+        $tipoPadrao = $mapaTipo[$tipoPedido] ?? 'multipla_escolha';
+        $servico = new \App\Modulos\Provas\Services\BancoQuestaoProfessorService($this->db);
+        $salvas = 0;
+        foreach ($exercicios as $exercicio) {
+            if (!is_array($exercicio)) {
+                continue;
+            }
+            $tipo = $mapaTipo[(string) ($exercicio['tipo_questao'] ?? $exercicio['tipo'] ?? '')] ?? $tipoPadrao;
+            $gravada = $servico->criarManual($professorId, [
+                'enunciado' => (string) ($exercicio['enunciado'] ?? $exercicio['pergunta'] ?? ''),
+                'tipo' => $tipo,
+                'nivel' => (string) ($exercicio['nivel'] ?? $exercicio['nivel_dificuldade'] ?? 'medio'),
+                'valor' => 1,
+                'materia' => $materia,
+                'alternativas' => $this->alternativasDaIa($exercicio['alternativas'] ?? [], (string) ($exercicio['correta'] ?? $exercicio['resposta_correta'] ?? '')),
+                'origem' => $origem,
+                'prefixo' => $origem,
+                'origem_referencia' => $referencia,
+                'resolucao' => (string) ($exercicio['explicacao'] ?? ''),
+            ]);
+            if (!empty($gravada['ok'])) {
+                $salvas++;
+            }
+        }
+
+        return $salvas;
+    }
+
+    /**
+     * @param mixed $alternativas
+     * @return list<array{texto:string,correta:int}>
+     */
+    private function alternativasDaIa($alternativas, string $correta): array
+    {
+        if (!is_array($alternativas)) {
+            return [];
+        }
+        $correta = strtoupper(trim($correta));
+        $letras = ['A', 'B', 'C', 'D', 'E'];
+        $lista = [];
+        $i = 0;
+        foreach ($alternativas as $chave => $texto) {
+            if ($i >= 5) {
+                break;
+            }
+            if (is_array($texto)) {
+                $letra = strtoupper((string) ($texto['letra'] ?? $letras[$i] ?? ''));
+                $texto = (string) ($texto['texto'] ?? '');
+            } else {
+                $letra = is_string($chave) && !is_int($chave) ? strtoupper($chave) : ($letras[$i] ?? 'A');
+                $texto = (string) $texto;
+            }
+            $lista[] = [
+                'texto' => $texto,
+                'correta' => ($correta !== '' && $letra === $correta) ? 1 : 0,
+            ];
+            $i++;
+        }
+
+        return $lista;
+    }
+
+    /**
+     * @param array<string,mixed> $user
+     */
+    private function reservarCreditoIa(array $user, string $acao): ?string
+    {
+        $creditos = new \App\Services\CreditosService();
+        $slug = defined('TENANT_SLUG') ? strtolower(trim((string) TENANT_SLUG)) : '';
+        $liberada = $slug === 'colegio-educa' && !$creditos->isCreditosHabilitado();
+        $modulo = 'gerar_exercicio_ia_professor';
+        if ($liberada || !$creditos->moduloCobraCredito($modulo) || $creditos->getCustoModulo($modulo) <= 0) {
+            return null;
+        }
+        $papel = \App\Services\CreditosService::tipoCarteiraDoUsuario((string) ($user['tipo'] ?? 'professor'));
+        $usuarioId = (int) ($user['id'] ?? 0);
+        if (!$creditos->podeConsumir($papel, $usuarioId, $modulo)) {
+            throw new \RuntimeException('TudiCoins insuficientes para esta ação.');
+        }
+        $referencia = $acao . '_' . $usuarioId . '_' . bin2hex(random_bytes(4));
+        $creditos->consumir($papel, $usuarioId, $modulo, $referencia);
+
+        return $referencia;
     }
 }
 }

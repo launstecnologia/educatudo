@@ -106,6 +106,11 @@ class BancoQuestaoProfessorService
         if (!in_array($tipo, ['multipla_escolha', 'verdadeiro_falso', 'dissertativa'], true)) {
             $tipo = 'multipla_escolha';
         }
+        $origem = (string) ($dados['origem'] ?? 'banco_manual');
+        if (!in_array($origem, ['banco_manual', 'banco_ia', 'banco_transcricao'], true)) {
+            $origem = 'banco_manual';
+        }
+        $dados['origem'] = $origem;
         $alternativas = [];
         $gabarito = '';
         if ($tipo === 'multipla_escolha') {
@@ -121,20 +126,20 @@ class BancoQuestaoProfessorService
         try {
             $this->gravar([
                 'professor_id' => $professorId,
-                'external_id' => 'banco_manual:' . $professorId . ':' . bin2hex(random_bytes(8)),
+                'external_id' => (string) ($dados['prefixo'] ?? 'banco_manual') . ':' . $professorId . ':' . bin2hex(random_bytes(8)),
                 'titulo' => $this->tituloDe($enunciado),
                 'materia' => (string) ($dados['materia'] ?? ''),
-                'assunto' => '',
+                'assunto' => (string) ($dados['assunto'] ?? ''),
                 'tipo' => $tipo,
                 'nivel' => $this->nivel((string) ($dados['nivel'] ?? 'facil')),
-                'origem' => 'banco_manual',
-                'origem_referencia' => 'banco',
+                'origem' => (string) ($dados['origem'] ?? 'banco_manual'),
+                'origem_referencia' => (string) ($dados['origem_referencia'] ?? 'banco'),
                 'enunciado' => $enunciado,
                 'alternativas' => $alternativas,
                 'gabarito' => $gabarito,
-                'resolucao' => '',
+                'resolucao' => (string) ($dados['resolucao'] ?? ''),
                 'payload' => [
-                    'origem' => 'banco',
+                    'origem' => (string) ($dados['origem'] ?? 'banco'),
                     'valor' => (float) ($dados['valor'] ?? 1),
                 ],
             ]);
