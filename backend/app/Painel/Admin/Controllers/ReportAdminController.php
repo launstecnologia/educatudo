@@ -441,7 +441,8 @@ class ReportAdminController extends AdminBaseController
                         $periodo,
                         $cursoId,
                         $pagina,
-                        20
+                        20,
+                        max(0, (int) ($_GET['modelo_documento_id'] ?? 0))
                     );
                 } catch (\Throwable $e) {
                     error_log('boletimCoordenacao vida_escolar: ' . $e->getMessage());
@@ -731,7 +732,18 @@ class ReportAdminController extends AdminBaseController
                 $this->redirect('/admin/reports/boletim-coordenacao');
                 return;
             }
-            $relatorios = [$this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId)];
+            $relatorios = [$this->montarRelatorioVidaEscolarCoordenacao(
+                $anoLetivo,
+                $turmaId,
+                $notaAbaixoDe,
+                $materiasExibicao,
+                $alunoQ,
+                $periodo,
+                $cursoId,
+                0,
+                20,
+                max(0, (int) ($_GET['modelo_documento_id'] ?? 0))
+            )];
         } else {
             $selecionados = $this->eventosVigentesBoletimCoordenacao($anoLetivo, $periodo);
             if ($selecionados === []) {
@@ -2519,6 +2531,160 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
+     * Alunos da matrícula quando ainda não existe ficha na Vida Escolar.
+     *
+     * @return list<array{aluno_id:int,aluno_nome:string,ra:string,turma_id:int,turma_nome:string,transferido:int}>
+     */
+    private function listarAlunosMatriculadosBoletimCoordenacao(int $anoLetivo, int $turmaId, string $alunoQ, int $cursoId): array
+    {
+        if ($anoLetivo <= 0 || ($turmaId <= 0 && $cursoId <= 0)) {
+            return [];
+        }
+        $turmaIds = $turmaId > 0 ? [$turmaId] : $this->idsTurmasDoCursoBoletimCoordenacao($cursoId);
+        if ($turmaIds === []) {
+            return [];
+        }
+        $params = ['ano' => $anoLetivo];
+        $marcas = [];
+        foreach ($turmaIds as $i => $id) {
+            $chave = 'turma_mat_' . $i;
+            $marcas[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($alunoQ, 'a');
+        $params = array_merge($params, $paramsAluno);
+        $in = implode(',', $marcas);
+        $sql = "SELECT a.id AS aluno_id,
+                       a.nome AS aluno_nome,
+                       a.ra,
+                       m.turma_id,
+                       t.nome AS turma_nome,
+                       MIN(CASE WHEN m.status = 'transferido' THEN 1 ELSE 0 END) AS transferido
+                FROM matricula m
+                INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id AND al.ano = :ano
+                INNER JOIN alunos a ON a.id = m.aluno_id
+                INNER JOIN turmas t ON t.id = m.turma_id
+                WHERE m.turma_id IN ({$in})
+                  AND m.status IN ('ativa', 'concluido', 'transferido')
+                  AND (a.ativo = 1 OR a.ativo IS NULL OR m.status = 'transferido')
+                  {$whereAluno}
+                GROUP BY a.id, a.nome, a.ra, m.turma_id, t.nome
+                ORDER BY t.nome ASC, a.nome ASC";
+        $rows = null;
+        try {
+            $rows = $this->db->fetchAll($sql, $params) ?: [];
+        } catch (\Throwable $e) {
+            $rows = null;
+        }
+        if ($rows === null) {
+            unset($params['ano']);
+            $sqlFallback = "SELECT a.id AS aluno_id,
+                                   a.nome AS aluno_nome,
+                                   a.ra,
+                                   a.turma_id,
+                                   t.nome AS turma_nome,
+                                   0 AS transferido
+                            FROM alunos a
+                            INNER JOIN turmas t ON t.id = a.turma_id
+                            WHERE a.turma_id IN ({$in})
+                              AND (a.ativo = 1 OR a.ativo IS NULL)
+                              {$whereAluno}
+                            ORDER BY t.nome ASC, a.nome ASC";
+            try {
+                $rows = $this->db->fetchAll($sqlFallback, $params) ?: [];
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($alunoId <= 0 || $tid <= 0) {
+                continue;
+            }
+            $out[] = [
+                'aluno_id' => $alunoId,
+                'aluno_nome' => (string) ($row['aluno_nome'] ?? ''),
+                'ra' => (string) ($row['ra'] ?? ''),
+                'turma_id' => $tid,
+                'turma_nome' => (string) ($row['turma_nome'] ?? ''),
+                'transferido' => !empty($row['transferido']) ? 1 : 0,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $base
+     * @param list<array{aluno_id:int,aluno_nome:string,ra:string,turma_id:int,turma_nome:string,transferido:int}> $matriculas
+     * @return array<string,mixed>
+     */
+    private function montarRelatorioLayoutDaMatricula(array $base, array $matriculas, int $modeloDocumentoId, int $pagina, int $porPagina): array
+    {
+        $total = count($matriculas);
+        $paginar = $pagina > 0;
+        if ($paginar) {
+            $porPagina = max(1, $porPagina);
+            $totalPaginas = max(1, (int) ceil($total / $porPagina));
+            $pagina = min(max(1, $pagina), $totalPaginas);
+            $fatia = array_slice($matriculas, ($pagina - 1) * $porPagina, $porPagina);
+            $base['pagina'] = $pagina;
+            $base['total_paginas'] = $totalPaginas;
+            $base['por_pagina'] = $porPagina;
+        } else {
+            $fatia = $matriculas;
+        }
+        $base['total_alunos'] = $total;
+        $base['alunos_com_ficha'] = 0;
+        $base['alunos_sem_ficha'] = 0;
+        $obs = $this->observacoesAlunosBoletimCoordenacao(array_map(static function (array $row): int {
+            return (int) ($row['aluno_id'] ?? 0);
+        }, $fatia));
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+        }
+        $alunos = [];
+        foreach ($fatia as $row) {
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            $obsAluno = $obs[$alunoId] ?? [];
+            $transferido = !empty($row['transferido']);
+            $layoutUrl = '';
+            if ($modeloDocumentoId > 0 && $tid > 0) {
+                $layoutUrl = URL . '/admin/modelos-documentos/' . $modeloDocumentoId
+                    . '/preview?turma_id=' . $tid . '&aluno_id=' . $alunoId;
+            }
+            $alunos[] = [
+                'id' => $alunoId,
+                'ficha_id' => 0,
+                'nome' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                    (string) ($row['aluno_nome'] ?? ''),
+                    $transferido
+                ),
+                'ra' => (string) ($row['ra'] ?? ''),
+                'turma' => (string) ($row['turma_nome'] ?? ''),
+                'transferido' => $transferido ? 1 : 0,
+                'observacao' => (string) ($obsAluno['conteudo'] ?? ''),
+                'observacao_updated_at' => $obsAluno['updated_at'] ?? null,
+                'materias' => [],
+                'demonstrativo_html' => '',
+                'layout_pdf_url' => $layoutUrl,
+            ];
+        }
+        $base['alunos'] = $alunos;
+        $base['total_linhas'] = count($alunos);
+
+        return $base;
+    }
+
+    /**
      * @return array<string,mixed>
      */
     private function montarRelatorioVidaEscolarCoordenacao(
@@ -2530,7 +2696,8 @@ class ReportAdminController extends AdminBaseController
         int $periodo = 0,
         int $cursoId = 0,
         int $pagina = 0,
-        int $porPagina = 20
+        int $porPagina = 20,
+        int $modeloDocumentoId = 0
     ): array {
         $columns = $this->colunasFichaVidaEscolar($anoLetivo, $periodo);
         $codigoCorte = $periodo > 0 ? ('n' . $periodo) : 'n0';
@@ -2564,8 +2731,22 @@ class ReportAdminController extends AdminBaseController
         }
 
         $fichas = $this->listarFichasVidaEscolarFiltradas($anoLetivo, $turmaId, $alunoQ, $cursoId);
+        $matriculasSemFicha = [];
         if ($fichas === []) {
-            return $base;
+            $matriculasSemFicha = $this->listarAlunosMatriculadosBoletimCoordenacao($anoLetivo, $turmaId, $alunoQ, $cursoId);
+            if ($matriculasSemFicha === []) {
+                $base['aviso_vazio'] = ($turmaId > 0 || $cursoId > 0)
+                    ? 'Nenhum aluno matriculado para estes filtros. O layout do boletim sai da turma escolhida no ano letivo.'
+                    : 'Escolha a turma para gerar o boletim com o modelo de documento. Sem ficha na Vida Escolar, o layout usa a matrícula da turma.';
+                return $base;
+            }
+            return $this->montarRelatorioLayoutDaMatricula(
+                $base,
+                $matriculasSemFicha,
+                $modeloDocumentoId,
+                $pagina,
+                $porPagina
+            );
         }
 
         // Tela: pagina as fichas antes de montar o quadro (Todas as turmas não pode carregar tudo).

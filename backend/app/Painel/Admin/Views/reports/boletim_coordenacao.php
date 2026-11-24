@@ -333,7 +333,10 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?php
             if ($fonteRelatorio === 'vida_escolar') {
-                echo 'Nenhum aluno com boletim oficial na Vida Escolar para estes filtros.';
+                $avisoVazio = trim((string) ($relatorio['aviso_vazio'] ?? ''));
+                echo $avisoVazio !== ''
+                    ? htmlspecialchars($avisoVazio, ENT_QUOTES, 'UTF-8')
+                    : 'Nenhum aluno com boletim oficial na Vida Escolar para estes filtros.';
             } elseif ($fonteRelatorio === 'demonstrativo') {
                 echo 'Nenhum demonstrativo de notas encontrado para os filtros selecionados.';
             } else {
@@ -379,6 +382,10 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             $pdfOficial = $fonteRelatorio === 'vida_escolar' && (int) ($aluno['id'] ?? 0) > 0 && $fichaAluno > 0
                 ? URL . '/admin/students/' . (int) $aluno['id'] . '/vida-escolar/pdf?ficha_id=' . $fichaAluno . '&modelo_documento_id=' . $modeloDocumentoId
                 : '';
+            $layoutPdf = trim((string) ($aluno['layout_pdf_url'] ?? ''));
+            if ($pdfOficial === '' && $layoutPdf !== '') {
+                $pdfOficial = $layoutPdf;
+            }
             ?>
             <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden <?= $transferidoAluno ? 'opacity-90' : '' ?>" data-print-title="<?= htmlspecialchars($tituloImpressao, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="coord-aluno-impressao">
@@ -405,7 +412,11 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 $htmlDemonstrativo = trim((string) ($aluno['demonstrativo_html'] ?? ''));
                 $materiasAluno = (array) ($aluno['materias'] ?? []);
                 ?>
-                <?php if ($fonteRelatorio === 'vida_escolar' && $pdfOficial !== ''): ?>
+                <?php if ($layoutPdf !== ''): ?>
+                <div class="p-4">
+                    <iframe title="Boletim de <?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>" src="<?= htmlspecialchars($layoutPdf, ENT_QUOTES, 'UTF-8') ?>" class="w-full border border-gray-200 rounded-lg" style="height:70vh;min-height:420px"></iframe>
+                </div>
+                <?php elseif ($fonteRelatorio === 'vida_escolar' && $pdfOficial !== ''): ?>
                 <details class="p-4" data-boletim-previa data-pdf-url="<?= htmlspecialchars($pdfOficial . '&previa=1', ENT_QUOTES, 'UTF-8') ?>">
                     <summary class="cursor-pointer text-sm font-semibold text-gray-700">Visualizar boletim no modelo do documento</summary>
                     <p class="text-sm text-gray-500 my-3" data-boletim-mensagem>Abra para gerar a prévia deste aluno com o mesmo layout do PDF e do ZIP.</p>

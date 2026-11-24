@@ -135,12 +135,30 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
             }
             if (!$inserido) {
                 $nomePai = mb_strtolower(trim((string) ($paiQ['materia_nome'] ?? '')), 'UTF-8');
+                $temOrdemPai = array_key_exists('ordem_boletim', $paiQ);
+                $ordemPai = $temOrdemPai ? (int) $paiQ['ordem_boletim'] : 1000000;
+                // 1000000 é “sem ordem na matriz”: volta para o nome, como antes.
+                $porNome = !$temOrdemPai || $ordemPai >= 1000000;
                 $novas = [];
                 foreach ($linhasTab as $linExist) {
-                    $nomeExist = mb_strtolower(trim((string) ($linExist['materia_nome'] ?? '')), 'UTF-8');
-                    if (!$inserido && $nomeExist !== '' && $nomeExist > $nomePai) {
-                        $novas[] = $paiQ;
-                        $inserido = true;
+                    // Não parte um grupo: filha não é ponto de inserção.
+                    if (!$inserido && empty($linExist['eh_grupo_filho'])) {
+                        $nomeExist = mb_strtolower(trim((string) ($linExist['materia_nome'] ?? '')), 'UTF-8');
+                        if ($porNome) {
+                            if ($nomeExist !== '' && $nomeExist > $nomePai) {
+                                $novas[] = $paiQ;
+                                $inserido = true;
+                            }
+                        } else {
+                            $ordemExist = array_key_exists('ordem_boletim', $linExist)
+                                ? (int) $linExist['ordem_boletim']
+                                : 1000000;
+                            if ($ordemExist > $ordemPai
+                                || ($ordemExist === $ordemPai && $nomeExist !== '' && $nomeExist > $nomePai)) {
+                                $novas[] = $paiQ;
+                                $inserido = true;
+                            }
+                        }
                     }
                     $novas[] = $linExist;
                 }

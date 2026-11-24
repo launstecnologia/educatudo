@@ -967,6 +967,7 @@ class BoletimAssistenteController extends BaseController
                 $i++;
                 continue;
             }
+            $ordemBloco = array_key_exists('ordem_boletim', $lin) ? (int) $lin['ordem_boletim'] : 1000000;
             if (!empty($lin['eh_grupo_pai'])) {
                 $bloco = [$lin];
                 $i++;
@@ -980,6 +981,7 @@ class BoletimAssistenteController extends BaseController
                 }
                 $blocos[] = [
                     'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                    'ordem' => $ordemBloco,
                     'linhas' => $bloco,
                 ];
                 continue;
@@ -988,6 +990,7 @@ class BoletimAssistenteController extends BaseController
                 // Filho órfão (sem mãe na lista): trata como linha comum.
                 $blocos[] = [
                     'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                    'ordem' => $ordemBloco,
                     'linhas' => [$lin],
                 ];
                 $i++;
@@ -995,11 +998,17 @@ class BoletimAssistenteController extends BaseController
             }
             $blocos[] = [
                 'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                'ordem' => $ordemBloco,
                 'linhas' => [$lin],
             ];
             $i++;
         }
         usort($blocos, static function (array $a, array $b): int {
+            $oa = (int) ($a['ordem'] ?? 1000000);
+            $ob = (int) ($b['ordem'] ?? 1000000);
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
             return strcmp((string) ($a['sort'] ?? ''), (string) ($b['sort'] ?? ''));
         });
         $out = [];

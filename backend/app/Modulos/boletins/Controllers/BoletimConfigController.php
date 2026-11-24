@@ -8604,6 +8604,74 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Ordem das matérias usada na construção do boletim (matriz, coluna ordem_boletim).
+     *
+     * @return array<int, int>
+     */
+    private function mapaOrdemBoletimDoQuadro(): array
+    {
+        if (!is_object($this->boletimConfig) || !method_exists($this->boletimConfig, 'mapaOrdemBoletimMaterias')) {
+            return [];
+        }
+        try {
+            $mapa = $this->boletimConfig->mapaOrdemBoletimMaterias();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        return is_array($mapa) ? $mapa : [];
+    }
+
+    private function ordemBoletimNoMapa(array $mapa, int $materiaId): int
+    {
+        if ($mapa === [] || $materiaId <= 0 || !isset($mapa[$materiaId])) {
+            return 1000000;
+        }
+
+        return (int) $mapa[$materiaId];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int, int> $mapa
+     * @return list<array<string,mixed>>
+     */
+    private function ordenarLinhasMateriasPelaOrdemDoBoletim(array $linhas, array $mapa): array
+    {
+        $decoradas = [];
+        foreach ($linhas as $i => $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $ordem = $this->ordemBoletimNoMapa($mapa, (int) ($linha['materia_id'] ?? 0));
+            $linha['ordem_boletim'] = $ordem;
+            $decoradas[] = [
+                'i' => $i,
+                'ordem' => $ordem,
+                'nome' => $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? '')),
+                'linha' => $linha,
+            ];
+        }
+        usort($decoradas, static function (array $a, array $b): int {
+            if ((int) $a['ordem'] !== (int) $b['ordem']) {
+                return (int) $a['ordem'] <=> (int) $b['ordem'];
+            }
+            $cmp = strcmp((string) $a['nome'], (string) $b['nome']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return (int) $a['i'] <=> (int) $b['i'];
+        });
+        $out = [];
+        foreach ($decoradas as $item) {
+            $out[] = $item['linha'];
+        }
+
+        return $out;
+    }
+
+    /**
      * Demonstrativo: linha-mãe do group_line (ex.: Língua Portuguesa) com as médias,
      * seguida das matérias filhas com as notas individuais.
      *
@@ -8737,7 +8805,13 @@ class BoletimConfigController extends BaseController
                 'ocultar_filhas' => !empty($grp['ocultar_filhas']),
             ];
         }
+        // Mesma sequência da construção do boletim (ordem da matriz), não A–Z.
+        $mapaOrdemBoletim = $this->mapaOrdemBoletimDoQuadro();
         if ($grupos === []) {
+            if ($mapaOrdemBoletim !== []) {
+                $matriz['linhas'] = $this->ordenarLinhasMateriasPelaOrdemDoBoletim($matriz['linhas'], $mapaOrdemBoletim);
+                $simulacao['matriz_materias'] = $matriz;
+            }
             return $simulacao;
         }
 
@@ -8809,8 +8883,12 @@ class BoletimConfigController extends BaseController
 
         $blocos = [];
         foreach ($outras as $linha) {
+            $midAvulsa = (int) ($linha['materia_id'] ?? 0);
+            $ordemAvulsa = $this->ordemBoletimNoMapa($mapaOrdemBoletim, $midAvulsa);
+            $linha['ordem_boletim'] = $ordemAvulsa;
             $blocos[] = [
                 'sort' => $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? '')),
+                'sort_ordem' => $ordemAvulsa,
                 'linhas' => [$linha],
             ];
         }
@@ -8824,6 +8902,10 @@ class BoletimConfigController extends BaseController
                     $filho['eh_grupo_filho'] = 1;
                     $filho['grupo_pai_nome'] = $g['label'];
                     $filho['grupo_key'] = $g['key'];
+                    $filho['ordem_boletim'] = $this->ordemBoletimNoMapa(
+                        $mapaOrdemBoletim,
+                        (int) ($filho['materia_id'] ?? 0)
+                    );
                     $filhosLinhas[] = $filho;
                 }
             }
@@ -8835,6 +8917,11 @@ class BoletimConfigController extends BaseController
             // notas nas filhas (ex.: ingresso posterior ao bimestre). Sem a mãe
             // identificada, a sincronização não atualiza a célula antiga da ficha.
             usort($filhosLinhas, function (array $a, array $b): int {
+                $oa = (int) ($a['ordem_boletim'] ?? 1000000);
+                $ob = (int) ($b['ordem_boletim'] ?? 1000000);
+                if ($oa !== $ob) {
+                    return $oa <=> $ob;
+                }
                 $ka = $this->canonicalMateriaNomeKey((string) ($a['materia_nome'] ?? ''));
                 $kb = $this->canonicalMateriaNomeKey((string) ($b['materia_nome'] ?? ''));
                 return $ka <=> $kb;
@@ -8873,6 +8960,19 @@ class BoletimConfigController extends BaseController
             }
             // Média Bim e as colunas seguintes saem da fórmula, com as notas já juntadas da área.
             $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo($paiNotas, $regra, $arredGrupo);
+            $ordemGrupo = 1000000;
+            foreach ((array) ($g['rotulo_ids'] ?? []) as $rid => $_) {
+                $ordemRotulo = $this->ordemBoletimNoMapa($mapaOrdemBoletim, (int) $rid);
+                if ($ordemRotulo < $ordemGrupo) {
+                    $ordemGrupo = $ordemRotulo;
+                }
+            }
+            foreach ($filhosLinhas as $filhoOrdem) {
+                $ordemFilho = (int) ($filhoOrdem['ordem_boletim'] ?? 1000000);
+                if ($ordemFilho < $ordemGrupo) {
+                    $ordemGrupo = $ordemFilho;
+                }
+            }
             $pai = [
                 'materia_id' => 0,
                 'materia_nome' => $g['label'],
@@ -8881,6 +8981,7 @@ class BoletimConfigController extends BaseController
                 'eh_grupo_filho' => 0,
                 'grupo_key' => $g['key'],
                 'grupo_filhos_qtd' => count($filhosLinhas),
+                'ordem_boletim' => $ordemGrupo,
             ];
             $linhasGrupo = [$pai];
             if (empty($g['ocultar_filhas'])) {
@@ -8888,11 +8989,17 @@ class BoletimConfigController extends BaseController
             }
             $blocos[] = [
                 'sort' => $g['label_key'] !== '' ? $g['label_key'] : 'grupo',
+                'sort_ordem' => $ordemGrupo,
                 'linhas' => $linhasGrupo,
             ];
         }
 
         usort($blocos, static function (array $a, array $b): int {
+            $oa = (int) ($a['sort_ordem'] ?? 1000000);
+            $ob = (int) ($b['sort_ordem'] ?? 1000000);
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
             return strcmp((string) ($a['sort'] ?? ''), (string) ($b['sort'] ?? ''));
         });
 
