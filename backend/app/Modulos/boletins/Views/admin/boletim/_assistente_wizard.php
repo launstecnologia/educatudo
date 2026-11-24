@@ -8045,6 +8045,7 @@ $boletimWizardSteps = [
     }
 
     function ehDemonstrativoNotas() {
+        if (ehQuadroPecasColag()) return false;
         return !!(estado && estado.exibir_em === 'notas' && !ehBoletimComposto() && !ehVisaoImpressaoEditavel() && !ehModeloSantaMaria());
     }
 

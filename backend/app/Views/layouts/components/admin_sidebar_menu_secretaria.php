@@ -199,6 +199,12 @@ $gestaoOpen = $secretariaNavOpen;
             <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Boletins</span>
         </a>
+        <?php if (\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()): ?>
+        <a href="<?= $urlBase ?>/admin/boletim-colag" class="<?= $linkCls($cur === 'boletim-colag') ?>">
+            <i class="fa-solid fa-folder-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Boletim Colag</span>
+        </a>
+        <?php endif; ?>
         <?php endif; ?>
         <?php endif; ?>
         </div>

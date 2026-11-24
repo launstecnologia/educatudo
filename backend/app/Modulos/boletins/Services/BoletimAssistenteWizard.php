@@ -172,16 +172,11 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * Quadro antigo de peças (tipos de nota) só no Colag.
-     * Outro tenant permanece no catálogo de eventos avaliativos.
+     * O modelo do quadro (Blocos A/B e cálculo) mora no módulo Boletim Colag.
      */
     private function ehTenantColag(): bool
     {
-        if (!defined('TENANT_SLUG')) {
-            return false;
-        }
-
-        return strtolower(trim((string) TENANT_SLUG)) === 'colag';
+        return \App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo();
     }
 
     /**
@@ -1139,6 +1134,10 @@ class BoletimAssistenteWizard
      */
     private function ehDemonstrativoNotas(array $estado): bool
     {
+        // Colag mantém média, bloco de cálculo e o quadro A/B.
+        if ($this->ehTenantColag()) {
+            return false;
+        }
         if ((string) ($estado['exibir_em'] ?? '') !== 'notas') {
             return false;
         }
@@ -8002,7 +8001,8 @@ class BoletimAssistenteWizard
             return false;
         }
         if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
-            return false;
+            return $this->ehTenantColag()
+                && in_array('semanal', (array) ($estado['pecas'] ?? []), true);
         }
         if (($estado['modelo_key'] ?? '') === 'quadro_semanal'
             && in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
@@ -8056,6 +8056,9 @@ class BoletimAssistenteWizard
     {
         $grupoQuadro = (int) ($estado['grupo_regras_notas_id'] ?? 0);
         $semanas = $this->semanasQuadroConfig($grupoQuadro > 0 ? $grupoQuadro : 0);
+        if ($this->ehTenantColag() && ($semanas['a'] === [] && $semanas['b'] === [])) {
+            $semanas = \App\Modulos\BoletimColag\Services\BoletimColagModelo::semanas();
+        }
         $rascunho = $this->ferramentas->montarRascunhoQuadroSemanal([
             'ano_letivo' => (int) ($estado['ano_letivo'] ?? date('Y')),
             'bimestre' => (int) ($estado['bimestre'] ?? 1),
