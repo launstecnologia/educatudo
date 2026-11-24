@@ -1084,8 +1084,78 @@ class BoletimAssistenteWizard
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
             }
         }
+        $this->aplicarEstruturaColag($estado);
 
         return $estado;
+    }
+
+    /**
+     * No Colag o demonstrativo já nasce com as peças e as colunas do boletim oficial.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function aplicarEstruturaColag(array &$estado): void
+    {
+        if (!$this->ehTenantColag() || $this->ehBoletimComposto($estado) || $this->ehModeloSantaMaria($estado)) {
+            return;
+        }
+        if ((string) ($estado['exibir_em'] ?? 'notas') !== 'notas') {
+            return;
+        }
+        $preservado = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
+        if ($preservado !== [] && $this->rascunhoJaEhQuadro($preservado)) {
+            return;
+        }
+
+        $pecas = [];
+        foreach (array_merge((array) ($estado['pecas'] ?? []), \App\Modulos\BoletimColag\Services\BoletimColagModelo::pecas()) as $peca) {
+            $peca = strtolower(trim((string) $peca));
+            if ($peca !== '' && !in_array($peca, $pecas, true)) {
+                $pecas[] = $peca;
+            }
+        }
+        $estado['pecas'] = $pecas;
+        $estado['pecas_opcoes'] = $this->mesclarPecasOpcoes(
+            $this->pecasOpcoesPadrao($pecas, (int) ($estado['bimestre'] ?? 0)),
+            is_array($estado['pecas_opcoes'] ?? null) ? $estado['pecas_opcoes'] : []
+        );
+
+        $nomes = is_array($estado['nomes_blocos'] ?? null) ? $estado['nomes_blocos'] : [];
+        foreach (\App\Modulos\BoletimColag\Services\BoletimColagModelo::nomes() as $codigo => $nome) {
+            if (trim((string) ($nomes[$codigo] ?? '')) === '') {
+                $nomes[$codigo] = $nome;
+            }
+        }
+        $estado['nomes_blocos'] = $nomes;
+
+        $colunas = \App\Modulos\BoletimColag\Services\BoletimColagModelo::colunas();
+        $linhas = $this->normalizarLinhasLayout($estado['linhas_layout'] ?? []);
+        $bimestre = (int) ($estado['bimestre'] ?? 1);
+        if ($bimestre < 1 || $bimestre > 4) {
+            $bimestre = 1;
+        }
+        if ($linhas === []) {
+            $linhas = [[
+                'id' => 'lincolag',
+                'nome' => $bimestre . 'º BIMESTRE',
+                'colunas' => $colunas,
+            ]];
+        } else {
+            $ja = [];
+            foreach ($linhas as $linha) {
+                foreach ((array) ($linha['colunas'] ?? []) as $codigo) {
+                    $ja[strtolower((string) $codigo)] = true;
+                }
+            }
+            foreach ($colunas as $codigo) {
+                if (isset($ja[$codigo]) || count($linhas[0]['colunas']) >= 12) {
+                    continue;
+                }
+                $linhas[0]['colunas'][] = $codigo;
+            }
+        }
+        $estado['linhas_layout'] = $this->normalizarLinhasLayout($linhas);
+        $estado['cabecalhos_manuais'] = 1;
     }
 
     /**
@@ -1201,6 +1271,7 @@ class BoletimAssistenteWizard
     public function montar(array $estado): array
     {
         $estado = $this->normalizarEstado($estado);
+        $this->aplicarEstruturaColag($estado);
         $this->aplicarNomeAutomatico($estado);
         $this->aplicarEscopoDoBoletimCadastro($estado);
         $this->aplicarMinimaResolvida($estado);
@@ -1337,6 +1408,7 @@ class BoletimAssistenteWizard
             );
             $rascunho = $this->aplicarConfigJornadaDoEstadoNoRascunho($rascunho, $estado);
             $rascunho = $this->aplicarFormulasBlocos($rascunho, $estado, []);
+            $rascunho = $this->garantirSemanasColagNoRascunho($rascunho, $estado);
             $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
             $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
             $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
@@ -1375,6 +1447,7 @@ class BoletimAssistenteWizard
             );
             $rascunho = $this->aplicarFormulasBlocos($rascunho, $estado, []);
             $rascunho = $this->garantirBlocosCalcNosComponentes($rascunho, $estado);
+            $rascunho = $this->garantirSemanasColagNoRascunho($rascunho, $estado);
             $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
             $errosOut = array_values(array_unique(array_merge($erros, $errosDemo, $validado['erros'])));
             $rascunhoOut = $this->sanitizarDemonstrativoSemFormula($validado['rascunho'], $estado);
@@ -8049,14 +8122,66 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Encaixa S1–S6 no rascunho do Colag sem apagar as colunas que a escola já montou.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    public function garantirSemanasColagNoRascunho(array $rascunho, array $estado): array
+    {
+        if (!$this->ehTenantColag()) {
+            return $rascunho;
+        }
+        $quadro = $this->montarQuadroDoEstado($estado);
+        $presentes = [];
+        $atuais = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if ($codigo === '') {
+                continue;
+            }
+            $presentes[$codigo] = true;
+            $atuais[] = $componente;
+        }
+        $semanas = [];
+        $novos = [];
+        foreach ((array) ($quadro['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if ($codigo === '' || isset($presentes[$codigo])) {
+                continue;
+            }
+            $presentes[$codigo] = true;
+            if (preg_match('/^s[1-8]$/', $codigo) === 1) {
+                $semanas[] = $componente;
+            } else {
+                $novos[] = $componente;
+            }
+        }
+        if ($semanas !== [] || $novos !== []) {
+            $rascunho['componentes'] = array_merge($semanas, $atuais, $novos);
+        }
+        $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
+
+        return $rascunho;
+    }
+
+    /**
      * @param array<string,mixed> $estado
      * @return array<string,mixed>
      */
     private function montarQuadroDoEstado(array $estado): array
     {
         $grupoQuadro = (int) ($estado['grupo_regras_notas_id'] ?? 0);
-        $semanas = $this->semanasQuadroConfig($grupoQuadro > 0 ? $grupoQuadro : 0);
-        if ($this->ehTenantColag() && ($semanas['a'] === [] && $semanas['b'] === [])) {
+        $consultaSemanas = $grupoQuadro > 0 ? $grupoQuadro : ($this->ehTenantColag() ? null : 0);
+        $semanas = $this->semanasQuadroConfig($consultaSemanas);
+        if ($this->ehTenantColag() && ($semanas['a'] === [] || $semanas['b'] === [])) {
             $semanas = \App\Modulos\BoletimColag\Services\BoletimColagModelo::semanas();
         }
         $rascunho = $this->ferramentas->montarRascunhoQuadroSemanal([
@@ -8096,7 +8221,7 @@ class BoletimAssistenteWizard
     private function semanasQuadroConfig(?int $grupoId = null): array
     {
         $vazio = ['a' => [], 'b' => []];
-        if ($grupoId === null || $grupoId <= 0) {
+        if ($grupoId !== null && $grupoId <= 0) {
             return $vazio;
         }
         $path = dirname(__DIR__, 2) . '/grupos-regras-notas/Services/GrupoRegrasNotasService.php';

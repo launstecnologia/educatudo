@@ -224,6 +224,7 @@ class BoletimAssistenteController extends BaseController
         }
 
         $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
+        $rascunho = $this->wizard->garantirSemanasColagNoRascunho($rascunho, $estado);
         $rascunho = $this->aplicarJornadaDoEstadoNoRascunhoPreview($rascunho, $estado);
         // Documento de boletim (impressão) precisa desses campos para puxar a regra de aprovação.
         foreach (['exibir_em', 'ano_letivo', 'finalidade', 'origem'] as $campoPreview) {
@@ -311,6 +312,7 @@ class BoletimAssistenteController extends BaseController
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
                     $previewReal = $this->trocarLinhasDoQuadro($previewReal, $previewQuadro, $grupoId);
                 }
+                $previewReal = $this->separarGruposColag($previewReal, $grupoId);
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
 
@@ -702,8 +704,10 @@ class BoletimAssistenteController extends BaseController
 
         if (!class_exists('BoletimQuadroLayoutHelper', false)) {
         }
-        $semanasA = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasA, $linhas);
-        $semanasB = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasB, $linhas);
+        if (!\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()) {
+            $semanasA = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasA, $linhas);
+            $semanasB = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasB, $linhas);
+        }
         $temQuadro = $semanasA !== [] || $semanasB !== [];
 
         if ($temBoletim && !$temQuadro) {
@@ -1168,6 +1172,69 @@ class BoletimAssistenteController extends BaseController
     }
 
     /**
+     * Quando as semanas não viraram quadro, ainda separa as matérias do Colag em Bloco A e Bloco B.
+     *
+     * @param array<string,mixed> $preview
+     * @return array<string,mixed>
+     */
+    private function separarGruposColag(array $preview, int $grupoId): array
+    {
+        if (!\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()) {
+            return $preview;
+        }
+        foreach (is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [] as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            $key = strtolower(trim((string) ($tab['key'] ?? '')));
+            if ($key === 'a' || $key === 'b') {
+                return $preview;
+            }
+        }
+        $tabelas = is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [];
+        if (count($tabelas) !== 1 || !is_array($tabelas[0])) {
+            return $preview;
+        }
+        $mapas = $this->mapasMateriasPorBloco($grupoId);
+        if (empty($mapas['tem'])) {
+            return $preview;
+        }
+        $base = $tabelas[0];
+        $linhas = is_array($base['linhas'] ?? null) ? $base['linhas'] : [];
+        $outras = is_array($base['outras'] ?? null) ? $base['outras'] : [];
+        $linhasA = $this->ordenarLinhasPreservandoGrupo(
+            $this->linhasDoBlocoQuadro($linhas, $mapas['A']['ids'], $mapas['A']['nomes'])
+        );
+        $linhasB = $this->ordenarLinhasPreservandoGrupo(
+            $this->linhasDoBlocoQuadro($linhas, $mapas['B']['ids'], $mapas['B']['nomes'])
+        );
+        if ($linhasA === [] || $linhasB === []) {
+            return $preview;
+        }
+        $preview['modo'] = 'quadro';
+        $preview['tabelas'] = [
+            [
+                'key' => 'a',
+                'titulo' => 'Matérias Bloco A',
+                'subtitulo' => '',
+                'semanas' => [],
+                'outras' => $outras,
+                'linhas' => $linhasA,
+            ],
+            [
+                'key' => 'b',
+                'titulo' => 'Matérias Bloco B',
+                'subtitulo' => '',
+                'semanas' => [],
+                'outras' => $outras,
+                'linhas' => $linhasB,
+            ],
+        ];
+
+        return $preview;
+    }
+
+    /**
      * @return array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}}
      */
     private function mapasMateriasPorBloco(int $grupoId): array
@@ -1181,11 +1248,11 @@ class BoletimAssistenteController extends BaseController
         if (!class_exists('GrupoRegrasNotasService', false)) {
             return $out;
         }
-        if ($grupoId <= 0) {
+        if ($grupoId <= 0 && !\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()) {
             return $out;
         }
         try {
-            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao($grupoId);
+            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao($grupoId > 0 ? $grupoId : null);
         } catch (\Throwable $e) {
             return $out;
         }

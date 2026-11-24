@@ -6313,9 +6313,12 @@ $boletimWizardSteps = [
     function previewLocal() {
         if (ehBoletimComposto()) return previewLocalBoletim();
         var pecas = (estado && estado.pecas) ? estado.pecas.slice() : [];
-        var temSemanal = pecas.indexOf('semanal') >= 0 && !colunaOculta('_semanal') && !colunaOculta('media_sem');
-        var semanasA = temSemanal ? [1, 3, 5, 7].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
-        var semanasB = temSemanal ? [2, 4, 6, 8].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
+        var semanasColag = ehQuadroPecasColag();
+        var temSemanal = semanasColag || (pecas.indexOf('semanal') >= 0 && !colunaOculta('_semanal') && !colunaOculta('media_sem'));
+        var listaA = semanasColag ? [1, 3, 5] : [1, 3, 5, 7];
+        var listaB = semanasColag ? [2, 4, 6] : [2, 4, 6, 8];
+        var semanasA = temSemanal ? listaA.map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
+        var semanasB = temSemanal ? listaB.map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
         var outras = temSemanal ? [{ codigo: 'media_sem', nome: 'Média Sem', layout_type: 'media_sem', source_type: 'calculado' }] : [];
         var colunas = temSemanal ? [{ codigo: '_semanal', nome: 'Prova semanal (S1-S8 · N e Q)', tipo: 'semana_grupo', travada: false }] : [];
         var partesMedia = temSemanal ? ['media_sem'] : [];

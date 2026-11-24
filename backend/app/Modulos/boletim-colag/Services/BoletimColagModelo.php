@@ -28,4 +28,41 @@ class BoletimColagModelo
             'b' => [2, 4, 6],
         ];
     }
+
+    /**
+     * Peças do demonstrativo oficial. As semanas ficam no quadro, não nesta lista.
+     *
+     * @return list<string>
+     */
+    public static function pecas(): array
+    {
+        return ['semanal', 'bimestral', 'jornada', 'enac', 'recuperacao'];
+    }
+
+    /**
+     * Colunas depois do bloco N/Q, na ordem do boletim oficial.
+     *
+     * @return list<string>
+     */
+    public static function colunas(): array
+    {
+        return ['prova_bim', 'jornada', 'enac', 'media_bim', 'rec', 'media_final', 'faltas'];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    public static function nomes(): array
+    {
+        return [
+            'media_sem' => 'Média Sem',
+            'prova_bim' => 'Prova Bim',
+            'jornada' => 'Jornada do aluno',
+            'enac' => 'ENAC',
+            'media_bim' => 'Média Bim',
+            'rec' => 'Recuperação Semestral',
+            'media_final' => 'Resultado Final',
+            'faltas' => 'Faltas',
+        ];
+    }
 }
