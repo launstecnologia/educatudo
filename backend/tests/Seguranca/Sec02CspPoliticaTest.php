@@ -65,6 +65,9 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringContainsString("'unsafe-eval'", $p);
         $this->assertStringContainsString('https://cdn.quilljs.com', $p);
         $this->assertStringNotContainsString("'nonce-", $p);
+        $this->assertStringContainsString("object-src blob:", $p);
+        $this->assertStringNotContainsString("object-src 'self'", $p);
+        $this->assertStringContainsString("frame-src 'self' blob: https:", $p);
     }
 
     public function testEnforcementPadraoUsaBaseline(): void
@@ -119,6 +122,9 @@ final class Sec02CspPoliticaTest extends TestCase
     {
         $p = CspPolitica::politicaRestrita(false);
         $this->assertStringContainsString("form-action 'self'", $p);
+        $this->assertStringContainsString("object-src blob:", $p);
+        $this->assertStringNotContainsString("object-src 'self'", $p);
+        $this->assertMatchesRegularExpression('/frame-src[^;]*blob:/', $p);
         $this->assertStringContainsString('worker-src', $p);
         $this->assertStringContainsString('wss://ws.educatudo.com', $p);
         $this->assertStringNotContainsString('report-uri', $p);

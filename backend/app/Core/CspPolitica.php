@@ -60,6 +60,7 @@ final class CspPolitica
 
     private const FRAME_HOSTS_RESTRITA = [
         "'self'",
+        'blob:',
         'https://8x8.vc',
         'https://meet.launs.com.br',
         'https://www.youtube.com',
@@ -291,7 +292,9 @@ final class CspPolitica
         return implode('; ', [
             "default-src 'self'",
             "base-uri 'self'",
-            "object-src 'none'",
+            // blob: no visualizador nativo de PDF (prévia do boletim e do editor).
+            // Sem 'self': <object>/<embed> da origem continuam bloqueados.
+            "object-src blob:",
             "frame-ancestors 'self'",
             "form-action 'self'",
             "worker-src 'self' blob: https://cdnjs.cloudflare.com",
@@ -300,7 +303,7 @@ final class CspPolitica
             "font-src 'self' data: {$fontHosts}",
             "img-src 'self' data: blob: https:",
             "connect-src 'self' https: wss:",
-            "frame-src 'self' https:",
+            "frame-src 'self' blob: https:",
             "media-src 'self' blob: https:",
         ]);
     }
@@ -321,7 +324,7 @@ final class CspPolitica
         $parts = [
             "default-src 'self'",
             "base-uri 'self'",
-            "object-src 'none'",
+            "object-src blob:",
             "frame-ancestors 'self'",
             "form-action 'self'",
             "worker-src 'self' blob: https://cdnjs.cloudflare.com",
