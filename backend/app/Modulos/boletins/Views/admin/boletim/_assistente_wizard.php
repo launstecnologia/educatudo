@@ -1258,6 +1258,11 @@ $boletimWizardSteps = [
         return !!(catalogo && catalogo.modulo_eventos_avaliativos && estado && estado.exibir_em === 'notas' && !ehBoletimComposto());
     }
 
+    /** Catálogo de peças do quadro antigo. Só o tenant Colag. */
+    function ehQuadroPecasColag() {
+        return !!(catalogo && catalogo.quadro_pecas_colag);
+    }
+
     function codigosPeriodoNota() {
         var bim = Number((estado && estado.bimestre) || 0);
         var ids = {};
@@ -8837,6 +8842,10 @@ $boletimWizardSteps = [
         if (mFal) {
             return adicionarColunaFal(Number(mFal[1] || 0), { linhaId: linhaId, nomeCab: nomeCab });
         }
+        var mPeca = payload.match(/^peca:([a-z0-9_]+)$/i);
+        if (mPeca && ehQuadroPecasColag()) {
+            return adicionarColunaPecaColag(String(mPeca[1] || ''), { linhaId: linhaId, nomeCab: nomeCab });
+        }
         return false;
     }
 
@@ -8945,6 +8954,261 @@ $boletimWizardSteps = [
         if (adicionados > 0) agendarMontar();
     }
 
+    function codigoCanonicoPecaColag(key) {
+        var mapa = {
+            jornada: 'jornada',
+            bimestral: 'bimestral',
+            enac: 'enac',
+            semanal: 'semanal',
+            trabalho: 'trab',
+            participacao: 'part',
+            recuperacao: 'rec'
+        };
+        key = String(key || '');
+        if (mapa[key]) return mapa[key];
+        var quadro = pecaCodigoQuadro(key);
+        return quadro || key;
+    }
+
+    function codigoExistentePecaColag(key) {
+        var canon = String(codigoCanonicoPecaColag(key) || '');
+        var alt = String(pecaCodigoQuadro(key) || '');
+        var candidatos = {};
+        [canon, alt, key].forEach(function (c) {
+            var low = String(c || '').toLowerCase();
+            if (low) candidatos[low] = true;
+        });
+        var achou = '';
+        function considerar(cod) {
+            if (achou) return;
+            var bruto = String(cod || '');
+            var low = bruto.toLowerCase();
+            if (!low) return;
+            if (candidatos[low]) {
+                achou = bruto;
+                return;
+            }
+            var comp = componentePorCodigo(bruto);
+            if (comp && chavePecaDeComponenteJs(comp) === key) achou = bruto;
+        }
+        (estado && estado.colunas_ordem || []).forEach(considerar);
+        (estado && estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(considerar);
+        });
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            ((r && r.componentes) || []).forEach(function (c) {
+                if (c) considerar(c.codigo);
+            });
+        });
+        return achou || canon;
+    }
+
+    function bimestresPecasColag() {
+        var vistos = {};
+        var lista = [];
+        function add(n) {
+            n = Number(n);
+            if (!periodoNumeroValido(n) || vistos[n]) return;
+            vistos[n] = true;
+            lista.push(n);
+        }
+        (estado && estado.pecas || []).forEach(function (key) {
+            var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
+            var bims = normalizarBimestresPeca(opts.bimestres);
+            if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
+            bims.forEach(add);
+        });
+        if (!lista.length && periodoNumeroValido(estado && estado.bimestre)) add(Number(estado.bimestre));
+        lista.sort(function (a, b) { return a - b; });
+        return lista;
+    }
+
+    function pecasDoBimestreColag(bim) {
+        bim = Number(bim);
+        var itens = [];
+        (estado && estado.pecas || []).forEach(function (key) {
+            if (!key) return;
+            if (key === 'jornada' && catalogo && !catalogo.modulo_jornadas) return;
+            var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
+            var bims = normalizarBimestresPeca(opts.bimestres);
+            if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
+            if (bims.indexOf(bim) < 0) return;
+            itens.push(key);
+        });
+        return itens;
+    }
+
+    function preencherComponentePecaColag(codigo, key, nome) {
+        var meta = pecaMeta(key);
+        var tipoId = Number((meta && meta.tipo_avaliacao_id) || 0);
+        var src = key === 'jornada' ? 'jornadas' : 'provas_sistema';
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '').toLowerCase() !== String(codigo || '').toLowerCase()) return;
+                c.nome = nome || c.nome || codigo;
+                if (!c.source_type || c.source_type === 'nenhuma') c.source_type = src;
+                if (!c.config || typeof c.config !== 'object' || Array.isArray(c.config)) c.config = {};
+                c.config.chave_quadro = key;
+                if (tipoId > 0 && !c.config.tipo_avaliacao_id) c.config.tipo_avaliacao_id = tipoId;
+            });
+        });
+    }
+
+    function adicionarColunaPecaColag(key, opcoes) {
+        if (!estado || !ehQuadroPecasColag()) return false;
+        opcoes = opcoes || {};
+        var silencioso = !!opcoes.silencioso;
+        key = String(key || '');
+        if (!key) return false;
+        var codigo = codigoExistentePecaColag(key);
+        var nome = pecaLabel(key) || pecaNomeQuadro(key) || codigo;
+        if (codigoExisteNoEstado(codigo)) {
+            garantirChipVisivelNoQuadro(codigo);
+            if (opcoes.linhaId || opcoes.nomeCab) {
+                var jaNeste = codigoEstaNoTitulo(codigo, opcoes.linhaId || '', opcoes.nomeCab || '');
+                if (!jaNeste) moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
+                if (!silencioso) {
+                    avisoLinha = {
+                        tipo: 'ok',
+                        texto: jaNeste
+                            ? ('Coluna “' + nome + '” já está neste título.')
+                            : ('Coluna “' + nome + '” colocada no título do período.')
+                    };
+                    renderRevisarDinamico();
+                    agendarMontar();
+                }
+                return true;
+            }
+            if (!silencioso) {
+                avisoLinha = { tipo: 'ok', texto: 'A coluna “' + nome + '” já está no quadro.' };
+                renderRevisarDinamico();
+            }
+            return false;
+        }
+        mostrarColuna(codigo);
+        estado.quadro_chips_manuais = 1;
+        estado.cabecalhos_manuais = 1;
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(String(codigo).toLowerCase()) < 0) {
+            estado.colunas_ordem.push(codigo);
+        }
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = nome;
+        garantirComponenteManualNoRascunho(codigo, nome);
+        preencherComponentePecaColag(codigo, key, nome);
+        if (opcoes.linhaId || opcoes.nomeCab) {
+            moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
+        }
+        if (!silencioso) {
+            marcarEdicaoManual();
+            avisoLinha = {
+                tipo: 'ok',
+                texto: (opcoes.linhaId || opcoes.nomeCab)
+                    ? ('Coluna “' + nome + '” colocada no título do período.')
+                    : ('Coluna “' + nome + '” adicionada. Selecione um título do período para vincular.')
+            };
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
+        }
+        return true;
+    }
+
+    function adicionarTodasPecasColag(bim) {
+        if (!estado || !ehQuadroPecasColag()) return;
+        bim = Number(bim || 0);
+        var destino = destinoTituloPeriodoAtivo();
+        if (!destino) {
+            avisoLinha = {
+                tipo: 'erro',
+                texto: 'Selecione um título do período no quadro e depois clique em Adicionar todos.'
+            };
+            renderRevisarDinamico();
+            return;
+        }
+        var opcoes = { silencioso: true, linhaId: destino.linhaId, nomeCab: destino.nomeCab };
+        var adicionados = 0;
+        pecasDoBimestreColag(bim).forEach(function (key) {
+            if (adicionarColunaPecaColag(key, opcoes)) adicionados += 1;
+        });
+        if (bim >= 1 && bim <= 4 && adicionarColunaFal(bim, opcoes)) adicionados += 1;
+        marcarEdicaoManual();
+        previewAtual = null;
+        var rotulo = periodoNumeroValido(bim) ? rotuloPeriodoNumero(bim) : 'período';
+        var nomeDest = destino.nomeCab || 'título do período';
+        avisoLinha = {
+            tipo: 'ok',
+            texto: adicionados > 0
+                ? (adicionados + ' coluna(s) de ' + rotulo + ' vinculada(s) em “' + nomeDest + '”.')
+                : ('As colunas de ' + rotulo + ' já estão em “' + nomeDest + '”.')
+        };
+        renderRevisarDinamico();
+        if (adicionados > 0) agendarMontar();
+    }
+
+    function htmlCatalogoPecasColag() {
+        var campoPeriodo = String(rotuloCampoPeriodo() || 'período').toLocaleLowerCase('pt-BR');
+        var html = '<aside class="bw-catalogo" aria-label="Catálogo de notas">';
+        html += '<div class="bw-catalogo-topo">';
+        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Notas por ' + esc(campoPeriodo) + '</p>';
+        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique em <strong>Abrir</strong> no ' + esc(campoPeriodo) + '. Depois selecione um título no quadro e use <strong>Adicionar todos</strong>.</p>';
+        html += '</div><div class="bw-catalogo-corpo">';
+        var pecas = (estado && estado.pecas) || [];
+        var bims = bimestresPecasColag();
+        if (!pecas.length || !bims.length) {
+            html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">Nenhuma nota marcada neste ano. Volte ao passo anterior e marque os tipos de nota.</p>';
+            html += '</div></aside>';
+            return html;
+        }
+        var destinoAtivo = destinoTituloPeriodoAtivo();
+        bims.forEach(function (bim) {
+            var keys = pecasDoBimestreColag(bim);
+            var faltam = 0;
+            keys.forEach(function (key) {
+                var cod = codigoExistentePecaColag(key);
+                if (!codigoExisteNoEstado(cod)) faltam += 1;
+                else if (destinoAtivo && !codigoEstaNoTitulo(cod, destinoAtivo.linhaId, destinoAtivo.nomeCab)) faltam += 1;
+            });
+            if (bim >= 1 && bim <= 4) {
+                if (!colunaFalJaNoQuadro(bim)) faltam += 1;
+                else if (destinoAtivo && !codigoEstaNoTitulo('b' + bim + '_fal', destinoAtivo.linhaId, destinoAtivo.nomeCab)) faltam += 1;
+            }
+            html += '<details class="bw-catalogo-grupo">';
+            html += '<summary title="Clique para abrir ou fechar as notas">'
+                + '<span>' + esc(rotuloPeriodoNumero(bim)) + '</span>'
+                + '<span class="bw-cat-abrir"><span class="bw-cat-abrir-txt"></span></span>'
+                + '</summary>';
+            html += '<div class="bw-catalogo-itens">';
+            html += '<button type="button" class="bw-catalogo-add-todos" data-catalogo-pecas-periodo="' + bim + '"'
+                + ' title="Selecione um título do período e vincule as notas nele (inclui FAL)"'
+                + (faltam ? '' : ' disabled') + '>'
+                + (faltam
+                    ? ('Adicionar todos (' + faltam + ')')
+                    : (destinoAtivo ? 'Todos já neste título' : 'Todos já no quadro')) + '</button>';
+            keys.forEach(function (key) {
+                var nome = pecaLabel(key) || pecaNomeQuadro(key) || key;
+                var sigla = String(codigoCanonicoPecaColag(key) || key).toUpperCase();
+                var cod = codigoExistentePecaColag(key);
+                var noQuadro = codigoExisteNoEstado(cod);
+                html += '<button type="button" draggable="true" class="bw-catalogo-item' + (noQuadro ? ' no-quadro' : '') + '" data-catalogo-peca="' + esc(key) + '" title="' + esc(nome + ' → arraste para o título do período') + '">';
+                html += '<span class="bw-cat-nome">' + esc(nome) + '</span>';
+                html += '<span class="bw-cat-sigla">' + esc(sigla) + '</span>';
+                html += '</button>';
+            });
+            if (bim >= 1 && bim <= 4) {
+                var falNoQuadro = colunaFalJaNoQuadro(bim);
+                html += '<button type="button" draggable="true" class="bw-catalogo-item' + (falNoQuadro ? ' no-quadro' : '') + '" data-catalogo-fal="' + bim + '" title="Faltas → arraste para o título do período">';
+                html += '<span class="bw-cat-nome">Faltas</span>';
+                html += '<span class="bw-cat-sigla">FAL</span>';
+                html += '</button>';
+            }
+            html += '</div></details>';
+        });
+        html += '</div></aside>';
+        return html;
+    }
+
     function htmlCatalogoEventosBuilder() {
         var eventos = eventosCatalogoBuilder();
         var html = '<aside class="bw-catalogo" aria-label="Catálogo de eventos">';
@@ -9022,7 +9286,7 @@ $boletimWizardSteps = [
         var cols = ordenarColunasLista(mesclarColunasExtrasDoEstado((pv && pv.colunas) || []));
 
         var html = '<div class="bw-builder">';
-        html += htmlCatalogoEventosBuilder();
+        html += ehQuadroPecasColag() ? htmlCatalogoPecasColag() : htmlCatalogoEventosBuilder();
         html += '<section class="bw-quadro" aria-label="Quadro de montagem">';
         html += '<div class="bw-quadro-topo">';
         html += '<div>';
@@ -10145,11 +10409,13 @@ $boletimWizardSteps = [
         var catalogoDragPayload = '';
         var catalogoDragou = false;
         bodyEl.addEventListener('dragstart', function (e) {
-            var item = e.target.closest('[data-catalogo-evento], [data-catalogo-fal]');
+            var item = e.target.closest('[data-catalogo-evento], [data-catalogo-fal], [data-catalogo-peca]');
             if (!item || !e.dataTransfer) return;
+            var pecaKey = item.getAttribute('data-catalogo-peca');
             var evId = item.getAttribute('data-catalogo-evento');
             var falBim = item.getAttribute('data-catalogo-fal');
-            catalogoDragPayload = evId ? ('ev:' + evId) : ('fal:' + falBim);
+            if (pecaKey && ehQuadroPecasColag()) catalogoDragPayload = 'peca:' + pecaKey;
+            else catalogoDragPayload = evId ? ('ev:' + evId) : ('fal:' + falBim);
             catalogoDragou = false;
             try {
                 e.dataTransfer.setData('text/bw-catalogo', catalogoDragPayload);
@@ -10218,6 +10484,24 @@ $boletimWizardSteps = [
             if (zoomBtn) {
                 e.preventDefault();
                 ajustarZoomPreview(zoomBtn.getAttribute('data-bw-zoom'));
+                return;
+            }
+            var catPecasTodos = e.target.closest('[data-catalogo-pecas-periodo]');
+            if (catPecasTodos && ehQuadroPecasColag()) {
+                e.preventDefault();
+                e.stopPropagation();
+                adicionarTodasPecasColag(Number(catPecasTodos.getAttribute('data-catalogo-pecas-periodo') || 0));
+                return;
+            }
+            var catPeca = e.target.closest('[data-catalogo-peca]');
+            if (catPeca && ehQuadroPecasColag()) {
+                e.preventDefault();
+                if (catalogoDragou) return;
+                var destPeca = destinoTituloPeriodoAtivo() || {};
+                adicionarColunaPecaColag(String(catPeca.getAttribute('data-catalogo-peca') || ''), {
+                    linhaId: destPeca.linhaId || '',
+                    nomeCab: destPeca.nomeCab || ''
+                });
                 return;
             }
             var catTodos = e.target.closest('[data-catalogo-periodo]');

@@ -158,6 +158,7 @@ class BoletimAssistenteWizard
             'boletins' => $this->catalogoBoletins(),
             'quadros_notas' => $this->catalogoQuadrosNotas(),
             'modulo_jornadas' => \App\Core\LayoutHelper::isModuleEnabled('jornadas'),
+            'quadro_pecas_colag' => $this->ehTenantColag(),
             'modulo_eventos_avaliativos' => \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos'),
             'eventos_avaliativos' => \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
                 ? $this->ferramentas->listarEventosAvaliativosParaBoletim()
@@ -168,6 +169,19 @@ class BoletimAssistenteWizard
             'escala_max_padrao' => $escalaMaxPadrao,
             'periodos_por_ano' => $this->catalogoPeriodos(),
         ];
+    }
+
+    /**
+     * Quadro antigo de peças (tipos de nota) só no Colag.
+     * Outro tenant permanece no catálogo de eventos avaliativos.
+     */
+    private function ehTenantColag(): bool
+    {
+        if (!defined('TENANT_SLUG')) {
+            return false;
+        }
+
+        return strtolower(trim((string) TENANT_SLUG)) === 'colag';
     }
 
     /**
