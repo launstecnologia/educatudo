@@ -755,14 +755,11 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             try {
                 $calendario = new SchoolCalendarService($this->db);
                 $anoCalendario = (int) date('Y');
-                $cfgCalendario = $calendario->resolverEscopos($anoCalendario, $calendario->escoposDoProfessor($professorId));
                 $visuaisCalendario = $calendario->visuaisTipos();
                 $calendarioPainel = [
                     'ano' => $anoCalendario,
                     'mes' => (int) date('n'),
-                    'eventos' => $cfgCalendario
-                        ? $calendario->eventosDoProfessor((int) $cfgCalendario['id'], $professorId)
-                        : [],
+                    'eventos' => $calendario->eventosPainelDoProfessor($anoCalendario, $professorId),
                     'labels' => $visuaisCalendario['labels'],
                     'bg' => $visuaisCalendario['bg'],
                     'text' => $visuaisCalendario['text'],

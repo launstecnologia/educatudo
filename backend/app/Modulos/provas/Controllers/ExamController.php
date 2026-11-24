@@ -2835,7 +2835,8 @@ class ExamController extends BaseController
             if (!$questaoVerificada) {
                 throw new \Exception('Questão não foi salva corretamente');
             }
-            
+            (new \App\Modulos\Provas\Services\BancoQuestaoProfessorService())->salvarQuestaoDaProva((int) $questaoId);
+
             $this->json([
                 'success' => true,
                 'message' => 'Questão adicionada com sucesso',
@@ -2888,7 +2889,8 @@ class ExamController extends BaseController
             ];
             
             $this->provaModel->updateQuestao($questaoId, $data);
-            
+            (new \App\Modulos\Provas\Services\BancoQuestaoProfessorService())->salvarQuestaoDaProva((int) $questaoId);
+
             $this->json([
                 'success' => true,
                 'message' => 'Questão atualizada com sucesso'

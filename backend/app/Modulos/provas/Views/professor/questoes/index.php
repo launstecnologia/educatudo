@@ -50,7 +50,15 @@ $rotulosOrigem = [
     'jornada_importacao' => 'Importada na jornada',
     'jornada_reuso' => 'Reutilizada',
     'banco_questoes' => 'Banco de questões',
+    'banco_manual' => 'Criada no banco',
+    'prova_manual' => 'Criada na prova',
     'api_externa' => 'Catálogo externo',
+];
+$rotulosTipo = [
+    'multipla_escolha' => 'Múltipla Escolha',
+    'verdadeiro_falso' => 'Verdadeiro ou Falso',
+    'dissertativa' => 'Dissertativa',
+    'alternativas' => 'Múltipla Escolha',
 ];
 $rotulosNivel = ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difícil'];
 $badgeNivel = ['facil' => 'ativo', 'medio' => 'pendente', 'dificil' => 'erro'];
@@ -65,7 +73,7 @@ include $ui . '/btn.php';
 $page_header_actions = ob_get_clean();
 
 $page_header_title = 'Banco de Questões';
-$page_header_subtitle = 'Questões que você criou ou gerou nas jornadas. Selecione e monte listas para usar com os alunos.';
+$page_header_subtitle = 'Questões que você criou na prova, no banco ou nas jornadas. Selecione e monte listas para usar com os alunos.';
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 ?>
 
@@ -79,6 +87,68 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         <?= htmlspecialchars($error) ?>
     </div>
 <?php endif; ?>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-4">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Nova questão</h2>
+    <form id="form-nova-questao" method="post" action="<?= URL ?>/professor/questoes/criar" class="questao-form space-y-4">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+        <input type="hidden" name="enunciado" id="banco-enunciado">
+        <input type="hidden" name="alternativas_json" id="banco-alternativas-json" value="[]">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="banco-tipo" class="block text-sm font-medium text-gray-700 mb-1.5">Tipo de questão</label>
+                <select id="banco-tipo" name="tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="multipla_escolha">Múltipla Escolha</option>
+                    <option value="verdadeiro_falso">Verdadeiro ou Falso</option>
+                    <option value="dissertativa">Dissertativa</option>
+                </select>
+            </div>
+            <div>
+                <label for="banco-nivel" class="block text-sm font-medium text-gray-700 mb-1.5">Nível</label>
+                <select id="banco-nivel" name="nivel" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="facil">Fácil</option>
+                    <option value="medio">Médio</option>
+                    <option value="dificil">Difícil</option>
+                </select>
+            </div>
+            <div>
+                <label for="banco-valor" class="block text-sm font-medium text-gray-700 mb-1.5">Pontuação</label>
+                <input id="banco-valor" type="number" name="valor" step="0.1" min="0" value="1.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+        <div>
+            <label for="banco-materia" class="block text-sm font-medium text-gray-700 mb-1.5">Matéria</label>
+            <?php if (!empty($materias_professor)): ?>
+                <select id="banco-materia" name="materia" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Selecione</option>
+                    <?php foreach ($materias_professor as $matProf): ?>
+                        <option value="<?= htmlspecialchars((string) ($matProf['nome'] ?? '')) ?>"><?= htmlspecialchars((string) ($matProf['nome'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <input id="banco-materia" type="text" name="materia" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex.: Biologia">
+            <?php endif; ?>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Enunciado</label>
+            <div class="editor-toolbar">
+                <button type="button" class="tb-btn" data-csp-click="fmtBancoEnunciado" data-csp-arg="bold"><b>B</b></button>
+                <button type="button" class="tb-btn" data-csp-click="fmtBancoEnunciado" data-csp-arg="italic"><i>I</i></button>
+                <button type="button" class="tb-btn" data-csp-click="fmtBancoEnunciado" data-csp-arg="underline"><u>U</u></button>
+            </div>
+            <div id="banco-editor-enunciado" class="rich-editor" contenteditable="true" data-placeholder="Digite o enunciado da questão"></div>
+        </div>
+        <div id="banco-opcoes">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Alternativas</label>
+            <div id="banco-opcoes-lista" class="alt-list mb-3"></div>
+            <div class="flex flex-wrap items-center gap-4">
+                <button type="button" data-csp-click="adicionarAlternativaBanco" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">+ Adicionar Alternativa</button>
+                <span class="text-xs text-gray-500">Máximo 5 alternativas (A, B, C, D, E)</span>
+            </div>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Adicionar Questão</button>
+    </form>
+</div>
 
 <form id="form-questoes" method="post" class="space-y-4">
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-wrap items-end gap-3">
@@ -156,7 +226,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     <?php endif; ?>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap"><?= htmlspecialchars((string) ($q['materia'] ?? '')) ?></td>
-                <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap"><?= htmlspecialchars((string) ($q['tipo'] ?? '')) ?></td>
+                <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap"><?= htmlspecialchars($rotulosTipo[(string) ($q['tipo'] ?? '')] ?? (string) ($q['tipo'] ?? '')) ?></td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <?php if ($nivelLabel !== ''): ?>
                         <?php
@@ -400,6 +470,98 @@ include $ui . '/offcanvas.php';
 </div>
 
 <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
+var bancoOpcoes = 0;
+var bancoLetras = ['A', 'B', 'C', 'D', 'E'];
+function fmtBancoEnunciado(cmd) {
+    var editor = document.getElementById('banco-editor-enunciado');
+    if (editor) editor.focus();
+    document.execCommand(cmd, false, null);
+}
+function adicionarAlternativaBanco() {
+    if (bancoOpcoes >= 5) {
+        alert('Máximo de 5 alternativas permitidas (A, B, C, D, E)');
+        return;
+    }
+    var letra = bancoLetras[bancoOpcoes];
+    var idx = bancoOpcoes;
+    bancoOpcoes++;
+    var item = document.createElement('div');
+    item.className = 'alt-item';
+    item.setAttribute('data-opcao-index', String(idx));
+    item.innerHTML = '<div class="alt-letter">' + letra + '</div>'
+        + '<div class="alt-input-wrap"><div class="alt-editor" contenteditable="true" data-placeholder="Alternativa ' + letra + '..."></div></div>'
+        + '<div class="alt-actions flex items-center gap-3">'
+        + '<label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="banco_gabarito" value="' + idx + '" class="w-5 h-5"><span class="alt-correct">Gabarito</span></label>'
+        + '<button type="button" data-csp-click="removerAlternativaBanco" data-csp-pass="el" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600">Remover</button>'
+        + '</div>';
+    document.getElementById('banco-opcoes-lista').appendChild(item);
+}
+function removerAlternativaBanco(botao) {
+    var item = botao.closest('.alt-item');
+    if (item) item.remove();
+    bancoOpcoes = Math.max(0, bancoOpcoes - 1);
+    document.querySelectorAll('#banco-opcoes-lista .alt-item').forEach(function (opcao, index) {
+        var letra = bancoLetras[index];
+        opcao.setAttribute('data-opcao-index', String(index));
+        var letter = opcao.querySelector('.alt-letter');
+        if (letter) letter.textContent = letra;
+        var radio = opcao.querySelector('input[type="radio"]');
+        if (radio) radio.value = String(index);
+    });
+}
+function atualizarAlternativasBanco() {
+    var tipo = document.getElementById('banco-tipo');
+    var caixa = document.getElementById('banco-opcoes');
+    if (!tipo || !caixa) return;
+    if (tipo.value === 'multipla_escolha') {
+        caixa.classList.remove('hidden');
+        if (bancoOpcoes === 0) {
+            adicionarAlternativaBanco();
+            adicionarAlternativaBanco();
+        }
+    } else {
+        caixa.classList.add('hidden');
+    }
+}
+document.getElementById('banco-tipo')?.addEventListener('change', atualizarAlternativasBanco);
+atualizarAlternativasBanco();
+document.getElementById('form-nova-questao')?.addEventListener('submit', function (event) {
+    var editor = document.getElementById('banco-editor-enunciado');
+    var hidden = document.getElementById('banco-enunciado');
+    if (editor && hidden) hidden.value = editor.innerHTML || '';
+    var texto = editor ? (editor.innerText || '').trim() : '';
+    if (texto === '') {
+        event.preventDefault();
+        alert('O enunciado é obrigatório.');
+        return;
+    }
+    var tipo = document.getElementById('banco-tipo');
+    var lista = [];
+    if (tipo && tipo.value === 'multipla_escolha') {
+        var marcado = document.querySelector('#banco-opcoes-lista input[name="banco_gabarito"]:checked');
+        if (!marcado) {
+            event.preventDefault();
+            alert('Marque o gabarito.');
+            return;
+        }
+        document.querySelectorAll('#banco-opcoes-lista .alt-item').forEach(function (item) {
+            var ed = item.querySelector('.alt-editor');
+            var radio = item.querySelector('input[type="radio"]');
+            lista.push({
+                texto: ed ? (ed.innerHTML || '').trim() : '',
+                correta: radio && radio.checked ? 1 : 0
+            });
+        });
+        if (lista.filter(function (item) { return (item.texto || '').replace(/<[^>]*>/g, '').trim() !== ''; }).length < 2) {
+            event.preventDefault();
+            alert('Adicione pelo menos 2 alternativas.');
+            return;
+        }
+    }
+    var campo = document.getElementById('banco-alternativas-json');
+    if (campo) campo.value = JSON.stringify(lista);
+});
+
 document.getElementById('btn-marcar-todas')?.addEventListener('click', function () {
     document.querySelectorAll('.checkbox-questao').forEach(function (el) { el.checked = true; });
 });

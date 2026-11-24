@@ -83,8 +83,11 @@ $eventosDoMes = [];
 foreach ($calEventos as $evCal) {
     $inicioCal = strtotime((string) ($evCal['data_inicio'] ?? ''));
     $fimCal = strtotime((string) ($evCal['data_fim'] ?? ''));
-    if (!$inicioCal || !$fimCal) {
+    if (!$inicioCal) {
         continue;
+    }
+    if (!$fimCal || $fimCal < $inicioCal) {
+        $fimCal = $inicioCal;
     }
     $entraNoMes = false;
     for ($diaCal = $inicioCal; $diaCal <= $fimCal; $diaCal += 86400) {

@@ -89,6 +89,7 @@ $router->get('/professor/ai-agents/usage', 'User/TeacherAiAgentsController@usage
 
 // Questões (Professor) - Banco local + montagem + PDF
 $router->get('/professor/questoes', 'Teacher/TeacherQuestionController@index');
+$router->post('/professor/questoes/criar', 'Teacher/TeacherQuestionController@criar');
 $router->post('/professor/questoes/importar', 'Teacher/TeacherQuestionController@importarApi');
 $router->post('/professor/questoes/montagens/salvar', 'Teacher/TeacherQuestionController@salvarMontagem');
 $router->post('/professor/questoes/pdf/selecionadas', 'Teacher/TeacherQuestionController@baixarPdfSelecionadas');

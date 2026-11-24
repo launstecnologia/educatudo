@@ -1196,6 +1196,62 @@ class SchoolCalendarService
         return $lista;
     }
 
+    /**
+     * Quadro do dashboard: calendário da escola e os lembretes que o professor
+     * gravou em qualquer calendário do ano.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function eventosPainelDoProfessor(int $ano, int $professorId): array
+    {
+        $cfg = $this->resolverEscopos($ano, $this->escoposDoProfessor($professorId));
+        if (!$cfg) {
+            $cfg = $this->getAno($ano);
+        }
+        if (!$cfg && class_exists(\App\Modulos\GrupoSeb\Services\GrupoSebService::class)
+            && \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()
+        ) {
+            $listaAno = $this->listarDoAno($ano);
+            $cfg = $listaAno[0] ?? null;
+        }
+        $lista = $cfg
+            ? $this->eventosDoProfessor((int) ($cfg['id'] ?? 0), $professorId)
+            : [];
+        if ($professorId <= 0 || $ano <= 0 || !$this->colunaExiste('calendario_letivo_eventos', 'professor_id')) {
+            return $lista;
+        }
+        $proprios = $this->db->fetchAll(
+            "SELECT e.*
+             FROM calendario_letivo_eventos e
+             INNER JOIN calendario_letivo c ON c.id = e.calendario_id
+             WHERE c.ano = :ano
+               AND e.professor_id = :professor
+             ORDER BY e.data_inicio ASC",
+            ['ano' => $ano, 'professor' => $professorId]
+        ) ?: [];
+        $porId = [];
+        foreach ($lista as $evento) {
+            if (!is_array($evento)) {
+                continue;
+            }
+            $porId[(int) ($evento['id'] ?? 0)] = $evento;
+        }
+        foreach ($proprios as $evento) {
+            if (!is_array($evento)) {
+                continue;
+            }
+            $evento['minha_informacao'] = 1;
+            $porId[(int) ($evento['id'] ?? 0)] = $evento;
+        }
+        $lista = array_values($porId);
+        usort(
+            $lista,
+            static fn ($a, $b) => strcmp((string) ($a['data_inicio'] ?? ''), (string) ($b['data_inicio'] ?? ''))
+        );
+
+        return $lista;
+    }
+
     public function podeIncluirInformacaoProfessor(): bool
     {
         return $this->tableExists() && $this->colunaExiste('calendario_letivo_eventos', 'professor_id');

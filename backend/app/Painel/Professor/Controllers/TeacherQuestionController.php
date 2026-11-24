@@ -39,6 +39,7 @@ class TeacherQuestionController extends BaseController
     {
         $user = $this->authManager->getUser();
         $professorId = (int) ($user['id'] ?? 0);
+        (new \App\Modulos\Provas\Services\BancoQuestaoProfessorService($this->db))->sincronizarProvasDoProfessor($professorId);
 
         $materia = trim((string) ($_GET['materia'] ?? ''));
         $tipo = trim((string) ($_GET['tipo'] ?? ''));
@@ -193,8 +194,26 @@ class TeacherQuestionController extends BaseController
             ['professor_id' => $professorId]
         );
 
+        $materiasProfessor = [];
+        try {
+            $materiasProfessor = $this->db->fetchAll(
+                "SELECT DISTINCT m.nome
+                   FROM grade_horaria g
+                   INNER JOIN materias m ON m.id = g.materia_id
+                  WHERE g.professor_id = :professor_id
+                    AND m.nome IS NOT NULL
+                    AND m.nome <> ''
+                  ORDER BY m.nome ASC",
+                ['professor_id' => $professorId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            $materiasProfessor = [];
+        }
+
         $data = [
             'title' => 'Questões - Portal do Professor',
+            'additional_css' => '<link rel="stylesheet" href="' . URL . '/public/static/css/math-editor.css">',
+            'materias_professor' => $materiasProfessor,
             'page_title' => 'Questões',
             'current_page' => 'questoes',
             'user' => $user,
@@ -227,6 +246,37 @@ class TeacherQuestionController extends BaseController
         ];
 
         $this->viewWithLayout('professor', 'teacher/questoes/index', $data);
+    }
+
+    public function criar(): void
+    {
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        $alternativas = [];
+        $brutas = json_decode((string) ($_POST['alternativas_json'] ?? ''), true);
+        if (is_array($brutas)) {
+            foreach ($brutas as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $alternativas[] = [
+                    'texto' => (string) ($item['texto'] ?? ''),
+                    'correta' => !empty($item['correta']) ? 1 : 0,
+                ];
+            }
+        }
+        $resultado = (new \App\Modulos\Provas\Services\BancoQuestaoProfessorService($this->db))->criarManual($professorId, [
+            'enunciado' => (string) ($_POST['enunciado'] ?? ''),
+            'tipo' => (string) ($_POST['tipo'] ?? 'multipla_escolha'),
+            'nivel' => (string) ($_POST['nivel'] ?? 'facil'),
+            'valor' => (float) ($_POST['valor'] ?? 1),
+            'materia' => (string) ($_POST['materia'] ?? ''),
+            'alternativas' => $alternativas,
+        ]);
+        if (empty($resultado['ok'])) {
+            $this->redirect('/professor/questoes?error=' . urlencode((string) ($resultado['erro'] ?? 'Não foi possível salvar a questão.')));
+        }
+        $this->redirect('/professor/questoes?success=' . urlencode('Questão adicionada ao banco.'));
     }
 
     public function importarApi()
