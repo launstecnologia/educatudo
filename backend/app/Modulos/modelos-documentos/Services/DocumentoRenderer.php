@@ -605,11 +605,12 @@ class DocumentoRenderer
     private function blocoBoletim(array $props, string $css, string $tipo = 'boletim'): string
     {
         $html = trim((string) ($props['html'] ?? ''));
-        if ($html === '') {
-            $bim = (int) ($props['bimestre'] ?? 0);
-            $chave = $tipo === 'boletim'
-                ? 'boletim_html'
-                : ($bim >= 1 && $bim <= 4 ? ('quadro_notas_b' . $bim . '_html') : 'quadro_notas_html');
+        $bim = (int) ($props['bimestre'] ?? 0);
+        $chave = $tipo === 'boletim'
+            ? 'boletim_html'
+            : ($bim >= 1 && $bim <= 4 ? ('quadro_notas_b' . $bim . '_html') : 'quadro_notas_html');
+        // Tabela gravada no editor fica com as notas daquela hora. Na emissão, usa o quadro vivo.
+        if ($html === '' || (stripos($html, '<table') !== false && !str_contains($html, '{{' . $chave . '}}') && !str_contains($html, '{{boletim_celula_'))) {
             $html = '<div class="quadro-notas-wrap">{{' . $chave . '}}</div>';
         }
         // Protege os blocos CSS para não virarem texto no PDF ao sanitizar o HTML.

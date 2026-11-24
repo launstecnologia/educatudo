@@ -1957,53 +1957,48 @@ class ProntuarioVidaEscolarService
             }
             $tipo = strtolower(trim((string) ($col['source_type'] ?? '')));
             $layout = strtolower(trim((string) ($col['layout_type'] ?? '')));
-            if ($tipo === 'calculado' || $layout === 'calculado' || $layout === 'media') {
-                $codigos[] = $codigo;
+            if ($tipo === 'faltas_evento' || $layout === 'faltas' || preg_match('/fal(tas)?$/i', $codigo) === 1) {
+                continue;
             }
+            $codigos[] = $codigo;
         }
         if ($codigos === []) {
             return $linhas;
         }
         $casas = max(0, min(4, $casas));
-        $filhosPorGrupo = [];
-        foreach ($linhas as $lin) {
-            if (!is_array($lin) || empty($lin['eh_grupo_filho'])) {
-                continue;
-            }
-            $chave = trim((string) ($lin['grupo_key'] ?? ''));
-            if ($chave === '') {
-                $chave = trim((string) ($lin['grupo_pai_nome'] ?? ''));
-            }
-            if ($chave === '') {
-                continue;
-            }
-            $filhosPorGrupo[$chave][] = $lin;
-        }
-        if ($filhosPorGrupo === []) {
-            return $linhas;
-        }
-        foreach ($linhas as $i => $lin) {
+        $filhosSeguidos = [];
+        $n = count($linhas);
+        for ($i = 0; $i < $n; $i++) {
+            $lin = $linhas[$i];
             if (!is_array($lin) || empty($lin['eh_grupo_pai'])) {
                 continue;
             }
-            $chave = trim((string) ($lin['grupo_key'] ?? ''));
-            if ($chave === '') {
-                $chave = trim((string) ($lin['materia_nome'] ?? ''));
+            $filhos = [];
+            for ($j = $i + 1; $j < $n; $j++) {
+                $prox = $linhas[$j];
+                if (!is_array($prox) || empty($prox['eh_grupo_filho'])) {
+                    break;
+                }
+                $filhos[] = $prox;
             }
-            $filhos = $filhosPorGrupo[$chave] ?? [];
-            if ($filhos === []) {
-                continue;
+            if ($filhos !== []) {
+                $filhosSeguidos[$i] = $filhos;
             }
-            $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
+        }
+        if ($filhosSeguidos === []) {
+            return $linhas;
+        }
+        foreach ($filhosSeguidos as $i => $filhos) {
+            $notas = is_array($linhas[$i]['notas'] ?? null) ? $linhas[$i]['notas'] : [];
             foreach ($codigos as $codigo) {
-                if ($this->notaQuadroEhNumero($notas[$codigo] ?? null)) {
+                if ($this->notaQuadroEhNumero($this->notaQuadroPorCodigo($notas, $codigo))) {
                     continue;
                 }
                 $soma = 0.0;
                 $tem = false;
                 foreach ($filhos as $filho) {
                     $notasFilho = is_array($filho['notas'] ?? null) ? $filho['notas'] : [];
-                    $valor = $this->notaQuadroNumero($notasFilho[$codigo] ?? null);
+                    $valor = $this->notaQuadroNumero($this->notaQuadroPorCodigo($notasFilho, $codigo));
                     if ($valor === null) {
                         continue;
                     }
@@ -2018,6 +2013,24 @@ class ProntuarioVidaEscolarService
         }
 
         return $linhas;
+    }
+
+    /**
+     * @param array<string,mixed> $notas
+     */
+    private function notaQuadroPorCodigo(array $notas, string $codigo): mixed
+    {
+        if (array_key_exists($codigo, $notas)) {
+            return $notas[$codigo];
+        }
+        $alvo = strtolower($codigo);
+        foreach ($notas as $chave => $valor) {
+            if (strtolower((string) $chave) === $alvo) {
+                return $valor;
+            }
+        }
+
+        return null;
     }
 
     private function notaQuadroEhNumero(mixed $valor): bool
