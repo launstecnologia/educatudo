@@ -7086,19 +7086,21 @@ $boletimWizardSteps = [
             }
         }
         var codigosAgregados = {};
+        var modoGrupo = modo === 'soma' ? 'soma' : 'media';
         (outras || []).forEach(function (col) {
             if (!col || !col.codigo) return;
-            // Média Bim e as colunas seguintes saem da fórmula, não da soma das filhas.
-            if (colunaEhCalculadaFormula(col)) return;
+            // Coluna calculada: no modo média a fórmula roda sobre as peças já juntadas.
+            // No modo soma, a mãe soma o valor que cada frente já calculou — vale para qualquer sigla da escola.
+            if (colunaEhCalculadaFormula(col) && modoGrupo !== 'soma') return;
             agregarCodigo(col.codigo, colunaEhFaltas(col));
             codigosAgregados[String(col.codigo).toLowerCase()] = true;
         });
-        // Peças ocultas (ex.: PP/PU com só MU na grade) ainda sobem para a mãe calcular.
+        // Peças que não aparecem na grade ainda sobem para a mãe calcular.
         (membros || []).forEach(function (lin) {
             Object.keys((lin && lin.notas) || {}).forEach(function (cod) {
                 var low = String(cod || '').toLowerCase();
                 if (!low || codigosAgregados[low] || /__(n|q)$/.test(low)) return;
-                if (ehCodigoBlocoCalc(cod)) return;
+                if (ehCodigoBlocoCalc(cod) && modoGrupo !== 'soma') return;
                 agregarCodigo(cod, /fal/.test(low));
                 codigosAgregados[low] = true;
             });
@@ -7636,17 +7638,23 @@ $boletimWizardSteps = [
         return !algumaPeca && refs.length > 0;
     }
 
-    function aplicarFormulasNaLinhaGrupo(notas) {
+    function aplicarFormulasNaLinhaGrupo(notas, gl) {
         var exprs = expressoesCalculadasDoGrupo();
         if (!exprs.length) return notas;
+        var modoGrupo = gl && gl.modo === 'soma' ? 'soma' : 'media';
         var i;
         var j;
         for (i = 0; i < exprs.length; i++) {
             for (j = 0; j < exprs.length; j++) {
-                if (formulaGrupoFaltouPecaObrigatoria(exprs[j].codigo, exprs[j].expressao, notas)) continue;
+                var codFormula = exprs[j].codigo;
+                if (modoGrupo === 'soma') {
+                    var jaSomado = notas[codFormula];
+                    if (jaSomado != null && jaSomado !== '' && isFinite(Number(jaSomado))) continue;
+                }
+                if (formulaGrupoFaltouPecaObrigatoria(codFormula, exprs[j].expressao, notas)) continue;
                 var valor = avaliarExpressaoGrupo(exprs[j].expressao, notas);
                 if (valor == null) continue;
-                notas[exprs[j].codigo] = valor;
+                notas[codFormula] = valor;
             }
         }
         return notas;
@@ -7803,7 +7811,7 @@ $boletimWizardSteps = [
                 }
             });
         }
-        aplicarFormulasNaLinhaGrupo(notasPai);
+        aplicarFormulasNaLinhaGrupo(notasPai, gl);
         out[pos] = {
             materia_id: 0,
             materia_nome: nomePai,
@@ -7943,7 +7951,7 @@ $boletimWizardSteps = [
         out[pos] = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
-            notas: aplicarFormulasNaLinhaGrupo(agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', [], gl))
+            notas: aplicarFormulasNaLinhaGrupo(agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', [], gl), gl)
         };
         return ordenarLinhasPorNome(out);
     }

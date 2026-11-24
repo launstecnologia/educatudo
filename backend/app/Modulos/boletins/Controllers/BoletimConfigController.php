@@ -8958,8 +8958,14 @@ class BoletimConfigController extends BaseController
                     }
                 }
             }
-            // Média Bim e as colunas seguintes saem da fórmula, com as notas já juntadas da área.
-            $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo($paiNotas, $regra, $arredGrupo);
+            // Média: a fórmula roda de novo sobre as peças já juntadas.
+            // Soma: a mãe fica com a soma do que cada frente já calculou, seja qual for a sigla da coluna.
+            $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo(
+                $paiNotas,
+                $regra,
+                $arredGrupo,
+                (string) ($g['mode'] ?? 'media')
+            );
             $ordemGrupo = 1000000;
             foreach ((array) ($g['rotulo_ids'] ?? []) as $rid => $_) {
                 $ordemRotulo = $this->ordemBoletimNoMapa($mapaOrdemBoletim, (int) $rid);
@@ -9460,7 +9466,12 @@ class BoletimConfigController extends BaseController
      * @param array<string,mixed> $regra
      * @return array<string,mixed>
      */
-    private function aplicarFormulasCalculadasNaLinhaGrupo(array $notas, array $regra, string $arredondamento = 'todos'): array
+    private function aplicarFormulasCalculadasNaLinhaGrupo(
+        array $notas,
+        array $regra,
+        string $arredondamento = 'todos',
+        string $modoGrupo = 'media'
+    ): array
     {
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         $exprs = [];
@@ -9484,9 +9495,16 @@ class BoletimConfigController extends BaseController
         if ($exprs === []) {
             return $notas;
         }
+        $modoGrupo = strtolower(trim($modoGrupo)) === 'soma' ? 'soma' : 'media';
         $passos = count($exprs);
         for ($passo = 0; $passo < $passos; $passo++) {
             foreach ($exprs as $item) {
+                if ($modoGrupo === 'soma') {
+                    $jaSomado = $notas[$item['codigo']] ?? null;
+                    if (is_numeric($jaSomado)) {
+                        continue;
+                    }
+                }
                 $refs = $this->codigosReferenciadosNaExpressao($item['expr'], array_keys($notas));
                 $vars = [];
                 $faltouMu = false;
@@ -9879,7 +9897,9 @@ class BoletimConfigController extends BaseController
                         $groupKeysAtivos[(string) $gk] = true;
                         continue;
                     }
-                    if (isset($calcCfgByCode[$codigo])) {
+                    $modoVirtual = strtolower(trim((string) ($meta['mode'] ?? 'media'))) === 'soma' ? 'soma' : 'media';
+                    // Soma: a coluna calculada da mãe é a soma das frentes, não a fórmula refeita.
+                    if ($modoVirtual !== 'soma' && isset($calcCfgByCode[$codigo])) {
                         $expr = (string) ($calcCfgByCode[$codigo]['expr'] ?? '');
                         if ($expr !== '') {
                             $refsExpr = $this->codigosReferenciadosNaExpressao($expr, array_keys($matrizPorCodigo));
@@ -9945,7 +9965,20 @@ class BoletimConfigController extends BaseController
             $matrizPorCodigo[$codigo] = $map;
         }
 
-        $this->aplicarFormulasNasLinhasVirtuais($matrizPorCodigo, $componentesRegra, $roundModeGrupo, $notasManuaisVirtuais);
+        $modoSomaPorVmid = [];
+        foreach ($groupMetaByKey as $gkModo => $metaModo) {
+            $vmidModo = (int) ($groupMidByKey[$gkModo] ?? 0);
+            if ($vmidModo < 0 && strtolower(trim((string) ($metaModo['mode'] ?? 'media'))) === 'soma') {
+                $modoSomaPorVmid[$vmidModo] = true;
+            }
+        }
+        $this->aplicarFormulasNasLinhasVirtuais(
+            $matrizPorCodigo,
+            $componentesRegra,
+            $roundModeGrupo,
+            $notasManuaisVirtuais,
+            $modoSomaPorVmid
+        );
         foreach ($notasManuaisVirtuais as $codVirtual => $porMidVirtual) {
             if (!isset($matrizPorCodigo[$codVirtual]) || !is_array($matrizPorCodigo[$codVirtual])) {
                 $matrizPorCodigo[$codVirtual] = [];
@@ -12017,7 +12050,8 @@ class BoletimConfigController extends BaseController
         array &$matrizPorCodigo,
         array $componentes,
         string $roundMode,
-        array $notasManuaisVirtuais = []
+        array $notasManuaisVirtuais = [],
+        array $modoSomaPorVmid = []
     ): void
     {
         $vmids = [];
@@ -12085,6 +12119,12 @@ class BoletimConfigController extends BaseController
                     }
                     if ($celulaManual) {
                         continue;
+                    }
+                    if (!empty($modoSomaPorVmid[(int) $vmid])) {
+                        $jaSomado = $matrizPorCodigo[$codigo][(int) $vmid] ?? null;
+                        if (is_numeric($jaSomado)) {
+                            continue;
+                        }
                     }
                     $notas = [];
                     foreach ($matrizPorCodigo as $codNota => $mapNota) {
