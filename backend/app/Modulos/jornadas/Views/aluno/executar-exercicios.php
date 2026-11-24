@@ -51,58 +51,68 @@ function enunciadoPermiteRemoverTituloDuplicado(string $titulo, string $enunciad
 }
 
 /**
+ * Endereço que o navegador do aluno consegue abrir com a sessão da escola.
+ * URLs antigas (outro host, /uploads, chave solta teacher/N/arquivo) viram /media/serve neste domínio.
+ */
+function urlPublicaImagemExercicioAluno($src) {
+    $baseUrl = rtrim((string) (defined('URL') ? URL : ''), '/');
+    $tenantSlug = defined('TENANT_SLUG') ? trim((string) TENANT_SLUG) : '';
+    $src = html_entity_decode(trim((string) $src), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($src === '' || stripos($src, 'data:image/') === 0) {
+        return $src;
+    }
+
+    $parsedUrl = @parse_url($src);
+    $queryParams = [];
+    if (!empty($parsedUrl['query'])) {
+        parse_str((string) $parsedUrl['query'], $queryParams);
+    }
+    $path = (string) ($parsedUrl['path'] ?? '');
+    $caminho = $path !== '' ? $path : $src;
+
+    if (($queryParams['type'] ?? '') === 'jornadas_exercicios' && !empty($queryParams['key'])) {
+        $src = '/media/serve?type=jornadas_exercicios&key=' . rawurlencode((string) $queryParams['key']);
+    } elseif (($queryParams['type'] ?? '') === 'provas_questoes' && !empty($queryParams['key'])) {
+        $src = '/media/serve?type=provas_questoes&key=' . rawurlencode((string) $queryParams['key']);
+    } elseif (preg_match('#(?:^|/)(?:' . preg_quote($tenantSlug, '#') . '/)?jornadas/exercicios/(.+)$#i', $caminho, $pm)) {
+        $src = '/media/serve?type=jornadas_exercicios&key=' . rawurlencode(ltrim((string) $pm[1], '/'));
+    } elseif (preg_match('#^(?:teacher|student)/\d+/.+\.(?:png|jpe?g|gif|webp)$#i', ltrim($caminho, '/'))) {
+        $src = '/media/serve?type=jornadas_exercicios&key=' . rawurlencode(ltrim($caminho, '/'));
+    } else {
+        $src = str_replace('/public/uploads/', '/uploads/', $src);
+        if (strpos($src, 'public/uploads/') === 0) {
+            $src = '/uploads/' . ltrim(substr($src, strlen('public/uploads/')), '/');
+        } elseif (strpos($src, 'uploads/') === 0) {
+            $src = '/uploads/' . ltrim(substr($src, strlen('uploads/')), '/');
+        } elseif (strpos($src, 'media/serve?') === 0) {
+            $src = '/media/serve?' . substr($src, strlen('media/serve?'));
+        }
+    }
+
+    if ($baseUrl !== '' && !preg_match('#^(https?:)?//#i', $src)) {
+        $src = $baseUrl . '/' . ltrim($src, '/');
+    }
+    if ($tenantSlug !== '' && stripos($src, '/media/serve?') !== false && stripos($src, 'tenant=') === false) {
+        $src .= (strpos($src, '?') !== false ? '&' : '?') . 'tenant=' . rawurlencode($tenantSlug);
+    }
+
+    return $src;
+}
+
+/**
  * Normaliza src de imagens dentro do enunciado para evitar ícone de imagem quebrada no aluno.
- * Corrige caminhos legados (/public/uploads), relativos e entidades (&amp;).
  */
 function normalizarImagensEnunciadoAluno($html) {
     if ($html === '' || $html === null || !is_string($html)) return $html;
-    $baseUrl = rtrim((string)(defined('URL') ? URL : ''), '/');
-    $tenantSlug = defined('TENANT_SLUG') ? trim((string)TENANT_SLUG) : '';
-    return preg_replace_callback('/<img\b([^>]*)\bsrc=["\']([^"\']+)["\']([^>]*)>/i', function ($m) use ($baseUrl, $tenantSlug) {
+    $normalizado = preg_replace_callback('/<img\b([^>]*)\bsrc=["\']([^"\']+)["\']([^>]*)>/i', function ($m) {
         $before = $m[1] ?? '';
-        $srcRaw = $m[2] ?? '';
         $after = $m[3] ?? '';
-        $src = html_entity_decode(trim((string)$srcRaw), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        if ($src !== '' && stripos($src, 'data:image/') !== 0) {
-            $parsedUrl = @parse_url($src);
-            $queryParams = [];
-            if (!empty($parsedUrl['query'])) {
-                parse_str((string) $parsedUrl['query'], $queryParams);
-            }
-            if (($queryParams['type'] ?? '') === 'jornadas_exercicios' && !empty($queryParams['key'])) {
-                $src = '/media/serve?type=jornadas_exercicios&key=' . rawurlencode((string) $queryParams['key']);
-            } elseif (($queryParams['type'] ?? '') === 'provas_questoes' && !empty($queryParams['key'])) {
-                $src = '/media/serve?type=provas_questoes&key=' . rawurlencode((string) $queryParams['key']);
-            } elseif (!empty($parsedUrl['path']) && preg_match('#(?:^|/)(?:' . preg_quote($tenantSlug, '#') . '/)?jornadas/exercicios/(.+)$#i', (string) $parsedUrl['path'], $pm)) {
-                $src = '/media/serve?type=jornadas_exercicios&key=' . rawurlencode(ltrim((string) $pm[1], '/'));
-            }
-
-            $src = str_replace('/public/uploads/', '/uploads/', $src);
-            if (strpos($src, 'public/uploads/') === 0) {
-                $src = '/uploads/' . ltrim(substr($src, strlen('public/uploads/')), '/');
-            } elseif (strpos($src, 'uploads/') === 0) {
-                $src = '/uploads/' . ltrim(substr($src, strlen('uploads/')), '/');
-            } elseif (strpos($src, 'media/serve?') === 0) {
-                $src = '/media/serve?' . substr($src, strlen('media/serve?'));
-            }
-
-            // Se vier relativo, torna absoluto no domínio da aplicação.
-            if ($baseUrl !== '' && !preg_match('#^(https?:)?//#i', $src) && stripos($src, 'data:image/') !== 0) {
-                $src = $baseUrl . '/' . ltrim($src, '/');
-            }
-
-            // Garante tenant no media/serve em ambiente multi-tenant.
-            if ($tenantSlug !== '' && stripos($src, '/media/serve?') !== false && stripos($src, 'tenant=') === false) {
-                $src .= (strpos($src, '?') !== false ? '&' : '?') . 'tenant=' . rawurlencode($tenantSlug);
-            }
-        }
-
+        $src = urlPublicaImagemExercicioAluno($m[2] ?? '');
         $srcEsc = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
-        return '<img' . $before . 'src="' . $srcEsc . '"' . $after
-            . ' onerror="if(!this.dataset.errfix){this.dataset.errfix=\'1\';var s=this.getAttribute(\'src\')||\'\';if(s.indexOf(\'/public/uploads/\')>=0){this.src=s.replace(\'/public/uploads/\',\'/uploads/\');return;}if(s.indexOf(\'/uploads/\')>=0&&s.indexOf(\'/media/serve?\')<0){this.src=s.replace(\'/uploads/\',\'/public/uploads/\');return;}if(s.indexOf(\'&amp;\')>=0){this.src=s.replace(/&amp;/g,\'&\');return;}}this.style.display=\'none\';"'
-            . '>';
+        return '<img' . $before . 'src="' . $srcEsc . '"' . $after . '>';
     }, $html);
+
+    return is_string($normalizado) ? $normalizado : $html;
 }
 $ocultarTituloJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', true);
 $ocultarTituloExercicioJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_exercicio_v1', true);
@@ -277,13 +287,12 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             ?>
         </div>
         <?php if (!empty($exercicio_atual['imagem_url'])): ?>
-        <?php
-            $img_url = $exercicio_atual['imagem_url'];
-            $img_url = preg_replace('#/public/uploads/#', '/uploads/', $img_url);
-        ?>
+        <?php $img_url = urlPublicaImagemExercicioAluno($exercicio_atual['imagem_url']); ?>
+        <?php if ($img_url !== ''): ?>
         <div class="mb-4">
             <img src="<?= htmlspecialchars($img_url, ENT_QUOTES, 'UTF-8') ?>" alt="Imagem do enunciado" class="max-w-full h-auto rounded-lg border border-gray-200 shadow-sm">
         </div>
+        <?php endif; ?>
         <?php endif; ?>
         
         <?php 
@@ -346,7 +355,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
                             </span>
                             <span class="flex-1 opcao-texto-mathjax prose prose-sm max-w-none inline <?= $isCorreta ? 'text-green-700 font-semibold' : ($isRespostaAluno ? 'text-red-700 font-semibold' : 'text-gray-700') ?>">
                                 <?php
-                                $textoOpcaoSafe = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoOpcao);
+                                $textoOpcaoSafe = normalizarImagensEnunciadoAluno(\App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoOpcao));
                                 echo $textoOpcaoSafe !== '' ? $textoOpcaoSafe : prepararTextoParaMathJax($textoOpcao);
                                 ?>
                             </span>
@@ -367,7 +376,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
                             <div class="flex-1">
                                 <span class="font-semibold text-gray-900 mr-2"><?= htmlspecialchars($letraOpcao, ENT_QUOTES, 'UTF-8') ?>.</span>
                                 <span class="text-gray-700 opcao-texto-mathjax prose prose-sm max-w-none inline"><?php
-                                $textoOpcaoSafe = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoOpcao);
+                                $textoOpcaoSafe = normalizarImagensEnunciadoAluno(\App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoOpcao));
                                 echo $textoOpcaoSafe !== '' ? $textoOpcaoSafe : prepararTextoParaMathJax($textoOpcao);
                                 ?></span>
                             </div>

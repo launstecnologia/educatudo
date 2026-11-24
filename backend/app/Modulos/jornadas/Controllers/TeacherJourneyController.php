@@ -4474,7 +4474,18 @@ class TeacherJourneyController extends BaseController
         }
 
         try {
-            $media = new MediaStorageService($this->config);
+            $configMedia = $this->config;
+            $tenantSlug = trim((string) (
+                (defined('TENANT_SLUG') ? TENANT_SLUG : '')
+                ?: ($configMedia['tenant']['slug'] ?? '')
+                ?: ($configMedia['school']['code'] ?? '')
+            ));
+            if ($tenantSlug !== '') {
+                $configMedia['tenant'] = array_merge($configMedia['tenant'] ?? [], ['slug' => $tenantSlug]);
+                $configMedia['school'] = array_merge($configMedia['school'] ?? [], ['code' => $tenantSlug]);
+                $configMedia['media'] = array_merge($configMedia['media'] ?? [], ['tenant_prefix' => true]);
+            }
+            $media = new MediaStorageService($configMedia);
 
             $result = preg_replace_callback('/<img\b([^>]*)\bsrc=["\']([^"\']+)["\']([^>]*)>/i', function ($m) use ($media, $professorId) {
                 $before = $m[1] ?? '';

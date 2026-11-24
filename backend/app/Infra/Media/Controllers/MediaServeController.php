@@ -156,6 +156,17 @@ class MediaServeController extends BaseController
                     exit;
                 }
             }
+
+            // Arquivo gravado no disco antes do S3: getLocalPath devolve null enquanto o storage é S3.
+            $disco = $config;
+            $disco['media'] = array_merge($disco['media'] ?? [], ['storage' => 'local', 'tenant_prefix' => false]);
+            $mediaDisco = new MediaStorageService($disco);
+            foreach ($candidateKeys as $candidateKey) {
+                $caminhoDisco = $mediaDisco->getLocalPath($type, $candidateKey);
+                if ($caminhoDisco !== null && is_file($caminhoDisco)) {
+                    $this->entregarArquivoLocal($type, $caminhoDisco);
+                }
+            }
         }
 
         $path = null;
@@ -185,6 +196,11 @@ class MediaServeController extends BaseController
             http_response_code(404);
             exit;
         }
+        $this->entregarArquivoLocal($type, $path);
+    }
+
+    private function entregarArquivoLocal(string $type, string $path): void
+    {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $disposition = $this->shouldServeInline($ext) ? 'inline' : 'attachment';
         header('Content-Type: ' . $this->mimeForExtension($ext));
