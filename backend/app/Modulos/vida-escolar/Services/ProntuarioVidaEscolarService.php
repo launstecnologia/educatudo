@@ -1914,6 +1914,7 @@ class ProntuarioVidaEscolarService
 
             // Casas da regra de aprovação (Modelos → critério), não o snapshot antigo do documento.
             $casas = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
+            $linhas = $this->preencherCalculadasVaziasDoPaiPelaSomaDosFilhos($linhas, $cols, $casas);
 
             $html = $this->renderizarQuadroBoletimTabela(
                 $cols,
@@ -1933,6 +1934,111 @@ class ProntuarioVidaEscolarService
             error_log('Quadro regra vida aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
             return '';
         }
+    }
+
+    /**
+     * Coluna calculada da mãe vazia recebe a soma do que cada frente já tem.
+     * Se a fórmula da média já gravou um número, ele permanece.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param list<array<string,mixed>> $colunas
+     * @return list<array<string,mixed>>
+     */
+    private function preencherCalculadasVaziasDoPaiPelaSomaDosFilhos(array $linhas, array $colunas, int $casas): array
+    {
+        $codigos = [];
+        foreach ($colunas as $col) {
+            if (!is_array($col)) {
+                continue;
+            }
+            $codigo = trim((string) ($col['codigo'] ?? ''));
+            if ($codigo === '') {
+                continue;
+            }
+            $tipo = strtolower(trim((string) ($col['source_type'] ?? '')));
+            $layout = strtolower(trim((string) ($col['layout_type'] ?? '')));
+            if ($tipo === 'calculado' || $layout === 'calculado' || $layout === 'media') {
+                $codigos[] = $codigo;
+            }
+        }
+        if ($codigos === []) {
+            return $linhas;
+        }
+        $casas = max(0, min(4, $casas));
+        $filhosPorGrupo = [];
+        foreach ($linhas as $lin) {
+            if (!is_array($lin) || empty($lin['eh_grupo_filho'])) {
+                continue;
+            }
+            $chave = trim((string) ($lin['grupo_key'] ?? ''));
+            if ($chave === '') {
+                $chave = trim((string) ($lin['grupo_pai_nome'] ?? ''));
+            }
+            if ($chave === '') {
+                continue;
+            }
+            $filhosPorGrupo[$chave][] = $lin;
+        }
+        if ($filhosPorGrupo === []) {
+            return $linhas;
+        }
+        foreach ($linhas as $i => $lin) {
+            if (!is_array($lin) || empty($lin['eh_grupo_pai'])) {
+                continue;
+            }
+            $chave = trim((string) ($lin['grupo_key'] ?? ''));
+            if ($chave === '') {
+                $chave = trim((string) ($lin['materia_nome'] ?? ''));
+            }
+            $filhos = $filhosPorGrupo[$chave] ?? [];
+            if ($filhos === []) {
+                continue;
+            }
+            $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
+            foreach ($codigos as $codigo) {
+                if ($this->notaQuadroEhNumero($notas[$codigo] ?? null)) {
+                    continue;
+                }
+                $soma = 0.0;
+                $tem = false;
+                foreach ($filhos as $filho) {
+                    $notasFilho = is_array($filho['notas'] ?? null) ? $filho['notas'] : [];
+                    $valor = $this->notaQuadroNumero($notasFilho[$codigo] ?? null);
+                    if ($valor === null) {
+                        continue;
+                    }
+                    $soma += $valor;
+                    $tem = true;
+                }
+                if ($tem) {
+                    $notas[$codigo] = round($soma, $casas);
+                }
+            }
+            $linhas[$i]['notas'] = $notas;
+        }
+
+        return $linhas;
+    }
+
+    private function notaQuadroEhNumero(mixed $valor): bool
+    {
+        return $this->notaQuadroNumero($valor) !== null;
+    }
+
+    private function notaQuadroNumero(mixed $valor): ?float
+    {
+        if (is_int($valor) || is_float($valor)) {
+            return (float) $valor;
+        }
+        if (!is_string($valor)) {
+            return null;
+        }
+        $texto = trim(str_replace([' ', '—', '–'], '', $valor));
+        if ($texto === '' || $texto === '-') {
+            return null;
+        }
+        $texto = str_replace(',', '.', $texto);
+        return is_numeric($texto) ? (float) $texto : null;
     }
 
     /**
