@@ -15,8 +15,25 @@ $fecharBlocoDash = static function () use ($dashOrdemCustom): void {
     }
 };
 ?>
-<!-- Header Section -->
-<div class="mb-6 md:mb-8<?= !empty($grupo_seb_ativo) ? ' hidden md:block' : '' ?>">
+<?php if (!empty($grupo_seb_ativo)): ?>
+<?php $primaryHex = (string) \App\Core\LayoutHelper::get('primary_color', '#3b82f6'); ?>
+<div class="mb-6 md:mb-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p class="text-sm sm:text-base text-gray-600 mt-1">Calendário escolar, aulas de hoje e desempenho das turmas.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 sm:justify-end">
+            <a href="<?= URL ?>/professor/grade-horaria" class="text-sm font-semibold hover:underline whitespace-nowrap" style="color:<?= htmlspecialchars($primaryHex) ?>">Minha grade →</a>
+            <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm text-right">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Código do professor</p>
+                <p class="text-base font-semibold" style="color:<?= htmlspecialchars($primaryHex) ?>"><?= htmlspecialchars((string) ($professor['codigo_prof'] ?? '')) ?></p>
+            </div>
+        </div>
+    </div>
+</div>
+<?php else: ?>
+<div class="mb-6 md:mb-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex-1">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Painel do Professor</h1>
@@ -35,6 +52,7 @@ $fecharBlocoDash = static function () use ($dashOrdemCustom): void {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php if ($dashOrdemCustom): ?><div class="flex flex-col"><?php endif; ?>
 <?php if (!empty($grupo_seb_ativo)): ?>
@@ -68,6 +86,9 @@ $mostrarAulasHoje = $dashVisivel('aulas_hoje');
 $mostrarDesempenhoProf = $dashVisivel('desempenho');
 $gradeSeb = !$dashOrdemCustom && ($mostrarAulasHoje || $mostrarDesempenhoProf);
 ?>
+<?php if ($gradeSeb): ?>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+<?php endif; ?>
 <?php if ($dashVisivel('calendario')): ?>
 <?php
 $calPainel = is_array($calendario_painel ?? null) ? $calendario_painel : [];
@@ -80,6 +101,7 @@ $calText = is_array($calPainel['text'] ?? null) ? $calPainel['text'] : [];
 $mesesPainel = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 $eventosPorDia = [];
 $eventosDoMes = [];
+$tiposUsadosCal = [];
 foreach ($calEventos as $evCal) {
     $inicioCal = strtotime((string) ($evCal['data_inicio'] ?? ''));
     $fimCal = strtotime((string) ($evCal['data_fim'] ?? ''));
@@ -89,112 +111,315 @@ foreach ($calEventos as $evCal) {
     if (!$fimCal || $fimCal < $inicioCal) {
         $fimCal = $inicioCal;
     }
+    $tipoCal = (string) ($evCal['tipo'] ?? '');
+    if ($tipoCal !== '') {
+        $tiposUsadosCal[$tipoCal] = true;
+    }
+    $tituloCal = trim((string) ($evCal['descricao'] ?? $evCal['titulo'] ?? ''));
+    if ($tituloCal === '') {
+        $tituloCal = (string) ($calLabels[$tipoCal] ?? 'Evento');
+    }
+    $itemCal = [
+        'tipo' => $tipoCal,
+        'titulo' => $tituloCal,
+        'local' => trim((string) ($evCal['local_evento'] ?? '')),
+        'link' => trim((string) ($evCal['link_reuniao'] ?? '')),
+        'minha' => !empty($evCal['minha_informacao']),
+        'inicio' => date('Y-m-d', $inicioCal),
+        'fim' => date('Y-m-d', $fimCal),
+    ];
     $entraNoMes = false;
     for ($diaCal = $inicioCal; $diaCal <= $fimCal; $diaCal += 86400) {
+        $eventosPorDia[date('Y-m-d', $diaCal)][] = $itemCal;
         if ((int) date('Y', $diaCal) === $calAno && (int) date('n', $diaCal) === $calMes) {
-            $eventosPorDia[date('Y-m-d', $diaCal)][] = $evCal;
             $entraNoMes = true;
         }
     }
     if ($entraNoMes) {
-        $eventosDoMes[] = $evCal;
+        $eventosDoMes[] = $itemCal;
     }
 }
+$legendaCal = $tiposUsadosCal === [] ? $calLabels : array_intersect_key($calLabels, $tiposUsadosCal);
 $primeiroDiaCal = mktime(0, 0, 0, $calMes, 1, $calAno);
 $diasNoMesCal = (int) date('t', $primeiroDiaCal);
 $offsetCal = (int) date('w', $primeiroDiaCal);
 $hojeCal = date('Y-m-d');
 $abrirBlocoDash('calendario');
 ?>
-<div class="bg-white rounded-xl shadow-lg mb-6 md:mb-8">
-    <div class="p-4 md:p-6 border-b border-gray-200">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-lg md:text-xl font-semibold text-gray-900">Calendário escolar</h2>
-                <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($mesesPainel[$calMes - 1] ?? '') ?> de <?= $calAno ?></p>
+<section id="pf-cal" class="<?= $gradeSeb ? 'xl:col-span-2 ' : 'mb-6 md:mb-8 ' ?>bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100"
+         data-ano="<?= (int) $calAno ?>" data-mes="<?= (int) $calMes ?>" data-hoje="<?= htmlspecialchars($hojeCal) ?>" data-primary="<?= htmlspecialchars($primaryHex) ?>">
+    <div class="px-5 sm:px-6 py-5 sm:py-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0 flex items-center gap-3">
+            <span class="w-1.5 h-10 rounded-full flex-shrink-0" style="background:<?= htmlspecialchars($primaryHex) ?>"></span>
+            <div>
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Calendário escolar</h2>
+                <p class="text-sm text-gray-500 mt-1">Feriados, recessos e os seus lembretes</p>
             </div>
-            <div class="flex items-center gap-2">
-                <a href="<?= URL ?>/professor/calendario-letivo?evento=1" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-                    <i class="fa-solid fa-plus"></i>
-                    Meu evento
-                </a>
-                <a href="<?= URL ?>/professor/calendario-letivo" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Ver ano</a>
-            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="<?= URL ?>/professor/calendario-letivo?evento=1" class="text-sm font-medium hover:underline whitespace-nowrap" style="color:<?= htmlspecialchars($primaryHex) ?>">Meu evento</a>
+            <a href="<?= URL ?>/professor/calendario-letivo" class="text-sm font-medium hover:underline whitespace-nowrap" style="color:<?= htmlspecialchars($primaryHex) ?>">Ver completo →</a>
         </div>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2">
-        <div class="p-4 md:p-6">
-            <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400 mb-1">
-                <?php foreach (['D','S','T','Q','Q','S','S'] as $siglaDia): ?>
-                <div class="py-1"><?= $siglaDia ?></div>
-                <?php endforeach; ?>
-            </div>
-            <div class="grid grid-cols-7 gap-1">
-                <?php for ($vazio = 0; $vazio < $offsetCal; $vazio++): ?>
-                <div class="h-10"></div>
-                <?php endfor; ?>
-                <?php for ($diaNum = 1; $diaNum <= $diasNoMesCal; $diaNum++):
-                    $chaveDia = sprintf('%04d-%02d-%02d', $calAno, $calMes, $diaNum);
-                    $evsDia = $eventosPorDia[$chaveDia] ?? [];
-                    $primeiroTipo = (string) ($evsDia[0]['tipo'] ?? '');
-                    $ehHoje = $chaveDia === $hojeCal;
-                ?>
-                <div class="h-10 rounded-lg flex flex-col items-center justify-center text-sm <?= $ehHoje ? 'ring-2 ring-blue-500 font-bold' : '' ?>"
-                     style="<?= $primeiroTipo !== '' ? 'background:' . htmlspecialchars((string) ($calBg[$primeiroTipo] ?? '#f3f4f6')) . ';color:' . htmlspecialchars((string) ($calText[$primeiroTipo] ?? '#111827')) : '' ?>">
-                    <span><?= $diaNum ?></span>
-                    <?php if (count($evsDia) > 1): ?>
-                    <span class="text-[10px] leading-none"><?= count($evsDia) ?></span>
-                    <?php endif; ?>
-                </div>
-                <?php endfor; ?>
-            </div>
+    <div class="px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-1">
+            <button type="button" id="pf-cal-prev" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100" aria-label="Mês anterior">
+                <svg class="w-4 h-4" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <span id="pf-cal-mes-label" class="text-sm font-semibold text-gray-800 min-w-[140px] text-center"><?= htmlspecialchars(($mesesPainel[$calMes - 1] ?? '') . ' de ' . $calAno) ?></span>
+            <button type="button" id="pf-cal-next" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100" aria-label="Próximo mês">
+                <svg class="w-4 h-4" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>
+            </button>
         </div>
-        <div class="p-4 md:p-6 border-t lg:border-t-0 lg:border-l border-gray-100 max-h-96 overflow-y-auto">
-            <?php if ($eventosDoMes === []): ?>
-            <p class="text-sm text-gray-500">Nenhum compromisso neste mês.</p>
+        <button type="button" id="pf-cal-hoje" class="px-2.5 py-1 text-xs font-medium rounded-md border border-gray-200 text-gray-600 bg-white hover:bg-gray-50">Hoje</button>
+    </div>
+    <?php if ($legendaCal !== []): ?>
+    <div class="px-4 sm:px-5 pb-2 flex flex-wrap gap-1.5">
+        <?php foreach ($legendaCal as $k => $v): ?>
+        <span class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full" style="background:<?= htmlspecialchars((string) ($calBg[$k] ?? '#f3f4f6')) ?>;color:<?= htmlspecialchars((string) ($calText[$k] ?? '#374151')) ?>">
+            <span class="w-1.5 h-1.5 rounded-full" style="background:<?= htmlspecialchars((string) ($calText[$k] ?? '#6b7280')) ?>"></span>
+            <?= htmlspecialchars((string) $v) ?>
+        </span>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <div class="px-3 sm:px-4 pb-3">
+        <div class="grid grid-cols-7 border-b border-gray-100">
+            <?php foreach (['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as $siglaDia): ?>
+            <div class="py-1.5 text-center text-[10px] font-semibold text-gray-400 uppercase"><?= $siglaDia ?></div>
+            <?php endforeach; ?>
+        </div>
+        <div id="pf-cal-grade" class="grid grid-cols-7 gap-0.5 pt-0.5">
+            <?php for ($vazio = 0; $vazio < $offsetCal; $vazio++): ?>
+            <div class="h-9 sm:h-10"></div>
+            <?php endfor; ?>
+            <?php for ($diaNum = 1; $diaNum <= $diasNoMesCal; $diaNum++):
+                $chaveDia = sprintf('%04d-%02d-%02d', $calAno, $calMes, $diaNum);
+                $evsDia = $eventosPorDia[$chaveDia] ?? [];
+                $tiposDia = array_values(array_unique(array_column($evsDia, 'tipo')));
+                $primeiroTipo = (string) ($tiposDia[0] ?? '');
+                $ehHoje = $chaveDia === $hojeCal;
+                $fimSemana = (int) date('N', strtotime($chaveDia)) >= 6;
+                if ($primeiroTipo !== '') {
+                    $cellBg = (string) ($calBg[$primeiroTipo] ?? '#eef2ff');
+                    $cellText = (string) ($calText[$primeiroTipo] ?? '#1e3a8a');
+                } else {
+                    $cellBg = 'transparent';
+                    $cellText = $fimSemana ? '#9ca3af' : '#4b5563';
+                }
+            ?>
+            <button type="button" class="pf-cal-dia relative h-9 sm:h-10 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:bg-gray-50 focus:outline-none"
+                    style="background:<?= htmlspecialchars($cellBg) ?>;<?= $ehHoje ? 'box-shadow:inset 0 0 0 1.5px ' . htmlspecialchars($primaryHex) . ';' : '' ?>"
+                    data-data="<?= htmlspecialchars($chaveDia) ?>" aria-label="Dia <?= $diaNum ?>">
+                <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold rounded-full <?= $ehHoje ? 'text-white' : '' ?>"
+                      style="color:<?= $ehHoje ? '#ffffff' : htmlspecialchars($cellText) ?>;<?= $ehHoje ? 'background-color:' . htmlspecialchars($primaryHex) : '' ?>"><?= $diaNum ?></span>
+                <?php if ($tiposDia !== []): ?>
+                <span class="flex gap-0.5 leading-none">
+                    <?php foreach (array_slice($tiposDia, 0, 3) as $tipoDot): ?>
+                    <span class="w-1 h-1 rounded-full" style="background:<?= htmlspecialchars((string) ($calText[$tipoDot] ?? '#6b7280')) ?>"></span>
+                    <?php endforeach; ?>
+                </span>
+                <?php endif; ?>
+            </button>
+            <?php endfor; ?>
+        </div>
+    </div>
+    <div class="px-4 sm:px-6 pb-5 border-t border-gray-100 bg-gray-50/60">
+        <div class="pt-4 flex items-center justify-between gap-2 mb-3">
+            <h3 class="text-sm font-semibold text-gray-800" id="pf-cal-dia-titulo">Eventos de <?= date('d/m/Y', strtotime($hojeCal)) ?></h3>
+            <span class="text-[10px] sm:text-xs text-gray-400" id="pf-cal-dia-count"></span>
+        </div>
+        <div id="pf-cal-dia-lista" class="space-y-2 min-h-[3rem]">
+            <?php $eventosHojeCal = $eventosPorDia[$hojeCal] ?? []; ?>
+            <?php if ($eventosHojeCal === []): ?>
+            <p class="text-sm text-gray-500">Nenhum evento escolar neste dia.</p>
             <?php else: ?>
-            <ul class="space-y-2">
-                <?php foreach ($eventosDoMes as $evMes):
-                    $tipoMes = (string) ($evMes['tipo'] ?? '');
-                    $iniMes = strtotime((string) ($evMes['data_inicio'] ?? ''));
-                    $fimMes = strtotime((string) ($evMes['data_fim'] ?? ''));
-                    $periodoMes = $iniMes ? date('d/m', $iniMes) : '';
-                    if ($fimMes && $iniMes && date('Y-m-d', $iniMes) !== date('Y-m-d', $fimMes)) {
-                        $periodoMes .= ' – ' . date('d/m', $fimMes);
-                    }
+                <?php foreach ($eventosHojeCal as $evHoje):
+                    $tipoHoje = (string) ($evHoje['tipo'] ?? '');
                 ?>
-                <li class="rounded-lg px-3 py-2" style="background:<?= htmlspecialchars((string) ($calBg[$tipoMes] ?? '#f3f4f6')) ?>">
-                    <p class="text-sm font-medium" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#111827')) ?>"><?= htmlspecialchars((string) ($evMes['descricao'] ?? '')) ?></p>
-                    <p class="text-xs mt-0.5" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#4b5563')) ?>">
-                        <?= htmlspecialchars($periodoMes) ?>
-                        · <?= htmlspecialchars((string) ($calLabels[$tipoMes] ?? $tipoMes)) ?>
-                        <?= !empty($evMes['minha_informacao']) ? ' · Meu lembrete' : '' ?>
-                    </p>
-                </li>
+                <div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <span class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:<?= htmlspecialchars((string) ($calText[$tipoHoje] ?? '#374151')) ?>"></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:<?= htmlspecialchars((string) ($calBg[$tipoHoje] ?? '#f3f4f6')) ?>;color:<?= htmlspecialchars((string) ($calText[$tipoHoje] ?? '#374151')) ?>"><?= htmlspecialchars((string) ($calLabels[$tipoHoje] ?? $tipoHoje)) ?></span>
+                            <?php if (!empty($evHoje['minha'])): ?><span class="text-[10px] text-gray-400">Meu lembrete</span><?php endif; ?>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-900 mt-1"><?= htmlspecialchars((string) ($evHoje['titulo'] ?? '')) ?></p>
+                    </div>
+                </div>
                 <?php endforeach; ?>
-            </ul>
             <?php endif; ?>
         </div>
+        <div class="mt-5 pt-4 border-t border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Neste mês</h3>
+            <ul id="pf-cal-mes-lista" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <?php if ($eventosDoMes === []): ?>
+                <li class="text-sm text-gray-500"><?= $calEventos === [] ? 'Nenhum evento cadastrado no calendário letivo ainda.' : 'Nenhum evento neste mês.' ?></li>
+                <?php else: ?>
+                    <?php foreach (array_slice($eventosDoMes, 0, 8) as $evMes):
+                        $tipoMes = (string) ($evMes['tipo'] ?? '');
+                        $iniBr = date('d/m', strtotime((string) $evMes['inicio']));
+                        $fimBr = date('d/m', strtotime((string) $evMes['fim']));
+                        $periodoMes = $iniBr === $fimBr ? $iniBr : $iniBr . ' – ' . $fimBr;
+                    ?>
+                    <li class="flex items-center gap-3 text-sm">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#6b7280')) ?>"></span>
+                        <span class="text-xs font-medium text-gray-500 w-20 flex-shrink-0"><?= htmlspecialchars($periodoMes) ?></span>
+                        <span class="text-gray-900 truncate font-medium"><?= htmlspecialchars((string) $evMes['titulo']) ?></span>
+                    </li>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </ul>
+        </div>
     </div>
-</div>
+</section>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
+(function () {
+    var root = document.getElementById('pf-cal');
+    if (!root) return;
+    var eventMap = <?= json_encode($eventosPorDia, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var eventosAno = <?= json_encode(array_values($eventosPorDia === [] ? [] : array_reduce($calEventos, static function ($acc, $ev) use ($calLabels) {
+        $ini = strtotime((string) ($ev['data_inicio'] ?? ''));
+        if (!$ini) {
+            return $acc;
+        }
+        $fim = strtotime((string) ($ev['data_fim'] ?? ''));
+        if (!$fim || $fim < $ini) {
+            $fim = $ini;
+        }
+        $tipo = (string) ($ev['tipo'] ?? '');
+        $titulo = trim((string) ($ev['descricao'] ?? $ev['titulo'] ?? ''));
+        if ($titulo === '') {
+            $titulo = (string) ($calLabels[$tipo] ?? 'Evento');
+        }
+        $acc[] = ['tipo' => $tipo, 'titulo' => $titulo, 'inicio' => date('Y-m-d', $ini), 'fim' => date('Y-m-d', $fim)];
+        return $acc;
+    }, [])), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tipoLabels = <?= json_encode($calLabels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tipoBg = <?= json_encode($calBg, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tipoText = <?= json_encode($calText, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var mesesNomes = <?= json_encode($mesesPainel, JSON_UNESCAPED_UNICODE) ?>;
+    var primaryHex = root.dataset.primary || '#3b82f6';
+    var hoje = root.dataset.hoje;
+    var ano = parseInt(root.dataset.ano, 10);
+    var mes = parseInt(root.dataset.mes, 10);
+    var diaSelecionado = hoje;
+    var elGrade = document.getElementById('pf-cal-grade');
+    var elLabel = document.getElementById('pf-cal-mes-label');
+    var elTitulo = document.getElementById('pf-cal-dia-titulo');
+    var elLista = document.getElementById('pf-cal-dia-lista');
+    var elCount = document.getElementById('pf-cal-dia-count');
+    var elMesLista = document.getElementById('pf-cal-mes-lista');
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    function iso(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+    function br(isoDate) { var p = String(isoDate).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function renderLista(dataIso) {
+        diaSelecionado = dataIso;
+        elTitulo.textContent = 'Eventos de ' + br(dataIso);
+        var evs = eventMap[dataIso] || [];
+        elCount.textContent = evs.length ? (evs.length === 1 ? '1 evento' : evs.length + ' eventos') : '';
+        if (!evs.length) {
+            elLista.innerHTML = '<p class="text-sm text-gray-500">Nenhum evento escolar neste dia.</p>';
+            return;
+        }
+        elLista.innerHTML = evs.map(function (ev) {
+            var tipo = ev.tipo || '';
+            var bg = tipoBg[tipo] || '#f3f4f6';
+            var tx = tipoText[tipo] || '#374151';
+            var minha = ev.minha ? '<span class="text-[10px] text-gray-400">Meu lembrete</span>' : '';
+            return '<div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">' +
+                '<span class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:' + esc(tx) + '"></span>' +
+                '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2">' +
+                '<span class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:' + esc(bg) + ';color:' + esc(tx) + '">' + esc(tipoLabels[tipo] || tipo || 'Evento') + '</span>' +
+                minha + '</div><p class="text-sm font-semibold text-gray-900 mt-1">' + esc(ev.titulo) + '</p></div></div>';
+        }).join('');
+    }
+    function renderMesLista() {
+        var lista = eventosAno.filter(function (ev) {
+            if (!ev.inicio) return false;
+            var ini = ev.inicio.split('-');
+            var fim = (ev.fim || ev.inicio).split('-');
+            var yi = parseInt(ini[0], 10), mi = parseInt(ini[1], 10);
+            var yf = parseInt(fim[0], 10), mf = parseInt(fim[1], 10);
+            return (yi < ano || (yi === ano && mi <= mes)) && (yf > ano || (yf === ano && mf >= mes));
+        }).slice(0, 8);
+        if (!lista.length) {
+            elMesLista.innerHTML = '<li class="text-sm text-gray-500">' + (eventosAno.length ? 'Nenhum evento neste mês.' : 'Nenhum evento cadastrado no calendário letivo ainda.') + '</li>';
+            return;
+        }
+        elMesLista.innerHTML = lista.map(function (ev) {
+            var tx = tipoText[ev.tipo] || '#6b7280';
+            var iniP = String(ev.inicio).split('-');
+            var fimP = String(ev.fim || ev.inicio).split('-');
+            var iniBr = iniP[2] + '/' + iniP[1];
+            var fimBr = fimP[2] + '/' + fimP[1];
+            var periodo = iniBr === fimBr ? iniBr : (iniBr + ' – ' + fimBr);
+            return '<li class="flex items-center gap-3 text-sm"><span class="w-2 h-2 rounded-full flex-shrink-0" style="background:' + esc(tx) + '"></span><span class="text-xs font-medium text-gray-500 w-20 flex-shrink-0">' + esc(periodo) + '</span><span class="text-gray-900 truncate font-medium">' + esc(ev.titulo) + '</span></li>';
+        }).join('');
+    }
+    function bindDias() {
+        elGrade.querySelectorAll('.pf-cal-dia').forEach(function (btn) {
+            btn.addEventListener('click', function () { renderLista(btn.dataset.data); marcarSelecao(); });
+        });
+    }
+    function marcarSelecao() {
+        elGrade.querySelectorAll('.pf-cal-dia').forEach(function (b) {
+            b.style.boxShadow = (b.dataset.data === diaSelecionado || b.dataset.data === hoje) ? ('inset 0 0 0 1.5px ' + primaryHex) : '';
+        });
+    }
+    function renderGrade() {
+        var primeiro = new Date(ano, mes - 1, 1);
+        var diasNoMes = new Date(ano, mes, 0).getDate();
+        var offset = primeiro.getDay();
+        elLabel.textContent = mesesNomes[mes - 1] + ' de ' + ano;
+        renderMesLista();
+        var html = '';
+        for (var i = 0; i < offset; i++) html += '<div class="h-9 sm:h-10"></div>';
+        for (var dia = 1; dia <= diasNoMes; dia++) {
+            var dataStr = iso(ano, mes, dia);
+            var evs = eventMap[dataStr] || [];
+            var tipos = [];
+            evs.forEach(function (e) { if (e.tipo && tipos.indexOf(e.tipo) === -1) tipos.push(e.tipo); });
+            var prim = tipos[0] || null;
+            var dow = new Date(ano, mes - 1, dia).getDay();
+            var ehHoje = dataStr === hoje;
+            var cellBg = prim ? (tipoBg[prim] || '#eef2ff') : 'transparent';
+            var cellText = prim ? (tipoText[prim] || '#1e3a8a') : ((dow === 0 || dow === 6) ? '#9ca3af' : '#4b5563');
+            var dots = tipos.slice(0, 3).map(function (t) {
+                return '<span class="w-1 h-1 rounded-full" style="background:' + esc(tipoText[t] || '#6b7280') + '"></span>';
+            }).join('');
+            html += '<button type="button" class="pf-cal-dia relative h-9 sm:h-10 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:bg-gray-50 focus:outline-none" style="background:' + esc(cellBg) + ';' + ((ehHoje || dataStr === diaSelecionado) ? 'box-shadow:inset 0 0 0 1.5px ' + primaryHex + ';' : '') + '" data-data="' + dataStr + '">' +
+                '<span class="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold rounded-full' + (ehHoje ? ' text-white' : '') + '" style="color:' + (ehHoje ? '#ffffff' : esc(cellText)) + ';' + (ehHoje ? 'background-color:' + primaryHex + ';' : '') + '">' + dia + '</span>' +
+                (dots ? '<span class="flex gap-0.5 leading-none">' + dots + '</span>' : '') + '</button>';
+        }
+        elGrade.innerHTML = html;
+        bindDias();
+    }
+    document.getElementById('pf-cal-prev').addEventListener('click', function () { mes -= 1; if (mes < 1) { mes = 12; ano -= 1; } renderGrade(); });
+    document.getElementById('pf-cal-next').addEventListener('click', function () { mes += 1; if (mes > 12) { mes = 1; ano += 1; } renderGrade(); });
+    document.getElementById('pf-cal-hoje').addEventListener('click', function () { var p = hoje.split('-'); ano = parseInt(p[0], 10); mes = parseInt(p[1], 10); renderGrade(); renderLista(hoje); });
+    bindDias();
+    var evsHoje = eventMap[hoje] || [];
+    elCount.textContent = evsHoje.length ? (evsHoje.length === 1 ? '1 evento' : evsHoje.length + ' eventos') : '';
+})();
+</script>
 <?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 <?php if ($gradeSeb): ?>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+<div class="space-y-4 md:space-y-6">
 <?php endif; ?>
 <?php if ($mostrarAulasHoje): ?>
 <?php $abrirBlocoDash('aulas_hoje'); ?>
-    <div class="bg-white rounded-xl shadow-lg">
-        <div class="p-4 md:p-6 border-b border-gray-200">
-            <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                    <h2 class="text-lg md:text-xl font-semibold text-gray-900">Aulas de hoje</h2>
-                    <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($rotuloHoje) ?></p>
-                </div>
-                <a href="<?= URL ?>/professor/grade-horaria" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Minha grade</a>
+    <section class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold text-gray-900">Aulas de hoje</h2>
+                <p class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($rotuloHoje) ?></p>
             </div>
+            <a href="<?= URL ?>/professor/grade-horaria" class="text-sm font-semibold hover:underline whitespace-nowrap" style="color:<?= htmlspecialchars($primaryHex) ?>">Grade →</a>
         </div>
-        <div class="p-4 md:p-6">
+        <div class="p-4 sm:p-5">
             <?php if ($aulasHoje === []): ?>
                 <p class="text-sm text-gray-500">Nenhuma aula prevista para hoje.</p>
             <?php else: ?>
@@ -206,12 +431,12 @@ $abrirBlocoDash('calendario');
                         $materiaAula = trim((string) ($aula['materia_nome'] ?? ''));
                         $salaAula = trim((string) ($aula['sala_nome'] ?? ''));
                     ?>
-                    <li class="flex gap-3 rounded-lg border border-gray-100 p-3">
+                    <li class="flex gap-3 rounded-xl border border-gray-100 p-3">
                         <div class="w-16 flex-shrink-0 text-center">
-                            <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($de) ?></p>
-                            <p class="text-xs text-gray-400"><?= htmlspecialchars($ate) ?></p>
+                            <p class="text-xs font-bold text-gray-900"><?= htmlspecialchars($de) ?></p>
+                            <p class="text-[10px] text-gray-400"><?= htmlspecialchars($ate) ?></p>
                         </div>
-                        <div class="min-w-0 flex-1 border-l-4 border-blue-500 pl-3">
+                        <div class="min-w-0 flex-1 border-l-4 pl-3" style="border-left-color:<?= htmlspecialchars($primaryHex) ?>">
                             <p class="text-sm font-semibold text-gray-900 truncate"><?= htmlspecialchars($turmaAula !== '' ? $turmaAula : 'Turma') ?></p>
                             <?php if ($materiaAula !== ''): ?>
                             <p class="text-xs text-gray-600 truncate"><?= htmlspecialchars($materiaAula) ?></p>
@@ -225,18 +450,18 @@ $abrirBlocoDash('calendario');
                 </ul>
             <?php endif; ?>
         </div>
-    </div>
+    </section>
 <?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 
 <?php if ($mostrarDesempenhoProf): ?>
 <?php $abrirBlocoDash('desempenho'); ?>
-    <div class="bg-white rounded-xl shadow-lg">
-        <div class="p-4 md:p-6 border-b border-gray-200">
+    <section class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-gray-100">
             <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <h2 class="text-lg md:text-xl font-semibold text-gray-900">Desempenho das turmas</h2>
-                    <p class="hidden sm:block text-sm text-gray-500 mt-1">Média das avaliações nas turmas em que você leciona</p>
+                    <h2 class="text-lg font-semibold text-gray-900">Desempenho das turmas</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Média das avaliações nas turmas em que você leciona</p>
                 </div>
                 <div class="text-right">
                     <p class="text-xs text-gray-500">Média geral</p>
@@ -246,7 +471,7 @@ $abrirBlocoDash('calendario');
                 </div>
             </div>
         </div>
-        <div class="p-4 md:p-6 max-h-96 overflow-y-auto">
+        <div class="p-4 sm:p-5 max-h-96 overflow-y-auto">
             <?php if ($linhasDesempenho === []): ?>
                 <p class="text-sm text-gray-500">Nenhuma turma vinculada à sua grade.</p>
             <?php else: ?>
@@ -255,7 +480,7 @@ $abrirBlocoDash('calendario');
                         $mediaLinha = isset($linha['media']) && $linha['media'] !== null ? (float) $linha['media'] : null;
                         $alunosLinha = (int) ($linha['alunos'] ?? 0);
                     ?>
-                    <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
+                    <li class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3">
                         <div class="min-w-0">
                             <p class="text-sm font-semibold text-gray-900 truncate"><?= htmlspecialchars((string) ($linha['turma_nome'] ?? 'Turma')) ?></p>
                             <p class="text-xs text-gray-500 truncate">
@@ -273,10 +498,11 @@ $abrirBlocoDash('calendario');
                 </ul>
             <?php endif; ?>
         </div>
-    </div>
+    </section>
 <?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 <?php if ($gradeSeb): ?>
+</div>
 </div>
 <?php endif; ?>
 <?php endif; ?>
