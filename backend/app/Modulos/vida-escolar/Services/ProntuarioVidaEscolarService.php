@@ -1503,10 +1503,11 @@ class ProntuarioVidaEscolarService
                     continue;
                 }
                 $gk = 'pai_' . (int) $paiId;
+                $exibirGrupo = strtolower(trim((string) ($regra['exibir_em'] ?? '')));
                 $grupos[$gk] = [
                     'key' => $gk,
                     'label' => $label,
-                    'mode' => 'media',
+                    'mode' => $exibirGrupo === 'boletim' ? 'soma' : 'media',
                     'materias_ids' => $filhos,
                     'agrupamento_id' => 0,
                     'aplicar_em' => 'ambos',

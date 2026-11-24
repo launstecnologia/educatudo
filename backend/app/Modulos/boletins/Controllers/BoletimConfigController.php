@@ -8161,7 +8161,9 @@ class BoletimConfigController extends BaseController
         );
 
         $midsOrdenados = array_keys($allMids);
-        if ($materiasAgrupadas !== []) {
+        $exibirQuadro = strtolower(trim((string) ($regra['exibir_em'] ?? 'boletim')));
+        // No boletim a mãe fica junto das frentes. No demonstrativo a linha consolidada substitui as filhas.
+        if ($materiasAgrupadas !== [] && $exibirQuadro !== 'boletim') {
             $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($materiasAgrupadas) {
                 return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
             }));
@@ -8184,7 +8186,7 @@ class BoletimConfigController extends BaseController
                 }
             }
             $midsOrdenados = array_keys($allMids);
-            if ($materiasAgrupadas !== []) {
+            if ($materiasAgrupadas !== [] && $exibirQuadro !== 'boletim') {
                 $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($materiasAgrupadas) {
                     return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
                 }));
@@ -8192,10 +8194,29 @@ class BoletimConfigController extends BaseController
         }
         // Com lista do modelo/evento: só exibe essas matérias (notas órfãs de disciplina
         // desmarcada — ex. Redação — não entram na simulação).
+        // No boletim as frentes do grupo entram mesmo quando o modelo só listou a mãe.
+        $idsFilhasBoletim = [];
+        if ($exibirQuadro === 'boletim') {
+            foreach ($componentesRegra as $compFilha) {
+                if (!is_array($compFilha)) {
+                    continue;
+                }
+                $grpFilha = $this->parseGroupLineConfigFromComponente($compFilha);
+                if ($grpFilha === null || !empty($grpFilha['ocultar_filhas'])) {
+                    continue;
+                }
+                foreach ((array) ($grpFilha['materias_ids'] ?? []) as $midFilha) {
+                    $midFilha = (int) $midFilha;
+                    if ($midFilha > 0) {
+                        $idsFilhasBoletim[$midFilha] = true;
+                    }
+                }
+            }
+        }
         if ($materiasSelecionadas !== []) {
             $set = array_fill_keys($materiasSelecionadas, true);
-            $filtradosSel = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set) {
-                return $mid <= 0 || isset($set[$mid]);
+            $filtradosSel = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set, $idsFilhasBoletim) {
+                return $mid <= 0 || isset($set[$mid]) || isset($idsFilhasBoletim[$mid]);
             }));
             if ($filtradosSel !== []) {
                 $midsOrdenados = $filtradosSel;
@@ -9790,6 +9811,7 @@ class BoletimConfigController extends BaseController
                 ? array_fill_keys(array_map('intval', (array) ($grupoDoComponente['materias_ids'] ?? [])), true)
                 : [];
             $ehFaltasCol = isset($codigosFaltas[$codigo]);
+            $manterFilhasNoQuadro = strtolower(trim($exibirEm)) !== 'notas';
 
             foreach (array_keys($materiasAgrupadas) as $midRem) {
                 $midRem = (int) $midRem;
@@ -9800,6 +9822,9 @@ class BoletimConfigController extends BaseController
                         isset($materiasComFormulaPropria[$midRem])
                         || ($grupoDoComponente !== null && !isset($idsGrupoDoComponente[$midRem]))
                     );
+                if ($manterFilhasNoQuadro) {
+                    continue;
+                }
                 if ($ehFaltasCol) {
                     // Falta da linha visível (ex.: Redação) permanece nela; só some
                     // a falta das filhas ocultas, que entra na soma do grupo.
