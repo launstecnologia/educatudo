@@ -17,8 +17,14 @@ function decodeUnicodeEscapesExercicio($str) {
  */
 function prepararTextoParaMathJax($str) {
     if ($str === '' || $str === null || !is_string($str)) return $str;
-    $str = preg_replace('/<script \b[^ <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>]*>.*?<\/script>/is', '', $str);
-    $str = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $str);
+    $semScript = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $str);
+    if (is_string($semScript)) {
+        $str = $semScript;
+    }
+    $semStyle = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $str);
+    if (is_string($semStyle)) {
+        $str = $semStyle;
+    }
     // Normaliza delimitadores que possam ter vindo escapados (ex.: \\ ( no banco vira \( no HTML )
     $str = str_replace(['\\\\(', '\\\\)', '\\\\[', '\\\\]'], ['\\(', '\\)', '\\[', '\\]'], $str);
     return $str;
@@ -247,18 +253,24 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             if (!mb_check_encoding($enunciado, 'UTF-8')) {
                 $enunciado = mb_convert_encoding($enunciado, 'UTF-8', 'auto');
             }
-            // Evita enunciado duplicado quando o professor colou o título no começo (negrito).
-            // Não aplica em exercícios gerados por IA (título = primeiros 60 chars do enunciado).
+            // Evita enunciado duplicado quando o título aparece na tela e o professor
+            // repetiu esse texto no começo. Com o título oculto, o enunciado é a pergunta.
             $geradoIa = !empty($exercicio_atual['gerado_ia']);
-            if (!$geradoIa && $tituloExercicio !== '' && is_string($enunciado) && $enunciado !== ''
+            if ($mostrarTituloExercicio && !$geradoIa && $tituloExercicio !== '' && is_string($enunciado) && $enunciado !== ''
                 && enunciadoPermiteRemoverTituloDuplicado($tituloExercicio, $enunciado)) {
                 $tituloQuoted = preg_quote($tituloExercicio, '~');
-                $enunciado = preg_replace(
+                $enunciadoSemTitulo = preg_replace(
                     '~^\s*(?:<p[^>]*>\s*)?(?:(?:<strong>|<b>)\s*)?' . $tituloQuoted . '\s*(?:(?:</strong>|</b>)\s*)?(?:</p>\s*)?(?:[:\\-–—]\\s*)?~iu',
                     '',
                     $enunciado,
                     1
                 );
+                $restante = is_string($enunciadoSemTitulo)
+                    ? trim(html_entity_decode(strip_tags($enunciadoSemTitulo), ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+                    : '';
+                if ($restante !== '' || stripos((string) $enunciadoSemTitulo, '<img') !== false || stripos((string) $enunciadoSemTitulo, '<table') !== false) {
+                    $enunciado = $enunciadoSemTitulo;
+                }
             }
             $enunciadoOriginal = (string)$enunciado;
             $enunciadoSanitizado = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($enunciadoOriginal);
@@ -268,7 +280,10 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             if ($originalTemMidiaOuTabela && !$sanitizadoTemMidiaOuTabela) {
                 // Fallback: preserva mídia/tabela quando o purifier remove conteúdo válido do professor.
                 // Mantém segurança removendo scripts/iframes e atributos on*.
-                $enunciadoFallbackSeguro = preg_replace('/<script \b[^ <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>]*>.*?<\/script>/is', '', $enunciadoOriginal);
+                $enunciadoFallbackSeguro = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $enunciadoOriginal);
+                if (!is_string($enunciadoFallbackSeguro)) {
+                    $enunciadoFallbackSeguro = $enunciadoOriginal;
+                }
                 $enunciadoFallbackSeguro = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $enunciadoFallbackSeguro);
                 $enunciadoFallbackSeguro = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $enunciadoFallbackSeguro);
                 $enunciadoFallbackSeguro = preg_replace('/\s+on\w+\s*=\s*[^\s>]+/i', '', $enunciadoFallbackSeguro);

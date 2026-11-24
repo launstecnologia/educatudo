@@ -602,12 +602,8 @@ $paineis_notas = $paineis_notas_originais;
 
 $btnNotasPartial = \App\Core\ViewPaths::adminPartial('ui/btn.php');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-$jsAbrir = static function (string $fonteId, string $titulo): string {
-    return 'abrirModalNotasAluno('
-        . json_encode($fonteId, JSON_UNESCAPED_UNICODE)
-        . ','
-        . json_encode($titulo, JSON_UNESCAPED_UNICODE)
-        . ')';
+$attrsAbrirNotas = static function (string $fonteId, string $titulo) use ($esc): string {
+    return 'data-csp-click="abrirModalNotasAluno" data-csp-arg="' . $esc($fonteId) . '" data-csp-arg2="' . $esc($titulo) . '"';
 };
 $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): string {
     if ($numero <= 0) {
@@ -733,7 +729,7 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                             <p class="text-sm text-gray-700"><?= $esc($descricao !== '' ? $descricao : '—') ?></p>
                             <?php if (!empty($linhaP['tem_quadro'])): ?>
                                 <button type="button"
-                                        onclick="<?= $esc($jsAbrir((string) $linhaP['id_quadro'], $tituloModal)) ?>"
+                                        <?= $attrsAbrirNotas((string) $linhaP['id_quadro'], $tituloModal) ?>
                                         class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-700 text-white shadow-sm">
                                     <i class="fa-solid fa-table-cells"></i> <?= $esc($labelBtn) ?>
                                 </button>
@@ -793,7 +789,7 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                                                 $ui_btn_label = $labelBtn;
                                                 $ui_btn_icon = 'fa-solid fa-table-cells';
                                                 $ui_btn_class = 'px-3 py-1.5';
-                                                $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], $tituloModal);
+                                                $ui_btn_attrs = $attrsAbrirNotas((string) $linhaP['id_quadro'], $tituloModal);
                                                 require $btnNotasPartial;
                                                 ?>
                                             <?php else: ?>
@@ -851,8 +847,9 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
 <?php endforeach; ?>
 
 <?php if ($linhasPeriodo !== []): ?>
-<div id="modalNotasAluno" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/50 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modalNotasAlunoTitulo" onclick="if (event.target === this) fecharModalNotasAluno()">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-[96vw] max-h-[92vh] flex flex-col">
+<div id="modalNotasAluno" class="hidden fixed inset-0 z-[80] items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modalNotasAlunoTitulo">
+    <button type="button" class="absolute inset-0 bg-black/50" data-csp-click="fecharModalNotasAluno" aria-label="Fechar"></button>
+    <div class="relative bg-white rounded-xl shadow-xl w-full max-w-[96vw] max-h-[92vh] flex flex-col">
         <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 shrink-0">
             <h3 id="modalNotasAlunoTitulo" class="text-lg font-semibold text-gray-900">Notas</h3>
             <button type="button" data-csp-click="fecharModalNotasAluno" class="text-gray-400 hover:text-gray-700 p-1" aria-label="Fechar">
@@ -869,6 +866,9 @@ function abrirModalNotasAluno(fonteId, titulo) {
     var corpo = document.getElementById('modalNotasAlunoCorpo');
     var tit = document.getElementById('modalNotasAlunoTitulo');
     if (!fonte || !modal || !corpo) return;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
     if (tit) tit.textContent = titulo || 'Notas';
     corpo.innerHTML = fonte.innerHTML;
     modal.classList.remove('hidden');

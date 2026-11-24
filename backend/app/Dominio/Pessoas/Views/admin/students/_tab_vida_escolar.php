@@ -250,7 +250,94 @@ function carregarVeNotasSobDemanda() {
         })
         .catch(function () {
             box.setAttribute('data-lazy-loaded', '0');
-            box.innerHTML = '<div class="text-center py-10 text-red-600 text-sm">Erro ao carregar notas. <button type="button" class="underline" onclick="document.getElementById(\'ve-notas-lazy\').setAttribute(\'data-lazy-loaded\',\'0\');carregarVeNotasSobDemanda();">Tentar novamente</button></div>';
+            box.innerHTML = '<div class="text-center py-10 text-red-600 text-sm">Erro ao carregar notas. <button type="button" class="underline" data-csp-click="carregarVeNotasSobDemanda">Tentar novamente</button></div>';
         });
+}
+
+function abrirModalNotasAluno(fonteId, titulo) {
+    var fonte = document.getElementById(fonteId);
+    var modal = document.getElementById('modalNotasAluno');
+    var corpo = document.getElementById('modalNotasAlunoCorpo');
+    var tit = document.getElementById('modalNotasAlunoTitulo');
+    if (!fonte || !modal || !corpo) return;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    if (tit) tit.textContent = titulo || 'Notas';
+    corpo.innerHTML = fonte.innerHTML;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+}
+
+function fecharModalNotasAluno() {
+    var modal = document.getElementById('modalNotasAluno');
+    var corpo = document.getElementById('modalNotasAlunoCorpo');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (corpo) corpo.innerHTML = '';
+    document.body.classList.remove('overflow-hidden');
+}
+
+if (!window.__notasAlunoModalPronto) {
+    window.__notasAlunoModalPronto = true;
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        var modal = document.getElementById('modalNotasAluno');
+        if (!modal || modal.classList.contains('hidden')) return;
+        fecharModalNotasAluno();
+    });
+    document.addEventListener('click', function (e) {
+        var aba = e.target.closest && e.target.closest('.js-notas-demo-aba');
+        if (aba) {
+            var nav = aba.closest('#notas-demo-abas');
+            if (!nav) return;
+            var grupo = aba.getAttribute('data-grupo') || '';
+            var classesAtivaOficial = ['bg-white', 'text-blue-800', 'shadow-sm', 'ring-1', 'ring-blue-200'];
+            var classesAtivaExtra = ['bg-white', 'text-amber-800', 'shadow-sm', 'ring-1', 'ring-amber-200'];
+            var classesInativa = ['text-gray-600', 'hover:text-gray-900', 'hover:bg-white/70'];
+            var todas = classesAtivaOficial.concat(classesAtivaExtra).concat(classesInativa);
+            nav.querySelectorAll('.js-notas-demo-aba').forEach(function (b) {
+                var on = b === aba;
+                var ehExtra = (b.getAttribute('data-curso-tipo') || '') === 'extra';
+                todas.forEach(function (c) { b.classList.remove(c); });
+                (on ? (ehExtra ? classesAtivaExtra : classesAtivaOficial) : classesInativa).forEach(function (c) {
+                    b.classList.add(c);
+                });
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+                if (on) b.setAttribute('aria-current', 'page');
+                else b.removeAttribute('aria-current');
+            });
+            document.querySelectorAll('.js-notas-demo-painel').forEach(function (painel) {
+                painel.classList.toggle('hidden', painel.getAttribute('data-grupo') !== grupo);
+            });
+            return;
+        }
+        var btn = e.target.closest && e.target.closest('[data-sim-vista]');
+        if (!btn) return;
+        var root = btn.closest('.boletim-sim-vistas');
+        if (!root) return;
+        var vista = btn.getAttribute('data-sim-vista') || 'demonstrativo';
+        root.querySelectorAll('[data-sim-vista]').forEach(function (b) {
+            var on = b.getAttribute('data-sim-vista') === vista;
+            b.classList.toggle('bg-white', !on);
+            b.classList.toggle('text-gray-700', !on);
+            b.classList.toggle('border-gray-300', !on);
+            if (on) {
+                b.style.background = 'var(--sidebar-bg-color,#1e3a5f)';
+                b.style.borderColor = 'var(--sidebar-bg-color,#1e3a5f)';
+                b.style.color = 'var(--sidebar-text-color,#fff)';
+            } else {
+                b.style.background = '';
+                b.style.borderColor = '';
+                b.style.color = '';
+            }
+        });
+        root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+            var show = panel.getAttribute('data-sim-panel') === vista;
+            panel.classList.toggle('hidden', !show);
+        });
+    });
 }
 </script>
