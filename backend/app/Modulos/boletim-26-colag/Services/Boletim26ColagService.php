@@ -172,6 +172,9 @@ class Boletim26ColagService
                     $linhas = is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [];
                     $pais = [];
                     foreach ($linhas as $linha) {
+                        if ($this->frentePortuguesOculta($linha)) {
+                            continue;
+                        }
                         if (!empty($linha['filha']) && $this->notaAbaixo($linha, $notaMinima, $notaCampo)) {
                             $pais[(string) ($linha['pai_nome'] ?? '')] = true;
                         }
@@ -179,6 +182,9 @@ class Boletim26ColagService
                     $linhas = array_values(array_filter(
                         $linhas,
                         function (array $linha) use ($notaMinima, $notaCampo, $pais): bool {
+                            if ($this->frentePortuguesOculta($linha)) {
+                                return false;
+                            }
                             if ($this->notaAbaixo($linha, $notaMinima, $notaCampo)) {
                                 return true;
                             }
@@ -214,6 +220,25 @@ class Boletim26ColagService
     private function notaAbaixo(array $linha, float $notaMinima, string $notaCampo): bool
     {
         return is_numeric($linha[$notaCampo] ?? null) && (float) $linha[$notaCampo] < $notaMinima;
+    }
+
+    /**
+     * Gramática, Literatura e Leitura não aparecem. A nota delas não puxa a Língua Portuguesa.
+     *
+     * @param array<string,mixed> $linha
+     */
+    private function frentePortuguesOculta(array $linha): bool
+    {
+        if (empty($linha['filha'])) {
+            return false;
+        }
+        $texto = $this->chave((string) ($linha['nome'] ?? '') . ' ' . (string) ($linha['pai_nome'] ?? ''));
+
+        return str_contains($texto, 'gramatica')
+            || str_contains($texto, 'literatura')
+            || str_contains($texto, 'leitura')
+            || str_contains($texto, 'lingua portuguesa')
+            || str_contains($texto, 'portugues');
     }
 
     /**

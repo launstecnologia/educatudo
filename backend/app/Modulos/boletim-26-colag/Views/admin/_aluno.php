@@ -58,7 +58,7 @@ if (!$demoTemAbaixo) {
     if ($notaMinima !== null) {
         $paisAbaixo = [];
         foreach ($linhas as $linhaFiltro) {
-            if (!empty($linhaFiltro['filha']) && $linhaTemNotaAbaixo($linhaFiltro)) {
+            if (!empty($linhaFiltro['filha']) && !$frentePortugues($linhaFiltro) && $linhaTemNotaAbaixo($linhaFiltro)) {
                 $paisAbaixo[(string) ($linhaFiltro['pai_nome'] ?? '')] = true;
             }
         }
@@ -179,6 +179,9 @@ foreach ($demonstrativos as $demoBoletim) {
                 $filhaAbaixo = false;
                 foreach (is_array($blocoBoletim['linhas'] ?? null) ? $blocoBoletim['linhas'] : [] as $irmaBoletim) {
                     if (!is_array($irmaBoletim) || empty($irmaBoletim['filha'])) {
+                        continue;
+                    }
+                    if ($frentePortugues($irmaBoletim)) {
                         continue;
                     }
                     if ((string) ($irmaBoletim['pai_nome'] ?? '') === (string) ($linhaBoletim['nome'] ?? '') && $linhaTemNotaAbaixo($irmaBoletim)) {
