@@ -36,6 +36,17 @@ if ($notaMinima !== null) {
     $filtrosAtivos++;
 }
 $reabrirFiltro = (string) ($_GET['filtro_aberto'] ?? '') === '1' && !$abrir;
+$carregarFundo = !empty($painel['carregar_fundo']);
+$filaFundo = [];
+if ($carregarFundo) {
+    foreach ($alunos as $itemFila) {
+        $idFila = (int) ($itemFila['id'] ?? 0);
+        if ($idFila <= 0 || ($alunoId > 0 && $idFila !== $alunoId)) {
+            continue;
+        }
+        $filaFundo[] = $idFila;
+    }
+}
 
 $fmt = static function ($valor): string {
     if ($valor === null || $valor === '') {
@@ -114,9 +125,21 @@ $rotuloSerie = static function (int $serie): string {
 .boletim-colag tbody tr:nth-child(odd) td { background: #fff; }
 .boletim-colag td.nota { color: #047857; font-weight: 600; }
 .boletim-colag tbody tr td.abaixo { color: #b45309; font-weight: 600; background: #fff7ed; }
+@keyframes boletim-status {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(280%); }
+}
 </style>
-<div id="boletim-carregando" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.78);">
-    <div class="bg-white rounded-xl shadow-lg px-6 py-4 text-sm font-medium text-gray-800">Carregando o demonstrativo...</div>
+<div id="boletim-status" <?= $carregarFundo ? '' : 'hidden' ?> style="position:sticky;top:0;z-index:30;margin-bottom:1rem;">
+    <div style="background:#fff;border:1px solid #dbe4ee;border-radius:12px;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;color:#1e293b;margin-bottom:8px;">
+            <span id="boletim-status-texto">Carregando as notas em segundo plano...</span>
+            <span id="boletim-status-conta"></span>
+        </div>
+        <div style="height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+            <div id="boletim-status-barra" style="height:100%;width:<?= $carregarFundo ? '0' : '40%' ?>;background:#1d4ed8;<?= $carregarFundo ? '' : 'animation:boletim-status 1.1s ease-in-out infinite;' ?>"></div>
+        </div>
+    </div>
 </div>
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
     <div class="min-w-0">
@@ -240,6 +263,8 @@ $rotuloSerie = static function (int $serie): string {
 <p class="mb-6 rounded-lg px-4 py-3 text-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;">Homologado em <?= htmlspecialchars($homologacaoEm, ENT_QUOTES, 'UTF-8') ?><?= (string) ($homologacao['usuario'] ?? '') !== '' ? ' por ' . htmlspecialchars((string) $homologacao['usuario'], ENT_QUOTES, 'UTF-8') : '' ?>. Nenhuma nota mudou desde então.</p>
 <?php elseif ($estadoHomologacao === 'sem_tabela'): ?>
 <p class="mb-6 rounded-lg px-4 py-3 text-sm" style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;">A homologação ainda não está disponível neste ambiente. Rode a migration do boletim Colag no Master.</p>
+<?php elseif ($estadoHomologacao === 'carregando'): ?>
+<div id="boletim-homologacao" class="mb-6"></div>
 <?php else: ?>
 <p class="mb-6 text-sm text-gray-600">Este resultado ainda não foi homologado.</p>
 <?php endif; ?>
@@ -248,7 +273,7 @@ $rotuloSerie = static function (int $serie): string {
 <?php
 $primeiroRelatorio = $relatorios[0] ?? null;
 $modeloVazio = !is_array($primeiroRelatorio) || !is_array($primeiroRelatorio['aluno'] ?? null);
-$bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
+$bimestresAbas = (($carregarFundo || !$modeloVazio) && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
 ?>
 <?php if (!$abrir): ?>
 <div class="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center mb-6">
@@ -278,7 +303,7 @@ if ($abrir && $notaMinima !== null) {
     $relatorios = array_values(array_filter($relatorios, $relatorioTemAbaixo));
 }
 ?>
-<?php if ($abrir && $notaMinima !== null && $relatorios === []): ?>
+<?php if ($abrir && !$carregarFundo && $notaMinima !== null && $relatorios === []): ?>
 <p class="text-sm text-gray-600 mb-6">Nenhum aluno com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.</p>
 <?php endif; ?>
 <?php if ($bimestresAbas !== []): ?>
@@ -294,146 +319,12 @@ if ($abrir && $notaMinima !== null) {
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
-<?php if ($abrir): ?>
+<?php if ($carregarFundo): ?>
+<div id="boletim-resultado"></div>
+<p id="boletim-vazio" hidden class="text-sm text-gray-600 mb-6"></p>
+<?php elseif ($abrir): ?>
 <?php foreach ($relatorios as $relatorio): ?>
-<?php
-$alunoRel = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : null;
-$turmaRel = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : null;
-$demonstrativos = is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [];
-$nomeAluno = $alunoRel !== null ? htmlspecialchars((string) ($alunoRel['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
-$serieTurma = $rotuloSerie((int) ($turmaRel['ano_serie'] ?? 0));
-$alunoPainelId = (int) ($alunoRel['id'] ?? 0);
-?>
-<?php foreach ($demonstrativos as $indice => $demo): ?>
-<?php
-$demoTemAbaixo = $notaMinima === null;
-if (!$demoTemAbaixo) {
-    foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $blocoDemo) {
-        foreach (is_array($blocoDemo['linhas'] ?? null) ? $blocoDemo['linhas'] : [] as $linhaDemo) {
-            if ($linhaTemNotaAbaixo($linhaDemo)) {
-                $demoTemAbaixo = true;
-                break 2;
-            }
-        }
-    }
-}
-if (!$demoTemAbaixo) {
-    continue;
-}
-?>
-<?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8 boletim-painel <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
-    <h3 class="text-lg font-semibold text-gray-900 mb-3">
-        <?php if (!empty($demo['titulo'])): ?>
-        <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
-        <?php else: ?>
-        Notas — <?= $bimestre ?>º Bimestre — <?= htmlspecialchars($serieTurma, ENT_QUOTES, 'UTF-8') ?>
-        <?php endif; ?>
-        <?php if ($nomeAluno !== ''): ?>
-        <span class="block text-sm font-normal text-gray-600"><?= $nomeAluno ?></span>
-        <?php endif; ?>
-    </h3>
-    <?php foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco): ?>
-    <?php
-    $semanas = is_array($bloco['semanas'] ?? null) ? $bloco['semanas'] : [];
-    $linhas = is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [];
-    $terceira = !empty($demo['terceira']);
-    if ($notaMinima !== null) {
-        $paisAbaixo = [];
-        foreach ($linhas as $linhaFiltro) {
-            if (!empty($linhaFiltro['filha']) && $linhaTemNotaAbaixo($linhaFiltro)) {
-                $paisAbaixo[(string) ($linhaFiltro['pai_nome'] ?? '')] = true;
-            }
-        }
-        $linhas = array_values(array_filter(
-            $linhas,
-            static function (array $linhaFiltro) use ($linhaTemNotaAbaixo, $paisAbaixo): bool {
-                if ($linhaTemNotaAbaixo($linhaFiltro)) {
-                    return true;
-                }
-
-                return empty($linhaFiltro['filha']) && isset($paisAbaixo[(string) ($linhaFiltro['nome'] ?? '')]);
-            }
-        ));
-    }
-    if ($notaMinima !== null && $linhas === []) {
-        continue;
-    }
-    ?>
-    <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">
-        <?php $cabeca = 'px-2 py-2 uppercase font-semibold whitespace-nowrap'; ?>
-        <table class="boletim-colag min-w-full text-sm text-center">
-            <thead>
-                <tr>
-                    <th class="<?= $cabeca ?> px-3 text-left"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>><?= htmlspecialchars((string) ($bloco['titulo'] ?? 'Matérias'), ENT_QUOTES, 'UTF-8') ?></th>
-                    <?php foreach ($semanas as $semana): ?>
-                    <th class="<?= $cabeca ?>" colspan="2">S<?= (int) $semana ?></th>
-                    <?php endforeach; ?>
-                    <?php if ($semanas !== []): ?>
-                    <th class="<?= $cabeca ?>" colspan="2">Total</th>
-                    <th class="<?= $cabeca ?>" rowspan="2" title="Média semanal">Méd. Sem</th>
-                    <?php endif; ?>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Prova bimestral">P. Bim</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Jornada do aluno">Jor. Aluno</th>
-                    <?php if (!$terceira): ?>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Média</th>
-                    <?php endif; ?>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Enac</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Média bimestral">Méd. Bim</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Recuperação semestral">Rec. Sem</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Resultado final">Res. Final</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Faltas">Fal</th>
-                </tr>
-                <?php if ($semanas !== []): ?>
-                <tr>
-                    <?php foreach ($semanas as $semana): ?>
-                    <th class="<?= $cabeca ?> py-1">N</th>
-                    <th class="<?= $cabeca ?> py-1">Q</th>
-                    <?php endforeach; ?>
-                    <th class="<?= $cabeca ?> py-1">N</th>
-                    <th class="<?= $cabeca ?> py-1">Q</th>
-                </tr>
-                <?php endif; ?>
-            </thead>
-            <tbody>
-                <?php foreach ($linhas as $linha): ?>
-                <?php $filha = !empty($linha['filha']); ?>
-                <tr>
-                    <td class="px-3 py-2 text-left <?= $filha ? 'pl-8 text-gray-700' : 'font-semibold text-gray-900' ?>">
-                        <?php if ($filha): ?><span class="text-gray-400 mr-1">↳</span><?php endif; ?>
-                        <?= htmlspecialchars((string) ($linha['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                    </td>
-                    <?php foreach ($semanas as $semana): ?>
-                    <?php $cel = is_array($linha['semanas'][$semana] ?? null) ? $linha['semanas'][$semana] : []; ?>
-                    <td class="px-2 py-2"><?= $fmtInt($cel['n'] ?? null) ?></td>
-                    <td class="px-2 py-2"><?= $fmtInt($cel['q'] ?? null) ?></td>
-                    <?php endforeach; ?>
-                    <?php if ($semanas !== []): ?>
-                    <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_n'] ?? null) ?></td>
-                    <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_q'] ?? null) ?></td>
-                    <?= $celNota($linha['media_sem'] ?? null, 'media_sem') ?>
-                    <?php endif; ?>
-                    <?= $celNota($linha['prova_bim'] ?? null, 'prova_bim') ?>
-                    <?= $celNota($linha['jornada'] ?? null, 'jornada') ?>
-                    <?php if (!$terceira): ?>
-                    <?= $celNota($linha['media'] ?? null, 'media') ?>
-                    <?php endif; ?>
-                    <?= $celNota($linha['enac'] ?? null, 'enac') ?>
-                    <?= $celNota($linha['media_bim'] ?? null, 'media_bim') ?>
-                    <?= $celNota($linha['rec'] ?? null, 'rec') ?>
-                    <?= $celNota($linha['resultado'] ?? null, 'resultado') ?>
-                    <td class="px-2 py-2"><?= $fmtInt($linha['faltas'] ?? null) ?></td>
-                </tr>
-                <?php endforeach; ?>
-                <?php if ($linhas === []): ?>
-                <tr><td class="px-3 py-4 text-gray-500" colspan="16"><?= $notaMinima !== null ? 'Nenhuma ' . htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') . ' abaixo de ' . htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') . '.' : 'Nenhuma matéria deste bloco.' ?></td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endforeach; ?>
-</section>
-<?php endforeach; ?>
+<?php include __DIR__ . '/_aluno.php'; ?>
 <?php endforeach; ?>
 <?php endif; ?>
 <script>
@@ -464,10 +355,16 @@ document.addEventListener('keydown', function (evento) {
     var form = document.getElementById('boletim-filtros');
     if (!form) return;
     function carregando() {
-        var tela = document.getElementById('boletim-carregando');
-        if (!tela) return;
-        tela.hidden = false;
-        tela.style.display = 'flex';
+        var caixa = document.getElementById('boletim-status');
+        var texto = document.getElementById('boletim-status-texto');
+        var barra = document.getElementById('boletim-status-barra');
+        if (!caixa) return;
+        caixa.hidden = false;
+        if (texto) texto.textContent = 'Carregando as notas em segundo plano...';
+        if (barra) {
+            barra.style.width = '40%';
+            barra.style.animation = 'boletim-status 1.1s ease-in-out infinite';
+        }
     }
     form.addEventListener('submit', function (evento) {
         var botao = evento.submitter;
@@ -506,11 +403,118 @@ document.addEventListener('keydown', function (evento) {
     }
 })();
 </script>
+<?php if ($carregarFundo): ?>
+<script>
+(function () {
+    var fila = <?= json_encode($filaFundo, JSON_UNESCAPED_UNICODE) ?>;
+    var form = document.getElementById('boletim-filtros');
+    var destino = document.getElementById('boletim-resultado');
+    var vazio = document.getElementById('boletim-vazio');
+    var texto = document.getElementById('boletim-status-texto');
+    var conta = document.getElementById('boletim-status-conta');
+    var barra = document.getElementById('boletim-status-barra');
+    var feitos = 0;
+    var linhas = [];
+    function atualizar(mensagem) {
+        if (texto) texto.textContent = mensagem;
+        if (conta) conta.textContent = fila.length ? (feitos + ' de ' + fila.length) : '';
+        if (barra) {
+            barra.style.animation = '';
+            barra.style.width = (fila.length ? Math.round((feitos / fila.length) * 100) : 0) + '%';
+        }
+    }
+    function pintarHomologacao(dados) {
+        var caixa = document.getElementById('boletim-homologacao');
+        if (!caixa || !dados) return;
+        var aviso = document.createElement('p');
+        aviso.className = 'rounded-lg px-4 py-3 text-sm';
+        if (dados.estado === 'alterada') {
+            aviso.style.cssText = 'background:#fff7ed;color:#9a3412;border:1px solid #fdba74;';
+            aviso.textContent = 'Houve alteração de nota desde a homologação de ' + (dados.em || '') + '. Homologue de novo.';
+        } else if (dados.estado === 'igual') {
+            aviso.style.cssText = 'background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;';
+            aviso.textContent = 'Homologado em ' + (dados.em || '') + (dados.usuario ? ' por ' + dados.usuario : '') + '. Nenhuma nota mudou desde então.';
+        } else if (dados.estado === 'sem_tabela') {
+            aviso.style.cssText = 'background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;';
+            aviso.textContent = 'A homologação ainda não está disponível neste ambiente. Rode a migration do boletim Colag no Master.';
+        } else {
+            aviso.className = 'text-sm text-gray-600';
+            aviso.textContent = 'Este resultado ainda não foi homologado.';
+        }
+        caixa.textContent = '';
+        caixa.appendChild(aviso);
+    }
+    function finalizar() {
+        var temNota = destino && destino.children.length > 0;
+        atualizar(temNota ? 'Notas carregadas.' : 'Nenhuma nota encontrada nesse filtro.');
+        if (!temNota && vazio) {
+            vazio.hidden = false;
+            vazio.textContent = 'Nenhum aluno com nota abaixo do filtro.';
+        }
+        if (!form) return;
+        var token = form.querySelector('[name="_token"]');
+        var payload = {};
+        new FormData(form).forEach(function (valor, chave) {
+            payload[chave] = valor;
+        });
+        payload._token = token ? token.value : '';
+        payload.linhas = linhas;
+        fetch(<?= json_encode(URL . '/admin/boletim-26-colag/situacao') ?>, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        }).then(function (resposta) {
+            return resposta.json();
+        }).then(pintarHomologacao).catch(function () {});
+    }
+    function proximo() {
+        if (!form || feitos >= fila.length) {
+            finalizar();
+            return;
+        }
+        var dados = new FormData(form);
+        dados.set('aluno_id', String(fila[feitos]));
+        dados.delete('_token');
+        dados.delete('abrir');
+        dados.delete('filtro_aberto');
+        atualizar('Carregando as notas em segundo plano...');
+        fetch(<?= json_encode(URL . '/admin/boletim-26-colag/parcial') ?> + '?' + new URLSearchParams(dados).toString(), {
+            headers: {Accept: 'application/json'}
+        }).then(function (resposta) {
+            return resposta.json();
+        }).then(function (corpo) {
+            if (corpo && corpo.html && destino) {
+                destino.insertAdjacentHTML('beforeend', corpo.html);
+                var abaAtiva = window.boletimAbaAtiva || '1';
+                if (document.querySelector('[data-boletim-aba]')) {
+                    document.querySelectorAll('[data-boletim-painel]').forEach(function (painel) {
+                        painel.classList.toggle('hidden', painel.getAttribute('data-boletim-painel') !== abaAtiva);
+                    });
+                }
+            }
+            if (corpo && Array.isArray(corpo.linhas)) {
+                linhas = linhas.concat(corpo.linhas);
+            }
+        }).catch(function () {}).then(function () {
+            feitos += 1;
+            proximo();
+        });
+    }
+    if (fila.length === 0) {
+        finalizar();
+        return;
+    }
+    proximo();
+})();
+</script>
+<?php endif; ?>
 <?php if ($bimestresAbas !== []): ?>
 <script>
+window.boletimAbaAtiva = '1';
 document.querySelectorAll('[data-boletim-aba]').forEach(function (botao) {
     botao.addEventListener('click', function () {
         var alvo = botao.getAttribute('data-boletim-aba');
+        window.boletimAbaAtiva = alvo;
         document.querySelectorAll('[data-boletim-aba]').forEach(function (item) {
             var ativo = item === botao;
             item.classList.toggle('bg-blue-900', ativo);

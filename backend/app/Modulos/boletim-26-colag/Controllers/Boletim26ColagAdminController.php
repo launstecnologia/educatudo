@@ -49,7 +49,8 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['bimestre'],
             $filtro['nota_minima'],
             $filtro['abrir'],
-            $filtro['nota_campo']
+            $filtro['nota_campo'],
+            false
         );
 
         $this->viewWithLayout('admin', 'admin/boletim-26-colag/index', [
@@ -140,6 +141,81 @@ class Boletim26ColagAdminController extends BaseController
             ], ';');
         }
         fclose($saida);
+        exit;
+    }
+
+    public function parcial(): void
+    {
+        $filtro = $this->filtroDaRequisicao();
+        if ((int) $filtro['aluno_id'] <= 0) {
+            $this->responderJson(['html' => '', 'linhas' => []]);
+            return;
+        }
+        $painel = $this->servico->montarPainel(
+            $filtro['turma_id'],
+            $filtro['aluno_id'],
+            $filtro['ano'],
+            $filtro['serie'],
+            $filtro['bimestre'],
+            $filtro['nota_minima'],
+            true,
+            $filtro['nota_campo'],
+            true
+        );
+        $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
+        $this->responderJson([
+            'html' => $this->htmlDosRelatorios($painel, $relatorios),
+            'linhas' => is_array($painel['linhas_planilha'] ?? null) ? $painel['linhas_planilha'] : [],
+        ]);
+    }
+
+    public function situacao(): void
+    {
+        $corpo = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($corpo)) {
+            $corpo = $_POST;
+        }
+        if (!$this->validateCsrf((string) ($corpo['_token'] ?? ''))) {
+            $this->responderJson(['estado' => 'nenhuma', 'em' => '', 'usuario' => ''], 403);
+            return;
+        }
+        $notaBruta = trim(str_replace(',', '.', (string) ($corpo['nota_minima'] ?? '')));
+        $notaCampo = (string) ($corpo['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
+        $linhas = is_array($corpo['linhas'] ?? null) ? $corpo['linhas'] : [];
+        $situacao = $this->servico->situacaoDasLinhas([
+            'ano' => (int) ($corpo['ano'] ?? 0),
+            'serie' => (int) ($corpo['serie'] ?? 0),
+            'turma_id' => (int) ($corpo['turma_id'] ?? 0),
+            'aluno_id' => (int) ($corpo['aluno_id'] ?? 0),
+            'bimestre' => (int) ($corpo['bimestre'] ?? 0),
+            'nota_campo' => $notaCampo,
+            'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
+        ], $linhas);
+        $this->responderJson($situacao);
+    }
+
+    /**
+     * @param array<string,mixed> $painel
+     * @param list<array<string,mixed>> $relatorios
+     */
+    private function htmlDosRelatorios(array $painel, array $relatorios): string
+    {
+        if ($relatorios === []) {
+            return '';
+        }
+        ob_start();
+        include __DIR__ . '/../Views/admin/_fragmento.php';
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string,mixed> $dados
+     */
+    private function responderJson(array $dados, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode($dados, JSON_UNESCAPED_UNICODE);
         exit;
     }
 

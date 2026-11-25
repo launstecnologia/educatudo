@@ -53,7 +53,7 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado'): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
@@ -86,7 +86,8 @@ class Boletim26ColagService
         $notaCampo = $notaCampo === 'media_bim' ? 'media_bim' : 'resultado';
         $bimestres = $bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4];
         $relatorios = [];
-        if ($abrir && ($turma !== null || $serieFiltro > 0)) {
+        $carregarFundo = $abrir && !$montarRelatorios && ($turma !== null || $serieFiltro > 0);
+        if ($abrir && $montarRelatorios && ($turma !== null || $serieFiltro > 0)) {
             foreach ($aluno !== null ? [$aluno] : $alunos as $pessoa) {
                 $turmaPessoa = $turma ?? $this->turmaPorId($turmasSerie, (int) ($pessoa['turma_id'] ?? 0));
                 if ($turmaPessoa === null) {
@@ -134,8 +135,11 @@ class Boletim26ColagService
             'turmas' => $turmasSerie,
             'alunos' => $alunos,
             'relatorios' => $relatorios,
-            'homologacao' => $abrir ? $this->situacaoHomologacao($filtroHomologacao, $relatorios) : ['estado' => 'fechado'],
-            'linhas_planilha' => $abrir ? $this->linhasDaPlanilha($relatorios) : [],
+            'carregar_fundo' => $carregarFundo,
+            'homologacao' => $carregarFundo
+                ? ['estado' => 'carregando', 'em' => '', 'usuario' => '']
+                : ($abrir ? $this->situacaoHomologacao($filtroHomologacao, $relatorios) : ['estado' => 'fechado']),
+            'linhas_planilha' => ($abrir && $montarRelatorios) ? $this->linhasDaPlanilha($relatorios) : [],
         ];
     }
 
@@ -261,9 +265,42 @@ class Boletim26ColagService
         if ($ultima === null) {
             return $vazio;
         }
+        return $this->compararComUltima($ultima, $this->linhasDaPlanilha($relatorios));
+    }
+
+    /**
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float} $filtro
+     * @param list<array<string,mixed>> $linhas
+     * @return array{estado:string,em:string,usuario:string}
+     */
+    public function situacaoDasLinhas(array $filtro, array $linhas): array
+    {
+        $vazio = ['estado' => 'nenhuma', 'em' => '', 'usuario' => ''];
+        try {
+            $repo = new Boletim26ColagHomologacao();
+            if (!$repo->tabelaPronta()) {
+                return ['estado' => 'sem_tabela', 'em' => '', 'usuario' => ''];
+            }
+            $ultima = $repo->ultima($filtro);
+        } catch (\Throwable $e) {
+            return $vazio;
+        }
+        if ($ultima === null) {
+            return $vazio;
+        }
+
+        return $this->compararComUltima($ultima, $linhas);
+    }
+
+    /**
+     * @param array<string,mixed> $ultima
+     * @param list<array<string,mixed>> $linhas
+     * @return array{estado:string,em:string,usuario:string}
+     */
+    private function compararComUltima(array $ultima, array $linhas): array
+    {
         $salvo = json_decode((string) ($ultima['resumo_json'] ?? ''), true);
-        $atual = $this->linhasDaPlanilha($relatorios);
-        $igual = is_array($salvo) && $this->resumoCanonico($salvo) === $this->resumoCanonico($atual);
+        $igual = is_array($salvo) && $this->resumoCanonico($salvo) === $this->resumoCanonico($linhas);
 
         return [
             'estado' => $igual ? 'igual' : 'alterada',
