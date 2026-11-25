@@ -5734,17 +5734,31 @@ class BoletimConfig
         }
         $placeholdersIds = implode(',', array_fill(0, count($blocoIds), '?'));
         $placeholdersBimsPb = implode(',', array_fill(0, count($bims), '?'));
-        $placeholdersBimsEv = implode(',', array_fill(0, count($bims), '?'));
         // Não aceita bimestre NULL/0 como curinga — isso fazia CH do 3º vazar no 1º.
-        $sql = "SELECT pb.id
-                  FROM provas_blocos pb
-                  LEFT JOIN eventos_avaliativos e
-                    ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
-                 WHERE pb.deleted_at IS NULL
-                   AND pb.id IN ({$placeholdersIds})
-                   AND (pb.bimestre IN ({$placeholdersBimsPb})
-                        OR e.bimestre IN ({$placeholdersBimsEv}))";
-        $params = array_merge($blocoIds, $bims, $bims);
+        // Colag não tem o módulo: a tabela eventos_avaliativos não existe.
+        $usaEvento = class_exists(\App\Core\LayoutHelper::class)
+            && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
+            && $this->hasTable('eventos_avaliativos')
+            && $this->hasColumn('provas_blocos', 'evento_avaliativo_id');
+        if ($usaEvento) {
+            $placeholdersBimsEv = implode(',', array_fill(0, count($bims), '?'));
+            $sql = "SELECT pb.id
+                      FROM provas_blocos pb
+                      LEFT JOIN eventos_avaliativos e
+                        ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
+                     WHERE pb.deleted_at IS NULL
+                       AND pb.id IN ({$placeholdersIds})
+                       AND (pb.bimestre IN ({$placeholdersBimsPb})
+                            OR e.bimestre IN ({$placeholdersBimsEv}))";
+            $params = array_merge($blocoIds, $bims, $bims);
+        } else {
+            $sql = "SELECT pb.id
+                      FROM provas_blocos pb
+                     WHERE pb.deleted_at IS NULL
+                       AND pb.id IN ({$placeholdersIds})
+                       AND pb.bimestre IN ({$placeholdersBimsPb})";
+            $params = array_merge($blocoIds, $bims);
+        }
         $rows = $this->db->fetchAll($sql, $params) ?: [];
         $out = [];
         foreach ($rows as $row) {

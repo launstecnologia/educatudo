@@ -180,6 +180,14 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * @param array<string,mixed> $estado
+     */
+    public function ehTerceiraSerieMedioColag(array $estado): bool
+    {
+        return $this->boletimEhTerceiraSerieColag($estado);
+    }
+
+    /**
      * 3ª série do ensino médio no Colag: média da prova com a jornada,
      * e o ENAC só substitui o resultado quando fica maior.
      *
@@ -8519,10 +8527,14 @@ class BoletimAssistenteWizard
             }
             $semNumero[] = $ev;
         }
-        if ($porSemana === [] && $semNumero !== []) {
+        if ($semNumero !== []) {
             usort($semNumero, static function (array $a, array $b): int {
                 return strcmp((string) ($a['data_prova'] ?? ''), (string) ($b['data_prova'] ?? ''));
             });
+            $ocupadas = [];
+            foreach (array_keys($porSemana) as $semOcupada) {
+                $ocupadas[(int) $semOcupada] = true;
+            }
             $datas = [];
             foreach ($semNumero as $ev) {
                 $data = substr((string) ($ev['data_prova'] ?? ''), 0, 10);
@@ -8531,12 +8543,31 @@ class BoletimAssistenteWizard
                 }
             }
             $indice = [];
-            foreach ($datas as $i => $data) {
-                $indice[$data] = $i + 1;
+            $proxima = 1;
+            foreach ($datas as $data) {
+                while ($proxima <= 8 && isset($ocupadas[$proxima])) {
+                    $proxima++;
+                }
+                if ($proxima > 8) {
+                    break;
+                }
+                $indice[$data] = $proxima;
+                $ocupadas[$proxima] = true;
+                $proxima++;
             }
             foreach ($semNumero as $ev) {
                 $data = substr((string) ($ev['data_prova'] ?? ''), 0, 10);
                 $sem = (int) ($indice[$data] ?? 0);
+                if ($sem < 1) {
+                    while ($proxima <= 8 && isset($ocupadas[$proxima])) {
+                        $proxima++;
+                    }
+                    $sem = $proxima <= 8 ? $proxima : 0;
+                    if ($sem >= 1) {
+                        $ocupadas[$sem] = true;
+                        $proxima++;
+                    }
+                }
                 if ($sem < 1 || $sem > 8) {
                     continue;
                 }
@@ -12591,6 +12622,16 @@ class BoletimAssistenteWizard
         $comum = array_merge($mediaSem, $comum);
 
         $materias = $this->materiasPreview($estado, ['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física']);
+        if ($this->boletimEhTerceiraSerieColag($estado)) {
+            return [[
+                'key' => 'u',
+                'titulo' => 'Matérias',
+                'subtitulo' => 'Exemplo',
+                'semanas' => [],
+                'outras' => $comum,
+                'materias' => $materias,
+            ]];
+        }
         $metade = (int) ceil(count($materias) / 2);
         $materiasA = array_slice($materias, 0, $metade);
         $materiasB = array_slice($materias, $metade);

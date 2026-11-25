@@ -6524,14 +6524,14 @@ $boletimWizardSteps = [
         var disp = (catalogo.pecas || []).filter(function (p) { return sel.indexOf(p.key) < 0; }).map(function (p) {
             return { key: p.key, label: p.label };
         });
-        var tabelas = temSemanal ? [
+        var tabelas = (temSemanal && !boletimEhTerceiraSerieColag()) ? [
             { key: 'a', titulo: 'Matérias Bloco A', subtitulo: '', semanas: semanasA, outras: outras, linhas: matsA.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasA) }; }) },
             { key: 'b', titulo: 'Matérias Bloco B', subtitulo: '', semanas: semanasB, outras: outras, linhas: matsB.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasB) }; }) }
         ] : [
             { key: 'u', titulo: 'Matérias', subtitulo: 'Exemplo', semanas: [], outras: outras, linhas: mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n, []) }; }) }
         ];
         return {
-            modo: temSemanal ? 'quadro' : 'simples',
+            modo: (temSemanal && !boletimEhTerceiraSerieColag()) ? 'quadro' : 'simples',
             aviso: 'Exemplo com dados fictícios — não são notas reais.',
             colunas: colunas,
             pecas_disponiveis: disp,

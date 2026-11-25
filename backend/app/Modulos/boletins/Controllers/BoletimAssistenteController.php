@@ -312,7 +312,7 @@ class BoletimAssistenteController extends BaseController
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
                     $previewReal = $this->trocarLinhasDoQuadro($previewReal, $previewQuadro, $grupoId);
                 }
-                $previewReal = $this->separarGruposColag($previewReal, $grupoId);
+                $previewReal = $this->separarGruposColag($previewReal, $grupoId, $estado);
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
 
@@ -1203,31 +1203,73 @@ class BoletimAssistenteController extends BaseController
      * @param array<string,mixed> $preview
      * @return array<string,mixed>
      */
-    private function separarGruposColag(array $preview, int $grupoId): array
+    private function separarGruposColag(array $preview, int $grupoId, array $estado = []): array
     {
         if (!\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()) {
             return $preview;
         }
-        foreach (is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [] as $tab) {
-            if (!is_array($tab)) {
-                continue;
-            }
-            $key = strtolower(trim((string) ($tab['key'] ?? '')));
-            if ($key === 'a' || $key === 'b') {
-                return $preview;
-            }
-        }
-        $tabelas = is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [];
-        if (count($tabelas) !== 1 || !is_array($tabelas[0])) {
-            return $preview;
+        if ($this->wizard->ehTerceiraSerieMedioColag($estado)) {
+            return $this->previewSemBlocosTerceiraSerie($preview);
         }
         $mapas = $this->mapasMateriasPorBloco($grupoId);
         if (empty($mapas['tem'])) {
             return $preview;
         }
-        $base = $tabelas[0];
-        $linhas = is_array($base['linhas'] ?? null) ? $base['linhas'] : [];
-        $outras = is_array($base['outras'] ?? null) ? $base['outras'] : [];
+
+        return $this->montarDoisBlocosColag($preview, $mapas);
+    }
+
+    /**
+     * 1ª e 2ª série: Bloco A nas semanas ímpares e Bloco B nas pares, com as matérias de cada um.
+     *
+     * @param array<string,mixed> $preview
+     * @param array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}} $mapas
+     * @return array<string,mixed>
+     */
+    private function montarDoisBlocosColag(array $preview, array $mapas): array
+    {
+        $tabelas = is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [];
+        if ($tabelas === []) {
+            return $preview;
+        }
+        $linhas = [];
+        $outras = [];
+        $semanasA = [];
+        $semanasB = [];
+        $vistos = [];
+        foreach ($tabelas as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            if ($outras === [] && is_array($tab['outras'] ?? null) && $tab['outras'] !== []) {
+                $outras = $tab['outras'];
+            }
+            foreach (is_array($tab['semanas'] ?? null) ? $tab['semanas'] : [] as $semana) {
+                if (!is_array($semana)) {
+                    continue;
+                }
+                $codigo = strtolower(trim((string) ($semana['codigo'] ?? '')));
+                $grupo = strtolower(trim((string) ($semana['layout_group'] ?? '')));
+                if ($grupo === 'quadro_b' || preg_match('/^s[2468]$/', $codigo) === 1) {
+                    $semanasB[] = $semana;
+                } else {
+                    $semanasA[] = $semana;
+                }
+            }
+            foreach (is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [] as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $chave = $this->chaveLinhaPreview($linha);
+                if ($chave !== '' && isset($vistos[$chave])) {
+                    continue;
+                }
+                if ($chave !== '') {
+                    $vistos[$chave] = true;
+                }
+                $linhas[] = $linha;
+            }
+        }
         $linhasA = $this->linhasDoBlocoQuadro($linhas, $mapas['A']['ids'], $mapas['A']['nomes']);
         $linhasB = $this->linhasDoBlocoQuadro($linhas, $mapas['B']['ids'], $mapas['B']['nomes']);
         [$linhasA, $linhasB] = $this->distribuirSobrasColag($linhas, $linhasA, $linhasB, $mapas);
@@ -1240,7 +1282,7 @@ class BoletimAssistenteController extends BaseController
                 'key' => 'a',
                 'titulo' => 'Matérias Bloco A',
                 'subtitulo' => '',
-                'semanas' => [],
+                'semanas' => $semanasA,
                 'outras' => $outras,
                 'linhas' => $linhasA,
             ],
@@ -1248,11 +1290,60 @@ class BoletimAssistenteController extends BaseController
                 'key' => 'b',
                 'titulo' => 'Matérias Bloco B',
                 'subtitulo' => '',
-                'semanas' => [],
+                'semanas' => $semanasB,
                 'outras' => $outras,
                 'linhas' => $linhasB,
             ],
         ];
+
+        return $preview;
+    }
+
+    /**
+     * 3ª série do ensino médio no Colag: uma lista só, sem Bloco A e Bloco B.
+     *
+     * @param array<string,mixed> $preview
+     * @return array<string,mixed>
+     */
+    private function previewSemBlocosTerceiraSerie(array $preview): array
+    {
+        $tabelas = is_array($preview['tabelas'] ?? null) ? $preview['tabelas'] : [];
+        if ($tabelas === []) {
+            return $preview;
+        }
+        $linhas = [];
+        $outras = [];
+        $vistos = [];
+        foreach ($tabelas as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            if ($outras === [] && is_array($tab['outras'] ?? null)) {
+                $outras = $tab['outras'];
+            }
+            foreach (is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [] as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $chave = $this->chaveLinhaPreview($linha);
+                if ($chave !== '' && isset($vistos[$chave])) {
+                    continue;
+                }
+                if ($chave !== '') {
+                    $vistos[$chave] = true;
+                }
+                $linhas[] = $linha;
+            }
+        }
+        $preview['modo'] = 'simples';
+        $preview['tabelas'] = [[
+            'key' => 'u',
+            'titulo' => 'Matérias',
+            'subtitulo' => '',
+            'semanas' => [],
+            'outras' => $outras,
+            'linhas' => $this->ordenarLinhasPreservandoGrupo($linhas),
+        ]];
 
         return $preview;
     }
