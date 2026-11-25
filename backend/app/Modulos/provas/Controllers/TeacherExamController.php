@@ -2560,7 +2560,7 @@ class TeacherExamController extends BaseController
         $linhas = [];
         foreach ((new ExamBlockManualGrade())->fetchLogPorBloco($blocoId, null) as $registro) {
             $linhas[] = [
-                $registro['criado_em'], $registro['aluno_nome'], $registro['turma_nome'],
+                $registro['id'], $registro['criado_em'], $registro['aluno_nome'], $registro['turma_nome'],
                 $registro['materia_nome'], $registro['professor_nome'], $registro['alterado_por_nome'],
                 $registro['nota_anterior'], $registro['nota_nova'],
                 $registro['observacao_anterior'], $registro['observacao_nova'],
@@ -2568,7 +2568,7 @@ class TeacherExamController extends BaseController
         }
         $arquivo = (new \App\Painel\Admin\Services\RelatorioCompletoArquivo())->excel(['abas' => [[
             'nome' => 'Histórico',
-            'colunas' => ['Data e hora', 'Aluno', 'Turma', 'Matéria', 'Professor', 'Alterado por',
+            'colunas' => ['ID da alteração', 'Data e hora', 'Aluno', 'Turma', 'Matéria', 'Professor', 'Alterado por',
                 'Nota anterior', 'Nota nova', 'Observação anterior', 'Observação nova'],
             'linhas' => $linhas,
         ]]]);

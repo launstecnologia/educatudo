@@ -688,6 +688,7 @@ if ($tipoFlash === 'error') {
         <?php if ($historico === []): ?>
             <p class="text-sm text-gray-500">Nenhuma alteração registrada ainda. Rode a migration <code class="text-xs bg-gray-100 px-1 rounded">2026_09_29_provas_blocos_notas_lancadas_log</code> se a tabela ainda não existir.</p>
         <?php else: ?>
+            <p class="text-xs text-gray-600">O ID segue a sequência de alterações de todos os eventos da escola. Pode haver intervalos entre os IDs deste evento.</p>
             <?php foreach ($historico as $h): ?>
                 <?php
                 $quando = !empty($h['criado_em']) ? date('d/m/Y H:i', strtotime((string) $h['criado_em'])) : '—';
@@ -698,7 +699,7 @@ if ($tipoFlash === 'error') {
                 ?>
                 <div class="rounded-lg border border-gray-200 p-3 text-sm">
                     <div class="flex justify-between gap-2 text-xs text-gray-500 mb-1">
-                        <span><?= htmlspecialchars($quando) ?></span>
+                        <span>ID #<?= htmlspecialchars((string) $h['id'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($quando) ?></span>
                         <span><?= htmlspecialchars((string) ($h['alterado_por_nome'] ?? 'Sistema')) ?></span>
                     </div>
                     <p class="font-medium text-gray-900"><?= htmlspecialchars((string) ($h['aluno_nome'] ?? '')) ?></p>
