@@ -47,7 +47,7 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado'): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
@@ -77,9 +77,10 @@ class Boletim26ColagService
                 break;
             }
         }
+        $notaCampo = $notaCampo === 'media_bim' ? 'media_bim' : 'resultado';
         $bimestres = $bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4];
         $relatorios = [];
-        if ($turma !== null || $serieFiltro > 0) {
+        if ($abrir && ($turma !== null || $serieFiltro > 0)) {
             foreach ($aluno !== null ? [$aluno] : $alunos as $pessoa) {
                 $turmaPessoa = $turma ?? $this->turmaPorId($turmasSerie, (int) ($pessoa['turma_id'] ?? 0));
                 if ($turmaPessoa === null) {
@@ -95,7 +96,7 @@ class Boletim26ColagService
                     'demonstrativos' => $demonstrativos,
                 ];
             }
-        } else {
+        } elseif ($turma === null && $serieFiltro === 0) {
             $relatorios[] = [
                 'aluno' => null,
                 'turma' => null,
@@ -108,6 +109,8 @@ class Boletim26ColagService
             'serie' => $serieFiltro,
             'bimestre' => $bimestreFiltro,
             'nota_minima' => $notaMinima,
+            'nota_campo' => $notaCampo,
+            'abrir' => $abrir,
             'turma_id' => $turmaId,
             'aluno_id' => $aluno !== null ? (int) $aluno['id'] : 0,
             'turmas' => $turmasSerie,

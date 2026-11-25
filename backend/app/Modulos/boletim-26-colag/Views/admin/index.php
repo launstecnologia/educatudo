@@ -8,6 +8,9 @@ $serieFiltro = (int) ($painel['serie'] ?? 0);
 $bimestreFiltro = (int) ($painel['bimestre'] ?? 0);
 $notaMinima = is_numeric($painel['nota_minima'] ?? null) ? (float) $painel['nota_minima'] : null;
 $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ',', '');
+$notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
+$notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
+$abrir = !empty($painel['abrir']);
 $turmaId = (int) ($painel['turma_id'] ?? 0);
 $alunoId = (int) ($painel['aluno_id'] ?? 0);
 
@@ -26,27 +29,24 @@ $fmtInt = static function ($valor): string {
     }
     return (string) (int) $valor;
 };
-$celNota = static function ($valor) use ($fmt, $notaMinima): string {
-    $abaixo = $notaMinima !== null && is_numeric($valor) && (float) $valor < $notaMinima;
-    if ($notaMinima !== null && !$abaixo) {
+$celNota = static function ($valor, string $campo = '') use ($fmt, $notaMinima, $notaCampo): string {
+    $texto = $fmt($valor);
+    if ($texto === '—') {
         return '<td class="px-2 py-2">—</td>';
     }
-    $texto = $fmt($valor);
-    $classe = $texto === '—' ? '' : ($notaMinima === null ? ' nota' : ' abaixo');
+    $abaixo = $notaMinima !== null
+        && $campo === $notaCampo
+        && is_numeric($valor)
+        && (float) $valor < $notaMinima;
 
-    return '<td class="px-2 py-2' . $classe . '">' . $texto . '</td>';
+    return '<td class="px-2 py-2 ' . ($abaixo ? 'abaixo' : 'nota') . '">' . $texto . '</td>';
 };
-$linhaTemNotaAbaixo = static function (array $linha) use ($notaMinima): bool {
+$linhaTemNotaAbaixo = static function (array $linha) use ($notaMinima, $notaCampo): bool {
     if ($notaMinima === null) {
         return true;
     }
-    foreach (['media_sem', 'prova_bim', 'jornada', 'media', 'enac', 'media_bim', 'rec', 'resultado'] as $campo) {
-        if (is_numeric($linha[$campo] ?? null) && (float) $linha[$campo] < $notaMinima) {
-            return true;
-        }
-    }
 
-    return false;
+    return is_numeric($linha[$notaCampo] ?? null) && (float) $linha[$notaCampo] < $notaMinima;
 };
 $rotuloSerie = static function (int $serie): string {
     if ($serie === 1) {
@@ -79,6 +79,9 @@ $rotuloSerie = static function (int $serie): string {
 .boletim-colag td.nota { color: #047857; font-weight: 600; }
 .boletim-colag tbody tr td.abaixo { color: #b45309; font-weight: 600; background: #fff7ed; }
 </style>
+<div id="boletim-carregando" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.78);">
+    <div class="bg-white rounded-xl shadow-lg px-6 py-4 text-sm font-medium text-gray-800">Carregando o demonstrativo...</div>
+</div>
 <div class="mb-6">
     <h2 class="text-2xl font-bold text-gray-900 mb-1">Boletim - colag</h2>
     <p class="text-gray-600">Demonstrativo desta escola. A conta já está feita. A 1ª e a 2ª série separam Bloco A e Bloco B. A 3ª série fica numa lista só.</p>
@@ -97,7 +100,7 @@ $rotuloSerie = static function (int $serie): string {
         <label class="block text-sm">
             <span class="font-medium text-gray-700">Série</span>
             <select name="serie" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0">Todas as séries</option>
+                <option value="0">Escolha a série</option>
                 <?php foreach ([1, 2, 3] as $serieOpcao): ?>
                 <option value="<?= $serieOpcao ?>" <?= $serieOpcao === $serieFiltro ? 'selected' : '' ?>><?= htmlspecialchars($rotuloSerie($serieOpcao), ENT_QUOTES, 'UTF-8') ?></option>
                 <?php endforeach; ?>
@@ -142,13 +145,20 @@ $rotuloSerie = static function (int $serie): string {
             </select>
         </label>
         <label class="block text-sm">
+            <span class="font-medium text-gray-700">Nota mínima em</span>
+            <select name="nota_campo" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                <option value="media_bim" <?= $notaCampo === 'media_bim' ? 'selected' : '' ?>>Média bimestral</option>
+                <option value="resultado" <?= $notaCampo === 'resultado' ? 'selected' : '' ?>>Resultado final</option>
+            </select>
+        </label>
+        <label class="block text-sm">
             <span class="font-medium text-gray-700">Nota mínima</span>
             <input type="text" name="nota_minima" inputmode="decimal" value="<?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: 6,5" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-            <span class="mt-1 block text-xs text-gray-500">Mostra só as notas abaixo desse valor.</span>
+            <span class="mt-1 block text-xs text-gray-500">Deixe vazio para ver todas. O cálculo da linha continua visível.</span>
         </label>
     </div>
     <div class="mt-4">
-        <button type="submit" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium">Abrir demonstrativo</button>
+        <button type="submit" name="abrir" value="1" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium">Abrir demonstrativo</button>
     </div>
 </form>
 
@@ -157,9 +167,11 @@ $primeiroRelatorio = $relatorios[0] ?? null;
 $modeloVazio = !is_array($primeiroRelatorio) || !is_array($primeiroRelatorio['aluno'] ?? null);
 $bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
 ?>
-<?php if ($modeloVazio && $serieFiltro === 0 && $turmaId === 0): ?>
+<?php if (!$abrir && ($serieFiltro > 0 || $turmaId > 0)): ?>
+<p class="text-sm text-gray-600 mb-6"><?= count($alunos) ?> aluno(s) nesta lista. Clique em Abrir demonstrativo para ver as notas.</p>
+<?php elseif ($modeloVazio && $serieFiltro === 0 && $turmaId === 0): ?>
 <p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a série ou a turma para preencher com as notas.</p>
-<?php elseif ($serieFiltro > 0 || $turmaId > 0): ?>
+<?php elseif ($abrir && ($serieFiltro > 0 || $turmaId > 0)): ?>
 <p class="text-sm text-gray-600 mb-6">
     <?php if ($alunoId > 0): ?>
     Um aluno.
@@ -167,7 +179,7 @@ $bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
     Todos os alunos<?= $serieFiltro > 0 && $turmaId === 0 ? ' da série' : ' da turma' ?>.
     <?php endif; ?>
     <?php if ($notaMinima !== null): ?>
-    Só as notas abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.
+    Só as matérias com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.
     <?php endif; ?>
 </p>
 <?php endif; ?>
@@ -281,22 +293,22 @@ $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
                     <?php if ($semanas !== []): ?>
                     <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_n'] ?? null) ?></td>
                     <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_q'] ?? null) ?></td>
-                    <?= $celNota($linha['media_sem'] ?? null) ?>
+                    <?= $celNota($linha['media_sem'] ?? null, 'media_sem') ?>
                     <?php endif; ?>
-                    <?= $celNota($linha['prova_bim'] ?? null) ?>
-                    <?= $celNota($linha['jornada'] ?? null) ?>
+                    <?= $celNota($linha['prova_bim'] ?? null, 'prova_bim') ?>
+                    <?= $celNota($linha['jornada'] ?? null, 'jornada') ?>
                     <?php if (!$terceira): ?>
-                    <?= $celNota($linha['media'] ?? null) ?>
+                    <?= $celNota($linha['media'] ?? null, 'media') ?>
                     <?php endif; ?>
-                    <?= $celNota($linha['enac'] ?? null) ?>
-                    <?= $celNota($linha['media_bim'] ?? null) ?>
-                    <?= $celNota($linha['rec'] ?? null) ?>
-                    <?= $celNota($linha['resultado'] ?? null) ?>
+                    <?= $celNota($linha['enac'] ?? null, 'enac') ?>
+                    <?= $celNota($linha['media_bim'] ?? null, 'media_bim') ?>
+                    <?= $celNota($linha['rec'] ?? null, 'rec') ?>
+                    <?= $celNota($linha['resultado'] ?? null, 'resultado') ?>
                     <td class="px-2 py-2"><?= $fmtInt($linha['faltas'] ?? null) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($linhas === []): ?>
-                <tr><td class="px-3 py-4 text-gray-500" colspan="16"><?= $notaMinima !== null ? 'Nenhuma nota abaixo de ' . htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') . '.' : 'Nenhuma matéria deste bloco.' ?></td></tr>
+                <tr><td class="px-3 py-4 text-gray-500" colspan="16"><?= $notaMinima !== null ? 'Nenhuma ' . htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') . ' abaixo de ' . htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') . '.' : 'Nenhuma matéria deste bloco.' ?></td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -309,6 +321,13 @@ $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
 (function () {
     var form = document.getElementById('boletim-filtros');
     if (!form) return;
+    function carregando() {
+        var tela = document.getElementById('boletim-carregando');
+        if (!tela) return;
+        tela.hidden = false;
+        tela.style.display = 'flex';
+    }
+    form.addEventListener('submit', carregando);
     function aoMudar(nome, limpar) {
         var campo = form.querySelector('[name="' + nome + '"]');
         if (!campo) return;
@@ -317,18 +336,13 @@ $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
                 var item = form.querySelector('[name="' + alvo + '"]');
                 if (item) item.value = '0';
             });
+            carregando();
             form.submit();
         });
     }
     aoMudar('ano', []);
     aoMudar('serie', ['turma_id', 'aluno_id']);
     aoMudar('turma_id', ['aluno_id']);
-    aoMudar('aluno_id', []);
-    aoMudar('bimestre', []);
-    var minima = form.querySelector('[name="nota_minima"]');
-    if (minima) {
-        minima.addEventListener('change', function () { form.submit(); });
-    }
 })();
 </script>
 <?php if ($bimestresAbas !== []): ?>
