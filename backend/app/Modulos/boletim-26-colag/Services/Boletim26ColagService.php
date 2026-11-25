@@ -5,6 +5,7 @@ namespace App\Modulos\Boletim26Colag\Services;
 require_once __DIR__ . '/../Models/Boletim26ColagHomologacao.php';
 
 use App\Core\PeriodoLetivo;
+use App\Helpers\AlunoLancamentoNotaHelper;
 use App\Dominio\Escola\Models\ComponenteCurricular;
 use App\Dominio\Pessoas\Services\AlunoTurmaResolver;
 use App\Modulos\Boletim26Colag\Models\Boletim26ColagHomologacao;
@@ -801,7 +802,7 @@ class Boletim26ColagService
         $out = [];
         foreach ($rows as $row) {
             $id = (int) ($row['id'] ?? 0);
-            if ($id <= 0 || !$this->alunoAtivo($row)) {
+            if ($id <= 0 || !$this->alunoAtivo($row) || AlunoLancamentoNotaHelper::ehAlunoTesteOcultar((string) ($row['nome'] ?? ''))) {
                 continue;
             }
             $out[] = [
