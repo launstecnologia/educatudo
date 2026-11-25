@@ -859,6 +859,32 @@ class BoletimAssistenteController extends BaseController
             $tab['linhas'] = $this->ordenarLinhasPreservandoGrupo(array_values($linhas));
             $tabelas[] = $tab;
         }
+        if (\App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo() && !empty($mapas['tem'])) {
+            $linhasA = [];
+            $linhasB = [];
+            foreach ($tabelas as $tab) {
+                $key = strtolower(trim((string) ($tab['key'] ?? '')));
+                if ($key === 'a') {
+                    $linhasA = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+                } elseif ($key === 'b') {
+                    $linhasB = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+                }
+            }
+            if ($linhasA !== [] && $linhasB !== []) {
+                [$linhasA, $linhasB] = $this->distribuirSobrasColag($linhasCompletas, $linhasA, $linhasB, $mapas);
+                foreach ($tabelas as $i => $tab) {
+                    $key = strtolower(trim((string) ($tab['key'] ?? '')));
+                    if ($key === 'a') {
+                        $tab['linhas'] = $linhasA;
+                    } elseif ($key === 'b') {
+                        $tab['linhas'] = $linhasB;
+                    } else {
+                        continue;
+                    }
+                    $tabelas[$i] = $tab;
+                }
+            }
+        }
         $preview['tabelas'] = $tabelas;
         $preview['linhas_completas'] = $this->ordenarLinhasPreservandoGrupo($linhasCompletas);
 
@@ -1202,12 +1228,9 @@ class BoletimAssistenteController extends BaseController
         $base = $tabelas[0];
         $linhas = is_array($base['linhas'] ?? null) ? $base['linhas'] : [];
         $outras = is_array($base['outras'] ?? null) ? $base['outras'] : [];
-        $linhasA = $this->ordenarLinhasPreservandoGrupo(
-            $this->linhasDoBlocoQuadro($linhas, $mapas['A']['ids'], $mapas['A']['nomes'])
-        );
-        $linhasB = $this->ordenarLinhasPreservandoGrupo(
-            $this->linhasDoBlocoQuadro($linhas, $mapas['B']['ids'], $mapas['B']['nomes'])
-        );
+        $linhasA = $this->linhasDoBlocoQuadro($linhas, $mapas['A']['ids'], $mapas['A']['nomes']);
+        $linhasB = $this->linhasDoBlocoQuadro($linhas, $mapas['B']['ids'], $mapas['B']['nomes']);
+        [$linhasA, $linhasB] = $this->distribuirSobrasColag($linhas, $linhasA, $linhasB, $mapas);
         if ($linhasA === [] || $linhasB === []) {
             return $preview;
         }
@@ -1357,6 +1380,148 @@ class BoletimAssistenteController extends BaseController
         }
 
         return $out;
+    }
+
+    /**
+     * Matéria com nota que o quadro não pôs em A nem em B continua na prévia.
+     * Língua Portuguesa é a área (mãe) e o id dela não está na lista do bloco.
+     *
+     * @param list<array<string,mixed>> $todas
+     * @param list<array<string,mixed>> $linhasA
+     * @param list<array<string,mixed>> $linhasB
+     * @param array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}} $mapas
+     * @return array{0:list<array<string,mixed>>,1:list<array<string,mixed>>}
+     */
+    private function distribuirSobrasColag(array $todas, array $linhasA, array $linhasB, array $mapas): array
+    {
+        $colocadas = [];
+        foreach (array_merge($linhasA, $linhasB) as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $chave = $this->chaveLinhaPreview($linha);
+            if ($chave !== '') {
+                $colocadas[$chave] = true;
+            }
+        }
+        $sobras = [];
+        foreach ($todas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $chave = $this->chaveLinhaPreview($linha);
+            if ($chave !== '' && isset($colocadas[$chave])) {
+                continue;
+            }
+            $sobras[] = $linha;
+        }
+        if ($sobras === []) {
+            return [
+                $this->ordenarLinhasPreservandoGrupo($linhasA),
+                $this->ordenarLinhasPreservandoGrupo($linhasB),
+            ];
+        }
+        $familiasComNota = [];
+        foreach ($sobras as $linha) {
+            if (!$this->linhaPreviewTemNota($linha)) {
+                continue;
+            }
+            $grupo = trim((string) ($linha['grupo_key'] ?? ''));
+            if ($grupo !== '') {
+                $familiasComNota[$grupo] = true;
+            }
+        }
+        $sobrasA = [];
+        $sobrasB = [];
+        foreach ($sobras as $linha) {
+            $grupo = trim((string) ($linha['grupo_key'] ?? ''));
+            $fica = $this->linhaPreviewTemNota($linha) || ($grupo !== '' && isset($familiasComNota[$grupo]));
+            if (!$fica) {
+                continue;
+            }
+            if ($this->blocoSobraColag($linha, $todas, $mapas) === 'b') {
+                $sobrasB[] = $linha;
+            } else {
+                $sobrasA[] = $linha;
+            }
+        }
+
+        return [
+            $this->ordenarLinhasPreservandoGrupo(array_merge($linhasA, $sobrasA)),
+            $this->ordenarLinhasPreservandoGrupo(array_merge($linhasB, $sobrasB)),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     */
+    private function chaveLinhaPreview(array $linha): string
+    {
+        $mid = (int) ($linha['materia_id'] ?? 0);
+        if ($mid > 0) {
+            return 'id:' . $mid;
+        }
+        $nome = $this->chaveNomeMateria((string) ($linha['materia_nome'] ?? ''));
+        $grupo = trim((string) ($linha['grupo_key'] ?? ''));
+        if ($nome === '' && $grupo === '') {
+            return '';
+        }
+
+        return 'nome:' . $grupo . '|' . $nome;
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     */
+    private function linhaPreviewTemNota(array $linha): bool
+    {
+        foreach ((array) ($linha['notas'] ?? []) as $valor) {
+            if (is_numeric($valor)) {
+                return true;
+            }
+            if (is_string($valor) && is_numeric(str_replace(',', '.', trim($valor)))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     * @param list<array<string,mixed>> $todas
+     * @param array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}} $mapas
+     */
+    private function blocoSobraColag(array $linha, array $todas, array $mapas): string
+    {
+        $idsA = is_array($mapas['A']['ids'] ?? null) ? $mapas['A']['ids'] : [];
+        $idsB = is_array($mapas['B']['ids'] ?? null) ? $mapas['B']['ids'] : [];
+        $mid = (int) ($linha['materia_id'] ?? 0);
+        if ($mid > 0) {
+            return isset($idsB[$mid]) && !isset($idsA[$mid]) ? 'b' : 'a';
+        }
+        $grupo = trim((string) ($linha['grupo_key'] ?? ''));
+        $emA = false;
+        $emB = false;
+        if ($grupo !== '') {
+            foreach ($todas as $outra) {
+                if (!is_array($outra) || !empty($outra['eh_grupo_pai'])) {
+                    continue;
+                }
+                if (trim((string) ($outra['grupo_key'] ?? '')) !== $grupo) {
+                    continue;
+                }
+                $filho = (int) ($outra['materia_id'] ?? 0);
+                if ($filho > 0 && isset($idsA[$filho])) {
+                    $emA = true;
+                }
+                if ($filho > 0 && isset($idsB[$filho])) {
+                    $emB = true;
+                }
+            }
+        }
+
+        return $emB && !$emA ? 'b' : 'a';
     }
 
     /**
