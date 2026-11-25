@@ -10,3 +10,5 @@ $router->get('/admin/boletim-26-colag/parcial', 'Modulos/boletim-26-colag/Boleti
 $router->post('/admin/boletim-26-colag/situacao', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@situacao');
 $router->post('/admin/boletim-26-colag/homologar', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@homologar');
 $router->get('/admin/boletim-26-colag/exportar', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@exportar');
+
+$router->post('/admin/boletim-26-colag/publicacao', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@publicarPortal');

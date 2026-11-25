@@ -113,24 +113,8 @@ $rotuloSerie = static function (int $serie): string {
     return 'Ensino Médio';
 };
 ?>
+<?php include dirname(__DIR__) . '/estilo_tabela.php'; ?>
 <style>
-.boletim-colag { border-collapse: collapse; }
-.boletim-colag th,
-.boletim-colag td { border: 1px solid #dbe4ee; }
-.boletim-colag thead th {
-    background: #1e3a8a;
-    color: #fff;
-    border-color: rgba(255, 255, 255, .45);
-    font-size: 11px;
-    letter-spacing: .04em;
-    line-height: 1.2;
-}
-.boletim-colag thead tr:nth-child(2) th { font-size: 10px; padding-top: 4px; padding-bottom: 4px; }
-.boletim-colag tbody tr:nth-child(even) td { background: #f4f8fc; }
-.boletim-colag tbody tr:nth-child(odd) td { background: #fff; }
-.boletim-colag td.nota { color: #047857; font-weight: 600; }
-.boletim-colag tbody tr td.abaixo { color: #b45309; font-weight: 600; background: #fff7ed; }
-.boletim-colag tbody tr td.vermelho { color: #b91c1c; font-weight: 700; background: #fef2f2; }
 @keyframes boletim-status {
     0% { transform: translateX(-120%); }
     100% { transform: translateX(280%); }
@@ -172,6 +156,26 @@ $rotuloSerie = static function (int $serie): string {
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($ano === (int) date('Y')): ?>
+<details class="mb-5 rounded-lg border bg-white p-4">
+    <summary class="cursor-pointer font-semibold">Exibição para pais e alunos</summary>
+    <form method="post" action="<?= URL ?>/admin/boletim-26-colag/publicacao" class="mt-4 space-y-4">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES) ?>">
+        <input type="hidden" name="ano" value="<?= $ano ?>">
+        <p class="text-sm">Selecione o que publicar para o ensino médio em <?= $ano ?>. O boletim consolidado inclui os resultados dos quatro bimestres.</p>
+        <?php foreach (['aluno' => 'Alunos', 'pais' => 'Responsáveis'] as $perfil => $rotulo): ?>
+        <fieldset><legend class="font-semibold"><?= $rotulo ?></legend><div class="flex flex-wrap gap-4">
+            <?php foreach (['1', '2', '3', '4', 'boletim'] as $opcao): ?>
+            <label><input type="checkbox" name="<?= $perfil ?>[]" value="<?= $opcao ?>" <?= in_array($opcao, $publicacao[$perfil] ?? [], true) ? 'checked' : '' ?>>
+                <?= $opcao === 'boletim' ? 'Boletim consolidado' : 'Notas do ' . $opcao . 'º bimestre' ?></label>
+            <?php endforeach; ?>
+        </div></fieldset>
+        <?php endforeach; ?>
+        <button class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Salvar exibição</button>
+    </form>
+</details>
+<?php endif; ?>
 
 <div id="boletimFiltroBackdrop" class="fixed inset-0 bg-black/40 z-40 <?= $reabrirFiltro ? '' : 'hidden' ?>" data-csp-click="closeBoletimFiltro"></div>
 <aside id="boletimFiltroDrawer"

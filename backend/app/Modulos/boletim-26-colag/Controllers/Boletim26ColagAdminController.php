@@ -59,8 +59,27 @@ class Boletim26ColagAdminController extends BaseController
             'current_page' => 'boletim-26-colag',
             'user' => $this->auth->getUser(),
             'csrf_token' => $this->generateCsrfToken(),
+            'publicacao' => (new \App\Modulos\Boletim26Colag\Models\Boletim26ColagLeitura())->publicacaoPortal((int) $painel['ano']),
             'painel' => $painel,
         ]);
+    }
+
+    public function publicarPortal(): void
+    {
+        $ano = (int) ($_POST['ano'] ?? 0);
+        if (!$this->validateCsrf((string) ($_POST['_token'] ?? '')) || $ano !== (int) date('Y')) {
+            http_response_code(403);
+            return;
+        }
+        $publicacao = [];
+        foreach (['aluno', 'pais'] as $perfil) {
+            $marcadas = (array) ($_POST[$perfil] ?? []);
+            $publicacao[$perfil] = array_values(array_filter(['1', '2', '3', '4', 'boletim'],
+                static fn (string $opcao): bool => in_array($opcao, $marcadas, true)));
+        }
+        (new \App\Modulos\Boletim26Colag\Models\Boletim26ColagLeitura())->salvarPublicacaoPortal($ano, $publicacao);
+        $this->setFlashMessage('Exibição nos portais atualizada.', 'success');
+        $this->redirect('/admin/boletim-26-colag?ano=' . $ano);
     }
 
     public function homologar(): void

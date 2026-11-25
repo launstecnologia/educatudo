@@ -45,6 +45,31 @@ class Boletim26ColagService
         $this->leitura = new Boletim26ColagLeitura();
     }
 
+    public function portalDoAluno(array $aluno, string $perfil, int $ano): ?array
+    {
+        $turma = $this->turmaPorId($this->turmasMedio(), (int) ($aluno['turma_id'] ?? 0));
+        if ($turma === null) {
+            return null;
+        }
+        $opcoes = $ano === (int) date('Y') ? ($this->leitura->publicacaoPortal($ano)[$perfil] ?? []) : [];
+        $boletim = in_array('boletim', $opcoes, true);
+        $notas = [];
+        $demonstrativos = [];
+        foreach ([1, 2, 3, 4] as $bimestre) {
+            $publicado = in_array((string) $bimestre, $opcoes, true);
+            if ($publicado || $boletim) {
+                $demonstrativos[] = $this->montarBimestre($turma, (int) $aluno['id'], $bimestre, $ano);
+            }
+            if ($publicado) {
+                $notas[] = $bimestre;
+            }
+        }
+        return [
+            'notas' => $notas, 'boletim' => $boletim,
+            'relatorio' => ['aluno' => $aluno, 'turma' => $turma, 'demonstrativos' => $demonstrativos],
+        ];
+    }
+
     public static function ativo(): bool
     {
         if (!defined('TENANT_SLUG')) {

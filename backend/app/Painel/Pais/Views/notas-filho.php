@@ -3,6 +3,10 @@ $filho = $filho ?? [];
 $nomeFilho = htmlspecialchars((string) ($filho['nome'] ?? 'seu filho'), ENT_QUOTES, 'UTF-8');
 $secaoPedida = isset($_GET['secao']) ? (string) $_GET['secao'] : '';
 $secaoInicial = in_array($secaoPedida, ['boletim', 'notas', 'provas'], true) ? $secaoPedida : 'boletim';
+if (isset($portalColag)) {
+    $pastaColag = dirname(__DIR__, 3) . '/Modulos/boletim-26-colag/Views/';
+    include $pastaColag . 'estilo_tabela.php';
+}
 ?>
 
 <div class="max-w-7xl mx-auto p-6">
@@ -18,10 +22,17 @@ $secaoInicial = in_array($secaoPedida, ['boletim', 'notas', 'provas'], true) ? $
     </div>
 
     <div data-painel-portal="boletim" id="boletim">
+        <?php if (isset($portalColag)): ?>
+        <?php $somentePortal = 'boletim'; include $pastaColag . 'portal.php'; ?>
+        <?php else: ?>
         <?php require \App\Core\ViewPaths::partial('boletim_portal.php'); ?>
+        <?php endif; ?>
     </div>
 
     <div data-painel-portal="notas" id="notas" class="hidden">
+        <?php if (isset($portalColag)): ?>
+        <?php $somentePortal = 'notas'; include $pastaColag . 'portal.php'; ?>
+        <?php else: ?>
         <?php
         $arquivoNotasAoVivo = realpath(__DIR__ . '/../../../Modulos/eventos-avaliativos/Views/aluno/notas_ao_vivo.php');
         if ($arquivoNotasAoVivo && is_file($arquivoNotasAoVivo)) {
@@ -30,6 +41,7 @@ $secaoInicial = in_array($secaoPedida, ['boletim', 'notas', 'provas'], true) ? $
         $notas_perfil = 'pais';
         require \App\Core\ViewPaths::partial('notas_portal_coordenacao.php');
         ?>
+        <?php endif; ?>
     </div>
 
     <div data-painel-portal="provas" class="hidden">

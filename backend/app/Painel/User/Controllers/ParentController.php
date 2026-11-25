@@ -1063,6 +1063,8 @@ class ParentController extends BaseController
         rsort($anosDisponiveis);
 
         $data = [
+            'portalColag' => \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
+                ? (new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService())->portalDoAluno($filho, 'pais', $anoLetivo ?? (int) date('Y')) : null,
             'title' => 'Provas do Filho - EducaTudo',
             'page_title' => 'Provas',
             'current_page' => 'notas',

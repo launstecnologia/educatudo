@@ -1,6 +1,10 @@
 <?php
 $aluno = $aluno ?? [];
 $nomeAluno = htmlspecialchars((string) ($aluno['nome'] ?? 'o aluno'), ENT_QUOTES, 'UTF-8');
+if (isset($portalColag)) {
+    $pastaColag = dirname(__DIR__, 3) . '/boletim-26-colag/Views/';
+    include $pastaColag . 'estilo_tabela.php';
+}
 ?>
 
 <div class="max-w-7xl mx-auto p-6">
@@ -16,10 +20,17 @@ $nomeAluno = htmlspecialchars((string) ($aluno['nome'] ?? 'o aluno'), ENT_QUOTES
     </div>
 
     <div data-painel-portal="boletim" id="boletim">
+        <?php if (isset($portalColag)): ?>
+        <?php $somentePortal = 'boletim'; include $pastaColag . 'portal.php'; ?>
+        <?php else: ?>
         <?php require \App\Core\ViewPaths::partial('boletim_portal.php'); ?>
+        <?php endif; ?>
     </div>
 
     <div data-painel-portal="notas" id="notas" class="hidden">
+        <?php if (isset($portalColag)): ?>
+        <?php $somentePortal = 'notas'; include $pastaColag . 'portal.php'; ?>
+        <?php else: ?>
         <?php
         $arquivoNotasAoVivo = dirname(__DIR__, 3) . '/eventos-avaliativos/Views/aluno/notas_ao_vivo.php';
         if (is_file($arquivoNotasAoVivo)) {
@@ -28,6 +39,7 @@ $nomeAluno = htmlspecialchars((string) ($aluno['nome'] ?? 'o aluno'), ENT_QUOTES
         $notas_perfil = 'aluno';
         require \App\Core\ViewPaths::partial('notas_portal_coordenacao.php');
         ?>
+        <?php endif; ?>
     </div>
 
     <div data-painel-portal="provas" class="hidden">

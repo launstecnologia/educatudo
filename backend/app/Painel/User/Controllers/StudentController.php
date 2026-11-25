@@ -1629,6 +1629,8 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
 
         $data = [
+            'portalColag' => \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
+                ? (new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService())->portalDoAluno($aluno, 'aluno', (int) date('Y')) : null,
             'title' => 'Provas - EducaTudo',
             'user' => $user,
             'aluno' => $aluno,

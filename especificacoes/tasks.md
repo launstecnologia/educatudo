@@ -187,3 +187,5 @@
 - [x] Boletim: regravação acionada por Sincronizar eventos preserva a mesma matriz do Demonstrativo usada na geração, incluindo Português agrupado. Regressão reproduz gerar → regravar e impede a perda da linha-mãe. — 2026-11-03
 
 - [x] Lançamento de notas da coordenação — baixar em Excel o histórico completo de alterações do evento pelo painel Histórico. — 2026-11-25
+
+- [x] Colag — controlar por ano e perfil a exibição das notas bimestrais e do boletim consolidado nos portais web dos alunos e responsáveis do ensino médio.

@@ -20,7 +20,7 @@ $frentePortugues = static function (array $linha): bool {
         || str_contains($texto, 'portugues');
 };
 ?>
-<?php foreach ($demonstrativos as $indice => $demo): ?>
+<?php foreach (($somentePortal ?? '') === 'boletim' ? [] : $demonstrativos as $indice => $demo): ?>
 <?php
 $demoTemAbaixo = $notaMinima === null;
 if (!$demoTemAbaixo) {
@@ -154,6 +154,9 @@ if (!$demoTemAbaixo) {
 </section>
 <?php endforeach; ?>
 <?php
+if (($somentePortal ?? '') === 'notas') {
+    return;
+}
 $gradeBoletim = [];
 $ordemBoletim = [];
 $bimestresBoletim = [];
@@ -272,7 +275,7 @@ sort($bimestresBoletim);
             </tbody>
         </table>
     </div>
-    <?php if ($alunoPainelId > 0): ?>
+    <?php if ($alunoPainelId > 0 && empty($somentePortal)): ?>
     <?php
     $obsBoletim = '';
     try {

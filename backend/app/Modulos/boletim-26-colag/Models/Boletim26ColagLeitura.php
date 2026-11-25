@@ -22,6 +22,22 @@ class Boletim26ColagLeitura
         $this->db = Database::getInstance();
     }
 
+    public function publicacaoPortal(int $ano): array
+    {
+        $linha = $this->db->fetch('SELECT config_value FROM config_layout WHERE config_key = ?', ['boletim_colag_portal_' . $ano]);
+        $valor = json_decode((string) ($linha['config_value'] ?? ''), true);
+        return is_array($valor) ? $valor : [];
+    }
+
+    public function salvarPublicacaoPortal(int $ano, array $opcoes): void
+    {
+        $this->db->query(
+            'INSERT INTO config_layout (config_key, config_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)',
+            ['boletim_colag_portal_' . $ano, json_encode($opcoes, JSON_THROW_ON_ERROR)]
+        );
+    }
+
     public function tabelaExiste(string $tabela): bool
     {
         if (isset($this->tabelas[$tabela])) {
