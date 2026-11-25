@@ -1292,6 +1292,9 @@ class Boletim26ColagService
     }
 
     /**
+     * Mesma tabela do boletim antigo (regra 14 / gerado ID 40):
+     * 10%–40% concluídas → 7,0 (piso); depois sobe de 0,5 em 0,5 até 100% → 10.
+     *
      * @return list<array{percentual_min:int,nota:float}>
      */
     private function faixasJornadaColag(): array
@@ -1304,9 +1307,9 @@ class Boletim26ColagService
             ['percentual_min' => 60, 'nota' => 8.0],
             ['percentual_min' => 50, 'nota' => 7.5],
             ['percentual_min' => 40, 'nota' => 7.0],
-            ['percentual_min' => 30, 'nota' => 6.5],
-            ['percentual_min' => 20, 'nota' => 6.0],
-            ['percentual_min' => 10, 'nota' => 5.5],
+            ['percentual_min' => 30, 'nota' => 7.0],
+            ['percentual_min' => 20, 'nota' => 7.0],
+            ['percentual_min' => 10, 'nota' => 7.0],
         ];
     }
 
