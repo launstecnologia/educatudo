@@ -48,6 +48,19 @@ $linhaTemNotaAbaixo = static function (array $linha) use ($notaMinima, $notaCamp
 
     return is_numeric($linha[$notaCampo] ?? null) && (float) $linha[$notaCampo] < $notaMinima;
 };
+$relatorioTemAbaixo = static function (array $relatorio) use ($linhaTemNotaAbaixo): bool {
+    foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+        foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+            foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                if ($linhaTemNotaAbaixo($linha)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+};
 $rotuloSerie = static function (int $serie): string {
     if ($serie === 1) {
         return '1ª Série EM';
@@ -183,6 +196,14 @@ $bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
     <?php endif; ?>
 </p>
 <?php endif; ?>
+<?php
+if ($abrir && $notaMinima !== null) {
+    $relatorios = array_values(array_filter($relatorios, $relatorioTemAbaixo));
+}
+?>
+<?php if ($abrir && $notaMinima !== null && $relatorios === []): ?>
+<p class="text-sm text-gray-600 mb-6">Nenhum aluno com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.</p>
+<?php endif; ?>
 <?php if ($bimestresAbas !== []): ?>
 <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Bimestres">
     <?php foreach ($bimestresAbas as $indice => $bimestreAba): ?>
@@ -206,6 +227,22 @@ $serieTurma = $rotuloSerie((int) ($turmaRel['ano_serie'] ?? 0));
 $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
 ?>
 <?php foreach ($demonstrativos as $indice => $demo): ?>
+<?php
+$demoTemAbaixo = $notaMinima === null;
+if (!$demoTemAbaixo) {
+    foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $blocoDemo) {
+        foreach (is_array($blocoDemo['linhas'] ?? null) ? $blocoDemo['linhas'] : [] as $linhaDemo) {
+            if ($linhaTemNotaAbaixo($linhaDemo)) {
+                $demoTemAbaixo = true;
+                break 2;
+            }
+        }
+    }
+}
+if (!$demoTemAbaixo) {
+    continue;
+}
+?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
 <section class="mb-8 boletim-painel <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
@@ -240,6 +277,9 @@ $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
                 return empty($linhaFiltro['filha']) && isset($paisAbaixo[(string) ($linhaFiltro['nome'] ?? '')]);
             }
         ));
+    }
+    if ($notaMinima !== null && $linhas === []) {
+        continue;
     }
     ?>
     <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">
