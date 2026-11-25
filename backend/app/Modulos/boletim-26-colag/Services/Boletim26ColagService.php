@@ -1524,10 +1524,7 @@ class Boletim26ColagService
         }
         $media = $this->mediaPresentes([$mediaSem, $prova, $notaJornada]);
         $mediaBim = $this->mediaBimComEnac($media, $enac);
-        $resultado = $mediaBim;
-        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-            $resultado = $rec;
-        }
+        $resultado = $this->resultadoComRecuperacao($mediaBim, $rec);
 
         return $linha + [
             'semanas' => $semanas,
@@ -1672,10 +1669,10 @@ class Boletim26ColagService
             is_numeric($pai['media'] ?? null) ? (float) $pai['media'] : null,
             is_numeric($pai['enac'] ?? null) ? (float) $pai['enac'] : null
         );
-        $pai['resultado'] = $pai['media_bim'];
-        if (is_numeric($pai['rec']) && ($pai['resultado'] === null || (float) $pai['rec'] > (float) $pai['resultado'])) {
-            $pai['resultado'] = $pai['rec'];
-        }
+        $pai['resultado'] = $this->resultadoComRecuperacao(
+            is_numeric($pai['media_bim'] ?? null) ? (float) $pai['media_bim'] : null,
+            is_numeric($pai['rec'] ?? null) ? (float) $pai['rec'] : null
+        );
 
         return $this->aplicarSoProvaSeEducacaoFisica($pai, false);
     }
@@ -1763,15 +1760,11 @@ class Boletim26ColagService
         $linha['prova_bim'] = $prova;
         if ($this->ehEducacaoFisica((string) ($linha['nome'] ?? ''))) {
             $rec = is_numeric($linha['rec'] ?? null) ? (float) $linha['rec'] : null;
-            $resultado = $prova;
-            if ($rec !== null && $rec > $resultado) {
-                $resultado = $rec;
-            }
             $linha['jornada'] = null;
             $linha['enac'] = null;
             $linha['media'] = $prova;
             $linha['media_bim'] = $prova;
-            $linha['resultado'] = $resultado;
+            $linha['resultado'] = $this->resultadoComRecuperacao($prova, $rec);
 
             return $linha;
         }
@@ -1789,13 +1782,9 @@ class Boletim26ColagService
         $mediaSem = is_numeric($linha['media_sem'] ?? null) ? (float) $linha['media_sem'] : null;
         $media = $this->mediaPresentes([$mediaSem, $prova, $jornada]);
         $mediaBim = $this->mediaBimComEnac($media, $enac);
-        $resultado = $mediaBim;
-        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-            $resultado = $rec;
-        }
         $linha['media'] = $media;
         $linha['media_bim'] = $mediaBim;
-        $linha['resultado'] = $resultado;
+        $linha['resultado'] = $this->resultadoComRecuperacao($mediaBim, $rec);
 
         return $linha;
     }
@@ -1813,15 +1802,11 @@ class Boletim26ColagService
         }
         $prova = is_numeric($pai['prova_bim'] ?? null) ? (float) $pai['prova_bim'] : null;
         $rec = is_numeric($pai['rec'] ?? null) ? (float) $pai['rec'] : null;
-        $resultado = $prova;
-        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-            $resultado = $rec;
-        }
         $pai['jornada'] = null;
         $pai['enac'] = null;
         $pai['media'] = $prova;
         $pai['media_bim'] = $prova;
-        $pai['resultado'] = $resultado;
+        $pai['resultado'] = $this->resultadoComRecuperacao($prova, $rec);
 
         return $pai;
     }
@@ -1833,11 +1818,6 @@ class Boletim26ColagService
      */
     private function linhaSoProvaBim(array $linha, array $semanas, int $totalN, int $totalQ, ?float $mediaSem, ?float $prova, ?float $rec, ?int $falta, bool $terceira): array
     {
-        $resultado = $prova;
-        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-            $resultado = $rec;
-        }
-
         return $linha + [
             'semanas' => $terceira ? [] : $semanas,
             'total_n' => (!$terceira && $totalQ > 0) ? $totalN : null,
@@ -1849,7 +1829,7 @@ class Boletim26ColagService
             'enac' => null,
             'media_bim' => $prova,
             'rec' => $rec,
-            'resultado' => $resultado,
+            'resultado' => $this->resultadoComRecuperacao($prova, $rec),
             'faltas' => $falta,
         ];
     }
@@ -1976,7 +1956,7 @@ class Boletim26ColagService
     /**
      * 3ª série: média da avaliação bimestral com a jornada.
      * A média final recebe o ENAC só quando supera essa média.
-     * A recuperação substitui o resultado final só quando é maior.
+     * A recuperação entra como (média + rec) / 2 só quando isso supera a média.
      *
      * @return array{media:?float,media_bim:?float,resultado:?float}
      */
@@ -1984,15 +1964,11 @@ class Boletim26ColagService
     {
         $media = $this->mediaPresentes([$prova, $jornada]);
         $mediaFinal = $this->mediaBimComEnac($media, $enac);
-        $resultado = $mediaFinal;
-        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-            $resultado = $rec;
-        }
 
         return [
             'media' => $media,
             'media_bim' => $mediaFinal,
-            'resultado' => $resultado,
+            'resultado' => $this->resultadoComRecuperacao($mediaFinal, $rec),
         ];
     }
 
@@ -2010,6 +1986,23 @@ class Boletim26ColagService
         $comEnac = $this->meio(($media + $enac) / 2);
 
         return $comEnac > $media ? $comEnac : $media;
+    }
+
+    /**
+     * Resultado final: (média bim + rec) / 2 só quando supera a média bim; senão mantém a média bim.
+     * Ex.: Física 6,0 + rec 8,0 → 7,0 (não substitui por 8,0).
+     */
+    private function resultadoComRecuperacao(?float $mediaBim, ?float $rec): ?float
+    {
+        if ($mediaBim === null) {
+            return $rec;
+        }
+        if ($rec === null) {
+            return $mediaBim;
+        }
+        $comRec = $this->meio(($mediaBim + $rec) / 2);
+
+        return $comRec > $mediaBim ? $comRec : $mediaBim;
     }
 
     private function meio(float $valor): float
