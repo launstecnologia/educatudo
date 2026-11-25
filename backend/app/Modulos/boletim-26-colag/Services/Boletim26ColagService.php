@@ -629,9 +629,6 @@ class Boletim26ColagService
         foreach ($provas as $prova) {
             $blocoId = (int) ($prova['id'] ?? 0);
             $peca = $this->pecaDaProva($prova);
-            if ($terceira && $peca === 'semanal' && $this->ehLancamentoDeNota($prova)) {
-                $peca = 'prova_bim';
-            }
             if ($peca === '') {
                 continue;
             }
@@ -647,7 +644,6 @@ class Boletim26ColagService
             $this->guardarNota($celulas, $peca, $blocoId, $materias, $notas, $acertos);
         }
         $this->completarEnacDaArte($celulas, $linhasBase);
-        $this->somarProvaDeProfessoresDaMesmaMateria($celulas, $linhasBase);
 
         $semanasBimestre = $terceira ? [] : $this->semanasDoBimestre($bimestre);
         $linhas = [];
@@ -1540,8 +1536,8 @@ class Boletim26ColagService
     }
 
     /**
-     * A prova bimestral soma a nota gravada de cada professor da matéria.
-     * Professor sem nota própria não repete a nota do outro.
+     * Mesma matéria e professores diferentes: a avaliação bimestral soma uma nota de cada professor.
+     * Cada professor entra uma vez. Lançamento semanal não entra nessa soma.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
@@ -1553,40 +1549,58 @@ class Boletim26ColagService
             return $linhas;
         }
         $porBloco = [];
+        $blocos = [];
         foreach ($notas as $nota) {
-            $peca = $this->pecaDaProva($nota);
-            if ($terceira && $peca === 'semanal' && $this->ehLancamentoDeNota($nota)) {
-                $peca = 'prova_bim';
-            }
-            if ($peca !== 'prova_bim') {
+            if ($this->pecaDaProva($nota) !== 'prova_bim') {
                 continue;
             }
             $bid = (int) $nota['bloco_id'];
             $mid = (int) $nota['materia_id'];
             $pid = (int) $nota['professor_id'];
-            if ($bid <= 0 || $mid <= 0 || $pid <= 0) {
+            if ($bid <= 0 || $mid <= 0) {
                 continue;
             }
-            if (!isset($porBloco[$bid][$mid][$pid])) {
-                $porBloco[$bid][$mid][$pid] = 0.0;
+            $blocos[$bid] = $bid;
+            $atual = $porBloco[$bid][$mid][$pid] ?? null;
+            $valor = (float) $nota['nota'];
+            if ($atual === null || $valor > $atual) {
+                $porBloco[$bid][$mid][$pid] = $valor;
             }
-            $porBloco[$bid][$mid][$pid] += (float) $nota['nota'];
         }
         if ($porBloco === []) {
             return $linhas;
         }
-        $somaPorMateria = [];
-        foreach ($porBloco as $materias) {
-            foreach ($materias as $mid => $porProfessor) {
-                $somaPorMateria[$mid] = ($somaPorMateria[$mid] ?? 0.0) + array_sum($porProfessor);
-            }
+        $ligados = [];
+        foreach ($this->leitura->professoresDasMaterias(array_values($blocos)) as $prof) {
+            $ligados[$prof['bloco_id']][$prof['materia_id']][$prof['professor_id']] = (int) $prof['professor_id'];
         }
-        $nomes = [];
-        foreach ($this->catalogoMaterias() as $materia) {
-            $id = (int) ($materia['id'] ?? 0);
-            $nome = trim((string) ($materia['nome'] ?? ''));
-            if ($id > 0 && $nome !== '') {
-                $nomes[$id] = $nome;
+        $notaPorProfessor = [];
+        foreach ($porBloco as $bid => $materias) {
+            foreach ($materias as $mid => $porProfessor) {
+                $professores = array_values($ligados[$bid][$mid] ?? []);
+                if ($professores === []) {
+                    $professores = array_map('intval', array_keys($porProfessor));
+                }
+                $gravadas = array_values(array_filter(
+                    $porProfessor,
+                    static fn (float $nota, int $pid): bool => $pid > 0,
+                    ARRAY_FILTER_USE_BOTH
+                ));
+                if ($gravadas === []) {
+                    $gravadas = array_values($porProfessor);
+                }
+                $referencia = max($gravadas);
+                foreach ($professores as $pid) {
+                    $pid = (int) $pid;
+                    if ($pid <= 0) {
+                        continue;
+                    }
+                    $valor = isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $referencia;
+                    $anterior = $notaPorProfessor[$mid][$pid] ?? null;
+                    if ($anterior === null || $valor > $anterior) {
+                        $notaPorProfessor[$mid][$pid] = $valor;
+                    }
+                }
             }
         }
         foreach ($linhas as $i => $linha) {
@@ -1594,22 +1608,11 @@ class Boletim26ColagService
                 continue;
             }
             $id = (int) ($linha['materia_id'] ?? 0);
-            $soma = 0.0;
-            $tem = false;
-            foreach ($somaPorMateria as $mid => $valor) {
-                $nomeNota = $nomes[(int) $mid] ?? '';
-                $mesmo = (int) $mid === $id
-                    || ($nomeNota !== '' && $this->mesmoNomeDeMateria((string) ($linha['nome'] ?? ''), $nomeNota));
-                if (!$mesmo) {
-                    continue;
-                }
-                $soma += (float) $valor;
-                $tem = true;
-            }
-            if (!$tem) {
+            $notasMateria = $notaPorProfessor[$id] ?? [];
+            if ($notasMateria === []) {
                 continue;
             }
-            $linhas[$i] = $this->trocarProvaBim($linha, $this->meio($soma), $terceira);
+            $linhas[$i] = $this->trocarProvaBim($linha, $this->meio(array_sum($notasMateria)), $terceira);
         }
 
         return $linhas;
