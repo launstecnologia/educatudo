@@ -650,12 +650,6 @@ class Boletim26ColagService
         foreach ($linhasBase as $linha) {
             $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira, $semanasBimestre);
         }
-        if ($bimestre >= 3) {
-            $linhas = array_values(array_filter(
-                $linhas,
-                fn (array $linha): bool => !$this->ehLiteratura((string) ($linha['nome'] ?? ''))
-            ));
-        }
         $linhas = $this->fecharGrupos($linhas, $terceira, $semanasBimestre);
         $linhas = array_values(array_filter(
             $linhas,
@@ -2123,11 +2117,6 @@ class Boletim26ColagService
     private function ehRedacao(string $nome): bool
     {
         return str_contains($this->chave($nome), 'redacao');
-    }
-
-    private function ehLiteratura(string $nome): bool
-    {
-        return str_contains($this->chave($nome), 'literatura');
     }
 
     private function ehEducacaoFisica(string $nome): bool
