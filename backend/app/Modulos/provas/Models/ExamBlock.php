@@ -84,6 +84,18 @@ class ExamBlock
         return $cache;
     }
 
+    /**
+     * Só o Colag junta cartões repetidos do mesmo professor e da mesma matéria.
+     */
+    private function juntarProfessorMateriaRepetidoNoColag(): bool
+    {
+        if (!defined('TENANT_SLUG')) {
+            return false;
+        }
+
+        return strtolower(trim((string) TENANT_SLUG)) === 'colag';
+    }
+
     private function exigirProfessorNoPar(?int $professorId): void
     {
         if ($professorId === null && !$this->professorIdAceitaNulo()) {
@@ -1287,23 +1299,40 @@ class ExamBlock
                 );
             }
             
-            // Adiciona novos professores com suas matérias e turmas
+            // Adiciona novos professores com suas matérias e turmas.
+            // No Colag, o mesmo professor e a mesma matéria podem vir em mais de um
+            // cartão. A chave única é bloco + professor + matéria, então as turmas
+            // desses cartões entram no mesmo registro. As outras escolas gravam cada cartão.
+            $juntarParRepetido = $this->juntarProfessorMateriaRepetidoNoColag();
             if (!empty($data['professores']) && is_array($data['professores'])) {
                 $turmasDoBloco = isset($data['turmas']) && is_array($data['turmas']) ? $data['turmas'] : [];
+                $professorMateriaInseridos = [];
                 foreach ($data['professores'] as $professorData) {
+                    if (!is_array($professorData)) {
+                        continue;
+                    }
                     $qtdQuestoes = $this->resolverQuantidadeQuestoes($professorData, $data);
-                    $this->exigirProfessorNoPar(!empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null);
-                    // Insere relacionamento bloco-professor-matéria
-                    $blocoProfessorId = $this->db->insert(
-                        "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
-                         VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
-                        [
-                            'bloco_id' => $id,
-                            'professor_id' => !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null,
-                            'materia_id' => $professorData['materia_id'],
-                            'quantidade_questoes' => $qtdQuestoes
-                        ]
-                    );
+                    $professorIdInsert = !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null;
+                    $materiaIdInsert = (int) ($professorData['materia_id'] ?? 0);
+                    $chaveProfessorMateria = ($professorIdInsert ?? 0) . ':' . $materiaIdInsert;
+                    if ($juntarParRepetido && isset($professorMateriaInseridos[$chaveProfessorMateria])) {
+                        $blocoProfessorId = $professorMateriaInseridos[$chaveProfessorMateria];
+                    } else {
+                        $this->exigirProfessorNoPar($professorIdInsert);
+                        $blocoProfessorId = $this->db->insert(
+                            "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
+                             VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
+                            [
+                                'bloco_id' => $id,
+                                'professor_id' => $professorIdInsert,
+                                'materia_id' => $materiaIdInsert,
+                                'quantidade_questoes' => $qtdQuestoes
+                            ]
+                        );
+                        if ($juntarParRepetido) {
+                            $professorMateriaInseridos[$chaveProfessorMateria] = (int) $blocoProfessorId;
+                        }
+                    }
                     // Vincula turmas deste professor ao bloco-professor.
                     // Se não vier turma por professor, usa turmas gerais do bloco.
                     $turmasParaProfessor = isset($professorData['turmas']) && is_array($professorData['turmas'])
