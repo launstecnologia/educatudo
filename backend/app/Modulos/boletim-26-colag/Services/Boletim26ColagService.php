@@ -1956,7 +1956,7 @@ class Boletim26ColagService
     /**
      * 3ª série: média da avaliação bimestral com a jornada.
      * A média final recebe o ENAC só quando supera essa média.
-     * A recuperação entra como (média + rec) / 2 só quando isso supera a média.
+     * A recuperação entra como max(média, min(7, rec)).
      *
      * @return array{media:?float,media_bim:?float,resultado:?float}
      */
@@ -1989,20 +1989,21 @@ class Boletim26ColagService
     }
 
     /**
-     * Resultado final: (média bim + rec) / 2 só quando supera a média bim; senão mantém a média bim.
-     * Ex.: Física 6,0 + rec 8,0 → 7,0 (não substitui por 8,0).
+     * Resultado final = max(média bim, min(7, rec)), como na regra antiga do EM.
+     * A recuperação sobe a nota, mas não passa de 7,0; se a média bim já for maior, mantém.
+     * Ex.: Física média bim 6,5 + rec 8,0 → max(6,5, 7) = 7,0 (não 7,5 nem 8,0).
      */
     private function resultadoComRecuperacao(?float $mediaBim, ?float $rec): ?float
     {
-        if ($mediaBim === null) {
-            return $rec;
-        }
         if ($rec === null) {
             return $mediaBim;
         }
-        $comRec = $this->meio(($mediaBim + $rec) / 2);
+        $recLimitada = min(7.0, $rec);
+        if ($mediaBim === null) {
+            return $this->meio($recLimitada);
+        }
 
-        return $comRec > $mediaBim ? $comRec : $mediaBim;
+        return $this->meio(max($mediaBim, $recLimitada));
     }
 
     private function meio(float $valor): float
