@@ -129,7 +129,7 @@ class Boletim26ColagService
             $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira);
         }
         $linhas = $this->fecharAreaPortugues($linhas, $terceira);
-        $blocos = $this->partirBlocos($linhas, $terceira);
+        $blocos = $this->partirBlocos($linhas, $terceira, true);
 
         return [
             'bimestre' => $bimestre,
@@ -781,7 +781,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $linhas
      * @return list<array{titulo:string,semanas:list<int>,linhas:list<array<string,mixed>>}>
      */
-    private function partirBlocos(array $linhas, bool $terceira): array
+    private function partirBlocos(array $linhas, bool $terceira, bool $ocultarSemanaVazia = false): array
     {
         if ($terceira) {
             return [[
@@ -799,11 +799,43 @@ class Boletim26ColagService
                 $a[] = $linha;
             }
         }
+        $semanasA = [1, 3, 5];
+        $semanasB = [2, 4, 6];
+        if ($ocultarSemanaVazia) {
+            $semanasA = $this->semanasComNota($a, $semanasA);
+            $semanasB = $this->semanasComNota($b, $semanasB);
+        }
 
         return [
-            ['titulo' => 'Matérias Bloco A', 'semanas' => [1, 3, 5], 'linhas' => $a],
-            ['titulo' => 'Matérias Bloco B', 'semanas' => [2, 4, 6], 'linhas' => $b],
+            ['titulo' => 'Matérias Bloco A', 'semanas' => $semanasA, 'linhas' => $a],
+            ['titulo' => 'Matérias Bloco B', 'semanas' => $semanasB, 'linhas' => $b],
         ];
+    }
+
+    /**
+     * Semana sem N nem Q em nenhuma matéria não entra no quadro.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param list<int> $candidatas
+     * @return list<int>
+     */
+    private function semanasComNota(array $linhas, array $candidatas): array
+    {
+        $out = [];
+        foreach ($candidatas as $semana) {
+            foreach ($linhas as $linha) {
+                $cel = $linha['semanas'][$semana] ?? null;
+                if (!is_array($cel)) {
+                    continue;
+                }
+                if (($cel['n'] ?? null) !== null || ($cel['q'] ?? null) !== null) {
+                    $out[] = (int) $semana;
+                    break;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**

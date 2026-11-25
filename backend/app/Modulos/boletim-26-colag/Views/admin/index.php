@@ -84,16 +84,37 @@ $rotuloSerie = static function (int $serie): string {
     </div>
 </form>
 
-<?php if ($aluno === null): ?>
-<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a turma e o aluno para preencher com as notas.</p>
-<?php endif; ?>
 <?php
 $nomeAluno = $aluno !== null ? htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
 $serieTurma = $rotuloSerie((int) ($turma['ano_serie'] ?? 0));
+$temAbas = false;
+foreach ($demonstrativos as $demoAba) {
+    if ((int) ($demoAba['bimestre'] ?? 0) > 0) {
+        $temAbas = true;
+        break;
+    }
+}
 ?>
-<?php foreach ($demonstrativos as $demo): ?>
+<?php if ($aluno === null): ?>
+<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a turma e o aluno para preencher com as notas.</p>
+<?php endif; ?>
+<?php if ($temAbas): ?>
+<div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Bimestres">
+    <?php foreach ($demonstrativos as $indice => $demoAba): ?>
+    <?php $bimestreAba = (int) ($demoAba['bimestre'] ?? 0); ?>
+    <button type="button"
+            class="boletim-aba px-4 py-1.5 rounded-full text-sm font-medium <?= $indice === 0 ? 'bg-blue-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
+            role="tab"
+            data-boletim-aba="<?= $bimestreAba ?>"
+            aria-selected="<?= $indice === 0 ? 'true' : 'false' ?>">
+        <?= $bimestreAba ?>º bimestre
+    </button>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+<?php foreach ($demonstrativos as $indice => $demo): ?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
+<section class="mb-8 boletim-painel <?= ($temAbas && $indice > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
         <?php if (!empty($demo['titulo'])): ?>
         <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
@@ -181,3 +202,23 @@ $serieTurma = $rotuloSerie((int) ($turma['ano_serie'] ?? 0));
     <?php endforeach; ?>
 </section>
 <?php endforeach; ?>
+<?php if ($temAbas): ?>
+<script>
+document.querySelectorAll('[data-boletim-aba]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+        var alvo = botao.getAttribute('data-boletim-aba');
+        document.querySelectorAll('[data-boletim-aba]').forEach(function (item) {
+            var ativo = item === botao;
+            item.classList.toggle('bg-blue-900', ativo);
+            item.classList.toggle('text-white', ativo);
+            item.classList.toggle('bg-gray-100', !ativo);
+            item.classList.toggle('text-gray-700', !ativo);
+            item.setAttribute('aria-selected', ativo ? 'true' : 'false');
+        });
+        document.querySelectorAll('[data-boletim-painel]').forEach(function (painel) {
+            painel.classList.toggle('hidden', painel.getAttribute('data-boletim-painel') !== alvo);
+        });
+    });
+});
+</script>
+<?php endif; ?>
