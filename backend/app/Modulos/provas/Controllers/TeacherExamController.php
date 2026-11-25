@@ -2412,6 +2412,7 @@ class TeacherExamController extends BaseController
         );
         $resultado = $this->aplicarCruzamentoImportacaoNotas(
             $blocoId,
+            $bloco,
             $cruzamento,
             !empty($_POST['substituir']),
             $urlVolta,
@@ -2531,6 +2532,7 @@ class TeacherExamController extends BaseController
         $cruzamento['ignoradas'] = (int) ($cruzamento['ignoradas'] ?? 0) + (int) ($lido['ignoradas'] ?? 0);
         $resultado = $this->aplicarCruzamentoImportacaoNotas(
             $blocoId,
+            $bloco,
             $cruzamento,
             !empty($_POST['substituir']),
             $urlVolta,
@@ -2627,7 +2629,7 @@ class TeacherExamController extends BaseController
 
         $notasModel = new ExamBlockManualGrade();
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $indexNotas = $this->indexarNotasLancadasBloco($existentes);
+        $indexNotas = $this->indexarNotasLancadasBloco($existentes, $this->combosLancamentoNotaBloco($bloco));
 
         $linhas = [];
         foreach ($combos as $combo) {
@@ -2833,7 +2835,7 @@ class TeacherExamController extends BaseController
         }
 
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $indexExistente = $this->indexarNotasLancadasBloco($existentes);
+        $indexExistente = $this->indexarNotasLancadasBloco($existentes, $this->combosLancamentoNotaBloco($bloco));
 
         $alteraExistente = false;
         $coletarAlteracao = function (int $pid, int $mid, int $tid, int $aid, $valorRaw, string $obs) use (&$alteraExistente, &$indexExistente): void {
@@ -3201,7 +3203,7 @@ class TeacherExamController extends BaseController
         $alvos = array_values($alvosUnicos);
 
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $indexExistente = $this->indexarNotasLancadasBloco($existentes);
+        $indexExistente = $this->indexarNotasLancadasBloco($existentes, $this->combosLancamentoNotaBloco($bloco));
         $precisaDesbloquear = false;
         foreach ($alvos as $alvo) {
             $antRaw = $this->buscarNotaLancadaIndex(
@@ -3319,7 +3321,7 @@ class TeacherExamController extends BaseController
 
         $notasModel = new ExamBlockManualGrade();
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $indexNotas = $this->indexarNotasLancadasBloco($existentes);
+        $indexNotas = $this->indexarNotasLancadasBloco($existentes, $this->combosLancamentoNotaBloco($bloco));
 
         $combos = $this->combosLancamentoNotaBloco($bloco, 0);
         $comboKeys = [];
@@ -3626,6 +3628,7 @@ class TeacherExamController extends BaseController
      */
     private function aplicarCruzamentoImportacaoNotas(
         int $blocoId,
+        array $bloco,
         array $cruzamento,
         bool $substituir,
         string $urlVolta,
@@ -3638,7 +3641,10 @@ class TeacherExamController extends BaseController
             return null;
         }
 
-        $index = $this->indexarNotasLancadasBloco($notasModel->fetchTodasNotasBlocoAdmin($blocoId));
+        $index = $this->indexarNotasLancadasBloco(
+            $notasModel->fetchTodasNotasBlocoAdmin($blocoId),
+            $this->combosLancamentoNotaBloco($bloco)
+        );
         $aplicar = [];
         $preservadas = 0;
         $alteraExistente = false;
@@ -4014,8 +4020,14 @@ class TeacherExamController extends BaseController
      * @param list<array<string,mixed>> $existentes
      * @return array{por_chave:array<string,array<string,mixed>>,por_materia_aluno:array<string,array<string,mixed>>}
      */
-    private function indexarNotasLancadasBloco(array $existentes): array
+    private function indexarNotasLancadasBloco(array $existentes, array $combos): array
     {
+        $docentes = [];
+        foreach ($combos as $combo) {
+            foreach ($combo['turma_ids'] as $tid) {
+                $docentes[$combo['materia_id']][$tid][$combo['professor_id']] = true;
+            }
+        }
         $porChave = [];
         $porMateriaAluno = [];
         foreach ($existentes as $ln) {
@@ -4028,6 +4040,11 @@ class TeacherExamController extends BaseController
             }
             $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
             $porChave[$k] = $ln;
+            // Só reaproveita um lançamento antigo quando existe um único docente de destino.
+            $vinculados = $docentes[$mid][$tid] ?? [];
+            if (count($vinculados) !== 1 || isset($vinculados[$pid])) {
+                continue;
+            }
             $km = $mid . '_' . $tid . '_' . $aid;
             $temNota = (($ln['nota'] ?? null) !== null && ($ln['nota'] ?? '') !== '');
             if (!isset($porMateriaAluno[$km])) {
@@ -4442,7 +4459,10 @@ class TeacherExamController extends BaseController
         $profRows = $this->blocoModel->getProfessores($blocoId);
         $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
         // Progresso usa matéria+aluno com fallback: notas podem ter professor_id antigo após troca de vínculo.
-        $indexNotas = $this->indexarNotasLancadasBloco($notasModel->fetchTodasNotasBlocoAdmin($blocoId));
+        $indexNotas = $this->indexarNotasLancadasBloco(
+            $notasModel->fetchTodasNotasBlocoAdmin($blocoId),
+            $this->combosLancamentoNotaBloco($bloco)
+        );
 
         $lancamentoPorMateria = [];
         $cntNaoIniciado = 0;
