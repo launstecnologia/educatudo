@@ -61,6 +61,8 @@ class Boletim26ColagService
             for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
                 $demonstrativos[] = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
             }
+        } else {
+            $demonstrativos = $this->montarModelo();
         }
 
         return [
@@ -146,7 +148,7 @@ class Boletim26ColagService
         foreach ($this->leitura->listarTurmas() as $turma) {
             $ano = $this->anoSerie(
                 (string) ($turma['serie_nome'] ?? ''),
-                (string) ($turma['curso_nome'] ?? ''),
+                trim((string) ($turma['curso_nome'] ?? '') . ' ' . (string) ($turma['tipo_ensino'] ?? '')),
                 (string) ($turma['nome'] ?? '')
             );
             if ($ano < 1) {
@@ -867,21 +869,113 @@ class Boletim26ColagService
         return round($valor * 2, 0, PHP_ROUND_HALF_UP) / 2;
     }
 
+    /**
+     * Quadro vazio, no formato oficial, para a escola ver o modelo antes de escolher o aluno.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function montarModelo(): array
+    {
+        return [
+            $this->modeloDaSerie(1, 'Modelo — 1ª e 2ª série — Bloco A e Bloco B'),
+            $this->modeloDaSerie(3, 'Modelo — 3ª série — uma lista, sem prova semanal'),
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function modeloDaSerie(int $serie, string $titulo): array
+    {
+        $terceira = $serie === 3;
+        $linhas = [];
+        foreach ($this->linhasDoModelo($serie) as $linha) {
+            $linhas[] = $linha + [
+                'semanas' => [],
+                'total_n' => null,
+                'total_q' => null,
+                'media_sem' => null,
+                'prova_bim' => null,
+                'jornada' => null,
+                'media' => null,
+                'enac' => null,
+                'media_bim' => null,
+                'rec' => null,
+                'resultado' => null,
+                'faltas' => null,
+            ];
+        }
+
+        return [
+            'bimestre' => 0,
+            'serie' => $serie,
+            'terceira' => $terceira,
+            'titulo' => $titulo,
+            'blocos' => $this->partirBlocos($linhas, $terceira),
+        ];
+    }
+
+    /**
+     * @return list<array{materia_id:int,nome:string,bloco:string,filha:bool,pai_nome:string}>
+     */
+    private function linhasDoModelo(int $serie): array
+    {
+        $linhas = $this->linhasDaSerie($serie);
+        if ($linhas !== []) {
+            return $linhas;
+        }
+        $filhas = ['Gramática', 'Literatura', 'Leitura e Interpretação'];
+        $blocoA = ['Língua Portuguesa', 'Gramática', 'Literatura', 'Leitura e Interpretação', 'Educação Física', 'Arte', 'Inglês', 'Física', 'Biologia', 'Sociologia'];
+        $blocoB = ['Matemática', 'História', 'Geografia', 'Química', 'Filosofia'];
+        $out = [];
+        $id = 1;
+        $nomes = $serie === 3 ? array_merge($blocoA, $blocoB) : $blocoA;
+        foreach ($nomes as $nome) {
+            $out[] = [
+                'materia_id' => $id++,
+                'nome' => $nome,
+                'bloco' => $serie === 3 ? 'u' : 'a',
+                'filha' => in_array($nome, $filhas, true),
+                'pai_nome' => '',
+            ];
+        }
+        if ($serie !== 3) {
+            foreach ($blocoB as $nome) {
+                $out[] = [
+                    'materia_id' => $id++,
+                    'nome' => $nome,
+                    'bloco' => 'b',
+                    'filha' => false,
+                    'pai_nome' => '',
+                ];
+            }
+        }
+
+        return $out;
+    }
+
     private function anoSerie(string $serie, string $curso, string $turma): int
     {
-        $cursoN = $this->chave($curso . ' ' . $serie . ' ' . $turma);
-        $medio = str_contains($cursoN, 'medio') || preg_match('/\bem\b/', $cursoN) === 1;
-        if (!$medio) {
+        $junto = $this->chave($curso . ' ' . $serie . ' ' . $turma);
+        $fundamental = str_contains($junto, 'fundamental') || str_contains($junto, 'infantil');
+        $medio = str_contains($junto, 'medio') || preg_match('/\bem\b/', $junto) === 1;
+        if ($fundamental && !$medio) {
             return 0;
         }
-        $serieN = $this->chave($serie . ' ' . $turma);
-        if (preg_match('/\b3\b|\bterceira\b/', $serieN) === 1) {
+        $numero = $this->numeroSerie($this->chave($serie . ' ' . $turma));
+
+        return $numero;
+    }
+
+    private function numeroSerie(string $texto): int
+    {
+        if (preg_match('/\bterceir[ao]\b|(?:^|\s)3(?:\s|[ao]|$)/', $texto) === 1) {
             return 3;
         }
-        if (preg_match('/\b2\b|\bsegunda\b/', $serieN) === 1) {
+        if (preg_match('/\bsegund[ao]\b|(?:^|\s)2(?:\s|[ao]|$)/', $texto) === 1) {
             return 2;
         }
-        if (preg_match('/\b1\b|\bprimeira\b/', $serieN) === 1) {
+        if (preg_match('/\bprimeir[ao]\b|(?:^|\s)1(?:\s|[ao]|$)/', $texto) === 1) {
             return 1;
         }
 

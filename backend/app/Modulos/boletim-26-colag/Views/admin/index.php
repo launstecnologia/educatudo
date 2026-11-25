@@ -84,21 +84,25 @@ $rotuloSerie = static function (int $serie): string {
     </div>
 </form>
 
-<?php if ($turmas === []): ?>
-<p class="text-sm text-gray-600">Nenhuma turma do ensino médio encontrada nesta escola.</p>
-<?php elseif ($aluno === null): ?>
-<p class="text-sm text-gray-600">Escolha a turma e o aluno. Os quatro bimestres aparecem juntos, já calculados.</p>
-<?php else: ?>
+<?php if ($aluno === null): ?>
+<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a turma e o aluno para preencher com as notas.</p>
+<?php endif; ?>
 <?php
-$nomeAluno = htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+$nomeAluno = $aluno !== null ? htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
 $serieTurma = $rotuloSerie((int) ($turma['ano_serie'] ?? 0));
 ?>
 <?php foreach ($demonstrativos as $demo): ?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8" id="bimestre-<?= $bimestre ?>">
+<section class="mb-8" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
+        <?php if (!empty($demo['titulo'])): ?>
+        <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
+        <?php else: ?>
         Notas — <?= $bimestre ?>º Bimestre — <?= htmlspecialchars($serieTurma, ENT_QUOTES, 'UTF-8') ?>
+        <?php endif; ?>
+        <?php if ($nomeAluno !== ''): ?>
         <span class="block text-sm font-normal text-gray-600"><?= $nomeAluno ?></span>
+        <?php endif; ?>
     </h3>
     <?php foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco): ?>
     <?php
@@ -177,4 +181,3 @@ $serieTurma = $rotuloSerie((int) ($turma['ano_serie'] ?? 0));
     <?php endforeach; ?>
 </section>
 <?php endforeach; ?>
-<?php endif; ?>

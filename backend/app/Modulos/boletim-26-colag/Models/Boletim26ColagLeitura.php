@@ -63,24 +63,26 @@ class Boletim26ColagLeitura
         if (!$this->tabelaExiste('turmas')) {
             return [];
         }
-        $joinSerie = $this->tabelaExiste('serie') ? 'LEFT JOIN serie s ON s.id = t.serie_id' : '';
-        $selSerie = $joinSerie !== '' ? 's.nome AS serie_nome, s.curso_id AS serie_curso_id' : 'NULL AS serie_nome, NULL AS serie_curso_id';
-        $cursoId = 'NULL';
-        if ($this->colunaExiste('turmas', 'curso_novo_id')) {
-            $cursoId = 't.curso_novo_id';
+        $temSerieId = $this->colunaExiste('turmas', 'serie_id') && $this->tabelaExiste('serie');
+        $joinSerie = $temSerieId ? 'LEFT JOIN serie s ON s.id = t.serie_id' : '';
+        if ($temSerieId) {
+            $selSerie = 's.nome AS serie_nome';
+        } elseif ($this->colunaExiste('turmas', 'serie')) {
+            $selSerie = 't.serie AS serie_nome';
+        } else {
+            $selSerie = 'NULL AS serie_nome';
         }
         $joinCurso = '';
         $selCurso = 'NULL AS curso_nome';
-        if ($this->tabelaExiste('curso')) {
-            $idCurso = $cursoId === 'NULL' ? '0' : $cursoId;
-            $idSerie = ($joinSerie !== '' && $this->colunaExiste('serie', 'curso_id')) ? 's.curso_id' : '0';
-            $joinCurso = 'LEFT JOIN curso c ON c.id = COALESCE(NULLIF(' . $idCurso . ', 0), ' . $idSerie . ')';
+        if ($temSerieId && $this->tabelaExiste('curso') && $this->colunaExiste('serie', 'curso_id')) {
+            $joinCurso = 'LEFT JOIN curso c ON c.id = s.curso_id';
             $selCurso = 'c.nome AS curso_nome';
         }
-        $ativo = $this->colunaExiste('turmas', 'ativo') ? ' WHERE t.ativo = 1' : '';
+        $selTipo = $this->colunaExiste('turmas', 'tipo_ensino') ? 't.tipo_ensino' : 'NULL AS tipo_ensino';
+        $ativo = $this->colunaExiste('turmas', 'ativo') ? ' WHERE (t.ativo = 1 OR t.ativo IS NULL)' : '';
         try {
             return $this->db->fetchAll(
-                "SELECT t.id, t.nome, {$selSerie}, {$selCurso}
+                "SELECT t.id, t.nome, {$selSerie}, {$selCurso}, {$selTipo}
                    FROM turmas t
                    {$joinSerie}
                    {$joinCurso}
