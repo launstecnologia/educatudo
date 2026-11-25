@@ -291,6 +291,68 @@ class Boletim26ColagLeitura
     }
 
     /**
+     * Notas já validadas de quem chegou no meio do ano.
+     *
+     * @return list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>
+     */
+    public function notasChegadaMeioAno(int $alunoId): array
+    {
+        if ($alunoId <= 0 || !$this->tabelaExiste('vida_escolar_importacoes')) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT payload_json
+                   FROM vida_escolar_importacoes
+                  WHERE aluno_id = :aluno AND status = 'validada'
+                  ORDER BY id DESC",
+                ['aluno' => $alunoId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        $vistos = [];
+        foreach ($rows as $row) {
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                continue;
+            }
+            $ano = (int) ($payload['ano_letivo'] ?? 0);
+            $bims = is_array($payload['bimestres_atuais'] ?? null) ? $payload['bimestres_atuais'] : [];
+            foreach ($bims as $bim) {
+                if (!is_array($bim)) {
+                    continue;
+                }
+                $periodo = (int) ($bim['periodo_numero'] ?? $bim['bimestre'] ?? 0);
+                $mid = (int) ($bim['materia_id'] ?? 0);
+                $nome = trim((string) ($bim['componente'] ?? $bim['componente_original'] ?? ''));
+                $notaBruta = trim((string) ($bim['nota'] ?? ''));
+                $faltasBruta = trim((string) ($bim['faltas'] ?? ''));
+                if ($periodo < 1 || $periodo > 4 || ($notaBruta === '' && $faltasBruta === '')) {
+                    continue;
+                }
+                $chave = $mid . '|' . mb_strtolower($nome) . '|' . $periodo . '|' . $ano;
+                if (isset($vistos[$chave])) {
+                    continue;
+                }
+                $vistos[$chave] = true;
+                $nota = str_replace(',', '.', $notaBruta);
+                $out[] = [
+                    'materia_id' => $mid,
+                    'componente' => $nome,
+                    'periodo' => $periodo,
+                    'nota' => is_numeric($nota) ? (float) $nota : null,
+                    'faltas' => is_numeric($faltasBruta) ? (int) $faltasBruta : null,
+                    'ano' => $ano,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param list<int> $ids
      * @return list<int>
      */

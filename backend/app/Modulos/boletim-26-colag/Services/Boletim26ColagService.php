@@ -36,6 +36,9 @@ class Boletim26ColagService
     /** @var array<string, array<int, array<string, float>>> */
     private array $cacheResultadoOficial = [];
 
+    /** @var array<int, list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>> */
+    private array $cacheChegadaMeioAno = [];
+
     public function __construct()
     {
         $this->leitura = new Boletim26ColagLeitura();
@@ -615,6 +618,7 @@ class Boletim26ColagService
             }
             $this->guardarNota($celulas, $peca, $blocoId, $materias, $notas, $acertos);
         }
+        $this->completarEnacDaArte($celulas, $linhasBase);
 
         $semanasBimestre = $terceira ? [] : $this->semanasDoBimestre($bimestre);
         $linhas = [];
@@ -632,6 +636,7 @@ class Boletim26ColagService
             $linhas,
             fn (array $linha): bool => !$this->ehRedacao((string) ($linha['nome'] ?? ''))
         ));
+        $linhas = $this->aplicarNotaChegadaMeioAno($linhas, $alunoId, $bimestre, $ano);
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
         return [
@@ -1039,6 +1044,12 @@ class Boletim26ColagService
             }
         }
         $destinos = $materias !== [] ? $materias : array_keys($valores);
+        foreach (array_keys($valores) as $midValor) {
+            $midValor = (int) $midValor;
+            if ($midValor > 0 && !in_array($midValor, $destinos, true)) {
+                $destinos[] = $midValor;
+            }
+        }
         foreach ($destinos as $mid) {
             $mid = (int) $mid;
             if ($mid <= 0 || empty($valores[$mid])) {
@@ -1841,6 +1852,130 @@ class Boletim26ColagService
         $chave = $this->chave($nome);
 
         return $chave === 'arte' || $chave === 'artes' || str_starts_with($chave, 'artes ');
+    }
+
+    /**
+     * Quem chegou no meio do ano tem a nota da outra escola no lugar do cálculo.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function aplicarNotaChegadaMeioAno(array $linhas, int $alunoId, int $bimestre, int $ano): array
+    {
+        $notas = $this->notasChegadaDoAluno($alunoId);
+        if ($notas === []) {
+            return $linhas;
+        }
+        foreach ($linhas as $i => $linha) {
+            $achada = $this->buscarNotaChegada($notas, $linha, $bimestre, $ano);
+            if ($achada === null) {
+                continue;
+            }
+            if ($achada['nota'] !== null) {
+                $valor = $this->meio($achada['nota']);
+                $linhas[$i]['resultado'] = $valor;
+                $linhas[$i]['media_bim'] = $valor;
+            }
+            if ($achada['faltas'] !== null) {
+                $linhas[$i]['faltas'] = $achada['faltas'];
+            }
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * @return list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>
+     */
+    private function notasChegadaDoAluno(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        if (!isset($this->cacheChegadaMeioAno[$alunoId])) {
+            try {
+                $this->cacheChegadaMeioAno[$alunoId] = $this->leitura->notasChegadaMeioAno($alunoId);
+            } catch (\Throwable $e) {
+                $this->cacheChegadaMeioAno[$alunoId] = [];
+            }
+        }
+
+        return $this->cacheChegadaMeioAno[$alunoId];
+    }
+
+    /**
+     * @param list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}> $notas
+     * @param array<string,mixed> $linha
+     * @return array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}|null
+     */
+    private function buscarNotaChegada(array $notas, array $linha, int $bimestre, int $ano): ?array
+    {
+        $mid = (int) ($linha['materia_id'] ?? 0);
+        $nome = $this->chaveOrdem((string) ($linha['nome'] ?? ''));
+        $porNome = null;
+        foreach ($notas as $nota) {
+            if ((int) $nota['periodo'] !== $bimestre) {
+                continue;
+            }
+            $anoNota = (int) $nota['ano'];
+            if ($anoNota >= 2000 && $ano >= 2000 && $anoNota !== $ano) {
+                continue;
+            }
+            if ($mid > 0 && (int) $nota['materia_id'] === $mid) {
+                return $nota;
+            }
+            if ($porNome === null && $nome !== '' && $this->chaveOrdem((string) $nota['componente']) === $nome) {
+                $porNome = $nota;
+            }
+        }
+
+        return $porNome;
+    }
+
+    /**
+     * A nota do ENAC pode estar em outro cadastro de Arte/Artes.
+     * A linha do boletim usa um id só; copia a nota lançada para essa linha.
+     *
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<array<string,mixed>> $linhasBase
+     */
+    private function completarEnacDaArte(array &$celulas, array $linhasBase): void
+    {
+        $idsLinha = [];
+        foreach ($linhasBase as $linha) {
+            if ($this->ehArte((string) ($linha['nome'] ?? ''))) {
+                $id = (int) ($linha['materia_id'] ?? 0);
+                if ($id > 0) {
+                    $idsLinha[$id] = true;
+                }
+            }
+        }
+        if ($idsLinha === []) {
+            return;
+        }
+        $notas = [];
+        foreach ($this->catalogoMaterias() as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            if ($id <= 0 || !$this->ehArte((string) ($materia['nome'] ?? ''))) {
+                continue;
+            }
+            foreach (is_array($celulas[$id]['enac'] ?? null) ? $celulas[$id]['enac'] : [] as $nota) {
+                if (is_numeric($nota)) {
+                    $notas[] = (float) $nota;
+                }
+            }
+        }
+        if ($notas === []) {
+            return;
+        }
+        foreach (array_keys($idsLinha) as $id) {
+            foreach (is_array($celulas[$id]['enac'] ?? null) ? $celulas[$id]['enac'] : [] as $nota) {
+                if (is_numeric($nota)) {
+                    continue 2;
+                }
+            }
+            $celulas[$id]['enac'] = $notas;
+        }
     }
 
     private function chaveOrdem(string $nome): string
