@@ -353,6 +353,44 @@ class Boletim26ColagLeitura
     }
 
     /**
+     * Professores da matéria que dão aula na turma do aluno.
+     *
+     * @param list<int> $blocoIds
+     * @return list<array{bloco_id:int,professor_id:int,materia_id:int}>
+     */
+    public function professoresDaMateriaNaTurma(array $blocoIds, int $turmaId): array
+    {
+        $blocoIds = $this->ids($blocoIds);
+        if ($blocoIds === [] || $turmaId <= 0 || !$this->tabelaExiste('provas_blocos_professores') || !$this->tabelaExiste('provas_blocos_professores_turmas')) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($blocoIds), '?'));
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT pbp.bloco_id, pbp.professor_id, pbp.materia_id
+                   FROM provas_blocos_professores pbp
+                   INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp.id
+                  WHERE pbp.professor_id > 0 AND pbp.materia_id > 0
+                    AND pbpt.turma_id = ?
+                    AND pbp.bloco_id IN ($ph)",
+                array_merge([$turmaId], $blocoIds)
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'bloco_id' => (int) ($row['bloco_id'] ?? 0),
+                'professor_id' => (int) ($row['professor_id'] ?? 0),
+                'materia_id' => (int) ($row['materia_id'] ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Notas já validadas de quem chegou no meio do ano.
      *
      * @return list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>

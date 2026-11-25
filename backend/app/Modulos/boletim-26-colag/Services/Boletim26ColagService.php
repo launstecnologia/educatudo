@@ -661,7 +661,7 @@ class Boletim26ColagService
             $linhas,
             fn (array $linha): bool => !$this->ehRedacao((string) ($linha['nome'] ?? ''))
         ));
-        $linhas = $this->aplicarSomaDosProfessores($linhas, $alunoId, $bimestre, $ano, $terceira);
+        $linhas = $this->aplicarSomaDosProfessores($linhas, $alunoId, (int) ($turma['id'] ?? 0), $bimestre, $ano, $terceira);
         $linhas = $this->aplicarNotaChegadaMeioAno($linhas, $alunoId, $bimestre, $ano);
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
@@ -1536,36 +1536,74 @@ class Boletim26ColagService
     }
 
     /**
-     * Mesma matéria e professores diferentes: soma a nota que cada professor lançou.
-     * Professor sem nota lançada não entra. Cada professor entra uma vez.
+     * Na mesma matéria, cada professor da turma entra com a nota da avaliação.
+     * A tela de lançamento repete a nota gravada no professor que ainda não tem a própria.
+     * Os dois entram na soma. Professor de outra turma não entra.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
      */
-    private function aplicarSomaDosProfessores(array $linhas, int $alunoId, int $bimestre, int $ano, bool $terceira): array
+    private function aplicarSomaDosProfessores(array $linhas, int $alunoId, int $turmaId, int $bimestre, int $ano, bool $terceira): array
     {
         $notas = $this->leitura->notasPorProfessorNoBimestre($alunoId, $bimestre, $ano);
         if ($notas === []) {
             return $linhas;
         }
-        $notaPorProfessor = [];
+        $porBloco = [];
+        $blocos = [];
         foreach ($notas as $nota) {
             if ($this->pecaDaProva($nota) !== 'prova_bim') {
                 continue;
             }
+            $bid = (int) $nota['bloco_id'];
             $mid = (int) $nota['materia_id'];
             $pid = (int) $nota['professor_id'];
-            if ($mid <= 0 || $pid <= 0 || !is_numeric($nota['nota'] ?? null)) {
+            if ($bid <= 0 || $mid <= 0 || !is_numeric($nota['nota'] ?? null)) {
                 continue;
             }
+            $blocos[$bid] = $bid;
             $valor = (float) $nota['nota'];
-            $anterior = $notaPorProfessor[$mid][$pid] ?? null;
-            if ($anterior === null || $valor > $anterior) {
-                $notaPorProfessor[$mid][$pid] = $valor;
+            $atual = $porBloco[$bid][$mid][$pid] ?? null;
+            if ($atual === null || $valor > $atual) {
+                $porBloco[$bid][$mid][$pid] = $valor;
             }
         }
-        if ($notaPorProfessor === []) {
+        if ($porBloco === []) {
             return $linhas;
+        }
+        $ligados = [];
+        foreach ($this->leitura->professoresDaMateriaNaTurma(array_values($blocos), $turmaId) as $prof) {
+            $ligados[$prof['bloco_id']][$prof['materia_id']][$prof['professor_id']] = (int) $prof['professor_id'];
+        }
+        $notaPorProfessor = [];
+        foreach ($porBloco as $bid => $materias) {
+            foreach ($materias as $mid => $porProfessor) {
+                $gravadas = [];
+                foreach ($porProfessor as $pid => $valor) {
+                    if ((int) $pid > 0) {
+                        $gravadas[] = (float) $valor;
+                    }
+                }
+                if ($gravadas === []) {
+                    continue;
+                }
+                $referencia = max($gravadas);
+                $professores = array_values($ligados[$bid][$mid] ?? []);
+                if ($professores === []) {
+                    $professores = array_map('intval', array_keys($porProfessor));
+                }
+                foreach ($professores as $pid) {
+                    $pid = (int) $pid;
+                    if ($pid <= 0) {
+                        continue;
+                    }
+                    $valor = isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $referencia;
+                    $anterior = $notaPorProfessor[$mid][$pid] ?? null;
+                    if ($anterior === null || $valor > $anterior) {
+                        $notaPorProfessor[$mid][$pid] = $valor;
+                    }
+                }
+            }
         }
         foreach ($linhas as $i => $linha) {
             if (!empty($linha['filha'])) {
