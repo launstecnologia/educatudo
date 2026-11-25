@@ -295,7 +295,7 @@ class Boletim26ColagLeitura
     /**
      * Cada professor da matéria, com a nota que ele lançou para o aluno no bimestre.
      *
-     * @return list<array{bloco_id:int,professor_id:int,materia_id:int,nota:float,titulo:string,tipo_nome:string,semana:int,formato_evento:string}>
+     * @return list<array{bloco_id:int,professor_id:int,materia_id:int,turma_id:int,nota:float,titulo:string,tipo_nome:string,semana:int,formato_evento:string,configuracao_nota:string}>
      */
     public function notasPorProfessorNoBimestre(int $alunoId, int $bimestre, int $ano): array
     {
@@ -307,6 +307,8 @@ class Boletim26ColagLeitura
         }
         $selectSemana = $this->colunaExiste('provas_blocos', 'semana') ? 'pb.semana' : '0 AS semana';
         $selectFormato = $this->colunaExiste('provas_blocos', 'formato_evento') ? 'pb.formato_evento' : 'NULL AS formato_evento';
+        $selectTurma = $this->colunaExiste('provas_blocos_notas_lancadas', 'turma_id') ? 'n.turma_id' : '0 AS turma_id';
+        $selectConfig = $this->colunaExiste('provas_blocos', 'configuracao_nota') ? 'pb.configuracao_nota' : 'NULL AS configuracao_nota';
         $joinTipo = '';
         $selectTipo = 'NULL AS tipo_nome';
         if ($this->tabelaExiste('provas_tipos_avaliacao') && $this->colunaExiste('provas_blocos', 'tipo_avaliacao_id')) {
@@ -322,7 +324,7 @@ class Boletim26ColagLeitura
         }
         try {
             $rows = $this->db->fetchAll(
-                "SELECT n.bloco_id, n.professor_id, n.materia_id, n.nota, pb.titulo, {$selectSemana}, {$selectFormato}, {$selectTipo}
+                "SELECT n.bloco_id, n.professor_id, n.materia_id, {$selectTurma}, n.nota, pb.titulo, {$selectSemana}, {$selectFormato}, {$selectTipo}, {$selectConfig}
                    FROM provas_blocos_notas_lancadas n
                    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
                    {$joinTipo}
@@ -341,11 +343,13 @@ class Boletim26ColagLeitura
                 'bloco_id' => (int) ($row['bloco_id'] ?? 0),
                 'professor_id' => (int) ($row['professor_id'] ?? 0),
                 'materia_id' => (int) ($row['materia_id'] ?? 0),
+                'turma_id' => (int) ($row['turma_id'] ?? 0),
                 'nota' => (float) $row['nota'],
                 'titulo' => (string) ($row['titulo'] ?? ''),
                 'tipo_nome' => (string) ($row['tipo_nome'] ?? ''),
                 'semana' => (int) ($row['semana'] ?? 0),
                 'formato_evento' => (string) ($row['formato_evento'] ?? ''),
+                'configuracao_nota' => (string) ($row['configuracao_nota'] ?? ''),
             ];
         }
 

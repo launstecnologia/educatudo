@@ -1012,6 +1012,9 @@ class Boletim26ColagService
     private function pecaDaProva(array $prova): string
     {
         $blob = $this->chave((string) ($prova['titulo'] ?? '') . ' ' . (string) ($prova['tipo_nome'] ?? ''));
+        if (str_contains($blob, 'itinerar')) {
+            return '';
+        }
         if (str_contains($blob, 'semanal')) {
             return 'semanal';
         }
@@ -1621,9 +1624,9 @@ class Boletim26ColagService
     }
 
     /**
-     * Na mesma matéria, cada professor da turma entra com a nota da avaliação.
-     * A tela de lançamento repete a nota gravada no professor que ainda não tem a própria.
-     * Os dois entram na soma. Professor de outra turma não entra.
+     * Na mesma matéria, soma a nota que cada professor da turma lançou.
+     * No lançamento da coordenação, a tela repete a nota gravada em quem ainda não tem a própria.
+     * Fora isso, professor sem nota não entra. Itinerário e nota de outra turma ficam de fora.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
@@ -1636,6 +1639,7 @@ class Boletim26ColagService
         }
         $porBloco = [];
         $blocos = [];
+        $copiaNota = [];
         foreach ($notas as $nota) {
             if ($this->pecaDaProva($nota) !== 'prova_bim') {
                 continue;
@@ -1643,10 +1647,17 @@ class Boletim26ColagService
             $bid = (int) $nota['bloco_id'];
             $mid = (int) $nota['materia_id'];
             $pid = (int) $nota['professor_id'];
+            $tid = (int) ($nota['turma_id'] ?? 0);
             if ($bid <= 0 || $mid <= 0 || !is_numeric($nota['nota'] ?? null)) {
                 continue;
             }
+            if ($turmaId > 0 && $tid > 0 && $tid !== $turmaId) {
+                continue;
+            }
             $blocos[$bid] = $bid;
+            if ((string) ($nota['configuracao_nota'] ?? '') === 'coordenacao_calcula') {
+                $copiaNota[$bid] = true;
+            }
             $valor = (float) $nota['nota'];
             $atual = $porBloco[$bid][$mid][$pid] ?? null;
             if ($atual === null || $valor > $atual) {
@@ -1677,9 +1688,13 @@ class Boletim26ColagService
                 if ($professores === []) {
                     $professores = array_map('intval', array_keys($porProfessor));
                 }
+                $repeteNota = !empty($copiaNota[$bid]);
                 foreach ($professores as $pid) {
                     $pid = (int) $pid;
                     if ($pid <= 0) {
+                        continue;
+                    }
+                    if (!isset($porProfessor[$pid]) && !$repeteNota) {
                         continue;
                     }
                     $valor = isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $referencia;
