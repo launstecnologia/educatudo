@@ -107,7 +107,10 @@ class Boletim26ColagService
         $rotulos = $this->rotulosQuadro($blocoIds);
         $notas = $this->indexarNotas($this->leitura->notasLancadas($alunoId, $blocoIds));
         $acertos = $this->leitura->acertosPorBloco($alunoId, $blocoIds);
-        $jornada = $this->jornadaPorMateria($alunoId, (int) $turma['id'], $bimestre, $ano);
+        $jornada = $this->aplicarJornadaNasMaterias(
+            $this->jornadaDoBimestre($alunoId, (int) $turma['id'], $bimestre, $ano),
+            $linhasBase
+        );
         $faltas = $this->faltasPorMateria($alunoId, (int) $turma['id'], $ano, $bimestre);
 
         $celulas = [];
@@ -558,9 +561,9 @@ class Boletim26ColagService
     }
 
     /**
-     * @return array<int, float>
+     * Uma nota só, pela conclusão das jornadas do bimestre na tabela de faixas.
      */
-    private function jornadaPorMateria(int $alunoId, int $turmaId, int $bimestre, int $ano): array
+    private function jornadaDoBimestre(int $alunoId, int $turmaId, int $bimestre, int $ano): ?float
     {
         try {
             $jornada = new JourneyBoletimLancamento();
@@ -572,24 +575,64 @@ class Boletim26ColagService
                 null,
                 null,
                 10.0,
-                true,
-                'media',
-                [],
                 false,
+                'media',
+                $this->faixasJornadaColag(),
+                true,
                 null,
                 true
             );
         } catch (\Throwable $e) {
+            return null;
+        }
+        $nota = $notas['nota_unica_valor_padrao'] ?? null;
+
+        return is_numeric($nota) ? (float) $nota : null;
+    }
+
+    /**
+     * A mesma jornada entra na média de cada matéria. Educação Física fica de fora.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return array<int, float>
+     */
+    private function aplicarJornadaNasMaterias(?float $nota, array $linhas): array
+    {
+        if ($nota === null) {
             return [];
         }
+        $nota = $this->meio($nota);
         $out = [];
-        foreach (is_array($notas['por_materia'] ?? null) ? $notas['por_materia'] : [] as $mid => $valor) {
-            if (is_numeric($valor)) {
-                $out[(int) $mid] = (float) $valor;
+        foreach ($linhas as $linha) {
+            if ($this->ehEducacaoFisica((string) ($linha['nome'] ?? ''))) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0) {
+                $out[$mid] = $nota;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<array{percentual_min:int,nota:float}>
+     */
+    private function faixasJornadaColag(): array
+    {
+        return [
+            ['percentual_min' => 100, 'nota' => 10.0],
+            ['percentual_min' => 90, 'nota' => 9.5],
+            ['percentual_min' => 80, 'nota' => 9.0],
+            ['percentual_min' => 70, 'nota' => 8.5],
+            ['percentual_min' => 60, 'nota' => 8.0],
+            ['percentual_min' => 50, 'nota' => 7.5],
+            ['percentual_min' => 40, 'nota' => 7.0],
+            ['percentual_min' => 30, 'nota' => 6.5],
+            ['percentual_min' => 20, 'nota' => 6.0],
+            ['percentual_min' => 10, 'nota' => 5.5],
+        ];
     }
 
     /**

@@ -152,12 +152,13 @@ foreach ($demonstrativos as $demoAba) {
                     <th class="px-2 py-2 whitespace-nowrap" rowspan="2" title="Resultado Final">Res. Final</th>
                     <th class="px-2 py-2" rowspan="2">FAL</th>
                 </tr>
-                <tr class="bg-blue-800 text-white text-xs">
+                <tr class="text-xs">
                     <?php foreach ($semanas as $semana): ?>
-                    <th class="px-2 py-1" colspan="2">S<?= (int) $semana ?></th>
+                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold whitespace-nowrap" colspan="2">S<?= (int) $semana ?></th>
                     <?php endforeach; ?>
                     <?php if ($semanas !== []): ?>
-                    <th class="px-2 py-1">N</th><th class="px-2 py-1">Q</th>
+                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold">N</th>
+                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold">Q</th>
                     <?php endif; ?>
                 </tr>
             </thead>
