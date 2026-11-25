@@ -74,7 +74,7 @@ class Boletim26ColagAdminController extends BaseController
         $publicacao = [];
         foreach (['aluno', 'pais'] as $perfil) {
             $marcadas = (array) ($_POST[$perfil] ?? []);
-            $publicacao[$perfil] = array_values(array_filter(['1', '2', '3', '4', 'boletim'],
+            $publicacao[$perfil] = array_values(array_filter(['1', '2', '3', '4', 'boletim', 'boletim_3'],
                 static fn (string $opcao): bool => in_array($opcao, $marcadas, true)));
         }
         (new \App\Modulos\Boletim26Colag\Models\Boletim26ColagLeitura())->salvarPublicacaoPortal($ano, $publicacao);

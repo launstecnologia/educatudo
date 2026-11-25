@@ -52,20 +52,28 @@ class Boletim26ColagService
             return null;
         }
         $opcoes = $ano === (int) date('Y') ? ($this->leitura->publicacaoPortal($ano)[$perfil] ?? []) : [];
-        $boletim = in_array('boletim', $opcoes, true);
+        $boletimCompleto = in_array('boletim', $opcoes, true);
+        $boletimAte3 = in_array('boletim_3', $opcoes, true);
+        $boletim = $boletimCompleto || $boletimAte3;
+        // Só mascara o 4º quando a opção parcial está ligada e o consolidado completo não.
+        $boletimAteBimestre = ($boletimAte3 && !$boletimCompleto) ? 3 : null;
         $notas = [];
         $demonstrativos = [];
         foreach ([1, 2, 3, 4] as $bimestre) {
             $publicado = in_array((string) $bimestre, $opcoes, true);
-            if ($publicado || $boletim) {
+            $noBoletim = $boletim && ($boletimAteBimestre === null || $bimestre <= $boletimAteBimestre);
+            if ($publicado || $noBoletim) {
                 $demonstrativos[] = $this->montarBimestre($turma, (int) $aluno['id'], $bimestre, $ano);
             }
             if ($publicado) {
                 $notas[] = $bimestre;
             }
         }
+
         return [
-            'notas' => $notas, 'boletim' => $boletim,
+            'notas' => $notas,
+            'boletim' => $boletim,
+            'boletim_ate_bimestre' => $boletimAteBimestre,
             'relatorio' => ['aluno' => $aluno, 'turma' => $turma, 'demonstrativos' => $demonstrativos],
         ];
     }

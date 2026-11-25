@@ -163,12 +163,22 @@ $rotuloSerie = static function (int $serie): string {
     <form method="post" action="<?= URL ?>/admin/boletim-26-colag/publicacao" class="mt-4 space-y-4">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES) ?>">
         <input type="hidden" name="ano" value="<?= $ano ?>">
-        <p class="text-sm">Selecione o que publicar para o ensino médio em <?= $ano ?>. O boletim consolidado inclui os resultados dos quatro bimestres.</p>
+        <p class="text-sm">Selecione o que publicar para o ensino médio em <?= $ano ?>. O boletim consolidado mostra os quatro bimestres; a opção até o 3º deixa o 4º como —.</p>
         <?php foreach (['aluno' => 'Alunos', 'pais' => 'Responsáveis'] as $perfil => $rotulo): ?>
         <fieldset><legend class="font-semibold"><?= $rotulo ?></legend><div class="flex flex-wrap gap-4">
-            <?php foreach (['1', '2', '3', '4', 'boletim'] as $opcao): ?>
+            <?php
+            $opcoesExibicao = [
+                '1' => 'Notas do 1º bimestre',
+                '2' => 'Notas do 2º bimestre',
+                '3' => 'Notas do 3º bimestre',
+                '4' => 'Notas do 4º bimestre',
+                'boletim' => 'Boletim consolidado',
+                'boletim_3' => 'Boletim até o 3º bimestre',
+            ];
+            foreach ($opcoesExibicao as $opcao => $rotuloOpcao):
+            ?>
             <label><input type="checkbox" name="<?= $perfil ?>[]" value="<?= $opcao ?>" <?= in_array($opcao, $publicacao[$perfil] ?? [], true) ? 'checked' : '' ?>>
-                <?= $opcao === 'boletim' ? 'Boletim consolidado' : 'Notas do ' . $opcao . 'º bimestre' ?></label>
+                <?= htmlspecialchars($rotuloOpcao, ENT_QUOTES, 'UTF-8') ?></label>
             <?php endforeach; ?>
         </div></fieldset>
         <?php endforeach; ?>

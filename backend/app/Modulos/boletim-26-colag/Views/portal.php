@@ -1,6 +1,9 @@
 <?php
 $exibir = $somentePortal;
 $relatorioPortal = $portalColag['relatorio'];
+$boletimAteBimestre = isset($portalColag['boletim_ate_bimestre']) && is_numeric($portalColag['boletim_ate_bimestre'])
+    ? (int) $portalColag['boletim_ate_bimestre']
+    : null;
 if ($exibir === 'notas') {
     $relatorioPortal['demonstrativos'] = array_filter($relatorioPortal['demonstrativos'],
         static fn (array $demo): bool => in_array($demo['bimestre'], $portalColag['notas'], true));

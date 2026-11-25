@@ -213,6 +213,11 @@ foreach ($demonstrativos as $demoBoletim) {
 }
 $bimestresBoletim = array_keys($bimestresBoletim);
 sort($bimestresBoletim);
+$boletimAteBimestre = isset($boletimAteBimestre) && is_numeric($boletimAteBimestre) ? (int) $boletimAteBimestre : null;
+if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimestre <= 4 && $ordemBoletim !== []) {
+    // Mantém as 4 colunas; bimestres além do limite saem como —.
+    $bimestresBoletim = [1, 2, 3, 4];
+}
 ?>
 <?php if ($ordemBoletim !== [] && $bimestresBoletim !== []): ?>
 <section class="mb-8 vista-boletim <?= $exibir === 'notas' ? 'hidden' : '' ?>">
@@ -231,7 +236,7 @@ sort($bimestresBoletim);
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
                     <th class="<?= $cabecaBoletim ?>" colspan="2"><?= (int) $bimestreColuna ?>º</th>
                     <?php endforeach; ?>
-                    <th class="<?= $cabecaBoletim ?>" rowspan="2" title="Média dos 4 bimestres">Média</th>
+                    <th class="<?= $cabecaBoletim ?>" rowspan="2" title="Média dos bimestres publicados">Média</th>
                 </tr>
                 <tr>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
@@ -246,17 +251,22 @@ sort($bimestresBoletim);
                     <td class="px-3 py-2 text-left font-semibold text-gray-900 whitespace-nowrap"><?= htmlspecialchars($nomeGrade, ENT_QUOTES, 'UTF-8') ?></td>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
                     <?php
+                    $ocultarBimestre = $boletimAteBimestre !== null && (int) $bimestreColuna > $boletimAteBimestre;
                     $celulaGrade = $gradeBoletim[$nomeGrade][$bimestreColuna] ?? ['resultado' => null, 'faltas' => null];
-                    $notaGrade = $celulaGrade['resultado'];
+                    $notaGrade = $ocultarBimestre ? null : ($celulaGrade['resultado'] ?? null);
+                    $faltaGrade = $ocultarBimestre ? null : ($celulaGrade['faltas'] ?? null);
                     $notaBaixa = $notaMinima !== null && is_numeric($notaGrade) && (float) $notaGrade < $notaMinima;
                     ?>
                     <td class="px-2 py-2 <?= $notaBaixa ? 'vermelho' : (is_numeric($notaGrade) ? 'nota' : '') ?>"><?= $fmt($notaGrade) ?></td>
-                    <td class="px-2 py-2"><?= $fmtInt($celulaGrade['faltas']) ?></td>
+                    <td class="px-2 py-2"><?= $fmtInt($faltaGrade) ?></td>
                     <?php endforeach; ?>
                     <?php
                     $somaMedia = 0.0;
                     $qtdMedia = 0;
                     foreach ($bimestresBoletim as $bimestreMedia) {
+                        if ($boletimAteBimestre !== null && (int) $bimestreMedia > $boletimAteBimestre) {
+                            continue;
+                        }
                         $notaMedia = $gradeBoletim[$nomeGrade][$bimestreMedia]['resultado'] ?? null;
                         if (!is_numeric($notaMedia)) {
                             continue;
