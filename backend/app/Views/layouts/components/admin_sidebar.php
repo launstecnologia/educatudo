@@ -175,6 +175,7 @@
             'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout',
             'reports_boletim_coordenacao',
             'provas', 'provas_blocos', 'eventos-avaliativos', 'leitor_gabarito',
+            'boletim-26-colag',
         ], true);
         $forumNestedOpen = $forumDenunciasAtivo;
         $notificacoesNestedOpen = in_array($cp, ['notifications', 'notificacoes-push'], true);

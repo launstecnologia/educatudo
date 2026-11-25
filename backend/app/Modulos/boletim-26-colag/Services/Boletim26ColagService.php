@@ -1,0 +1,911 @@
+<?php
+
+namespace App\Modulos\Boletim26Colag\Services;
+
+use App\Core\PeriodoLetivo;
+use App\Dominio\Escola\Models\ComponenteCurricular;
+use App\Dominio\Pessoas\Services\AlunoTurmaResolver;
+use App\Modulos\Boletim26Colag\Models\Boletim26ColagLeitura;
+use App\Modulos\Boletins\Models\JourneyBoletimLancamento;
+use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
+use App\Modulos\Presenca\Services\FrequencyService;
+use App\Modulos\Provas\Models\ExamBlock;
+
+/**
+ * Demonstrativo fixo do Colag. A conta já vem pronta: a escola não monta fórmula.
+ * 1ª e 2ª série: Bloco A nas semanas ímpares e Bloco B nas pares.
+ * 3ª série: uma lista, sem semana, e o ENAC só substitui o resultado quando fica maior.
+ */
+class Boletim26ColagService
+{
+    private Boletim26ColagLeitura $leitura;
+
+    public function __construct()
+    {
+        $this->leitura = new Boletim26ColagLeitura();
+    }
+
+    public static function ativo(): bool
+    {
+        if (!defined('TENANT_SLUG')) {
+            return false;
+        }
+
+        return strtolower(trim((string) TENANT_SLUG)) === 'colag';
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function montarPainel(int $turmaId, int $alunoId, int $ano): array
+    {
+        $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+        $turmas = $this->turmasMedio();
+        $alunos = $turmaId > 0 ? $this->alunosDaTurma($turmaId) : [];
+        $turma = null;
+        foreach ($turmas as $item) {
+            if ((int) $item['id'] === $turmaId) {
+                $turma = $item;
+                break;
+            }
+        }
+        $aluno = null;
+        foreach ($alunos as $item) {
+            if ((int) $item['id'] === $alunoId) {
+                $aluno = $item;
+                break;
+            }
+        }
+        $demonstrativos = [];
+        if ($turma !== null && $aluno !== null) {
+            for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
+                $demonstrativos[] = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
+            }
+        }
+
+        return [
+            'ano' => $ano,
+            'turma_id' => $turmaId,
+            'aluno_id' => $alunoId,
+            'turmas' => $turmas,
+            'alunos' => $alunos,
+            'turma' => $turma,
+            'aluno' => $aluno,
+            'demonstrativos' => $demonstrativos,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $turma
+     * @return array<string,mixed>
+     */
+    private function montarBimestre(array $turma, int $alunoId, int $bimestre, int $ano): array
+    {
+        $serie = (int) ($turma['ano_serie'] ?? 0);
+        $terceira = $serie === 3;
+        $linhasBase = $this->linhasDaSerie($serie);
+        $blocoDaMateria = [];
+        foreach ($linhasBase as $linhaBase) {
+            $blocoDaMateria[(int) $linhaBase['materia_id']] = (string) ($linhaBase['bloco'] ?? 'a');
+        }
+        $provas = $this->leitura->provasDoBimestre((int) $turma['id'], $bimestre, $ano);
+        $blocoIds = [];
+        foreach ($provas as $prova) {
+            $id = (int) ($prova['id'] ?? 0);
+            if ($id > 0) {
+                $blocoIds[] = $id;
+            }
+        }
+        $materiasBloco = $this->leitura->materiasPorBloco($blocoIds);
+        $rotulos = $this->rotulosQuadro($blocoIds);
+        $notas = $this->indexarNotas($this->leitura->notasLancadas($alunoId, $blocoIds));
+        $acertos = $this->leitura->acertosPorBloco($alunoId, $blocoIds);
+        $jornada = $this->jornadaPorMateria($alunoId, (int) $turma['id'], $bimestre, $ano);
+        $faltas = $this->faltasPorMateria($alunoId, (int) $turma['id'], $ano, $bimestre);
+
+        $celulas = [];
+        foreach ($provas as $prova) {
+            $blocoId = (int) ($prova['id'] ?? 0);
+            $peca = $this->pecaDaProva($prova);
+            if ($peca === '') {
+                continue;
+            }
+            $semana = $this->semanaDaProva($prova, $rotulos[$blocoId] ?? []);
+            $materias = $materiasBloco[$blocoId] ?? [];
+            if ($peca === 'semanal' && !$terceira) {
+                $this->guardarSemana($celulas, $blocoId, $semana, $materias, $notas, $acertos, $blocoDaMateria);
+                continue;
+            }
+            if ($peca === 'semanal') {
+                continue;
+            }
+            $this->guardarNota($celulas, $peca, $blocoId, $materias, $notas, $acertos);
+        }
+
+        $linhas = [];
+        foreach ($linhasBase as $linha) {
+            $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira);
+        }
+        $linhas = $this->fecharAreaPortugues($linhas, $terceira);
+        $blocos = $this->partirBlocos($linhas, $terceira);
+
+        return [
+            'bimestre' => $bimestre,
+            'serie' => $serie,
+            'terceira' => $terceira,
+            'blocos' => $blocos,
+        ];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function turmasMedio(): array
+    {
+        $out = [];
+        foreach ($this->leitura->listarTurmas() as $turma) {
+            $ano = $this->anoSerie(
+                (string) ($turma['serie_nome'] ?? ''),
+                (string) ($turma['curso_nome'] ?? ''),
+                (string) ($turma['nome'] ?? '')
+            );
+            if ($ano < 1) {
+                continue;
+            }
+            $turma['ano_serie'] = $ano;
+            $out[] = $turma;
+        }
+        usort($out, static function (array $a, array $b): int {
+            $cmp = ((int) $a['ano_serie']) <=> ((int) $b['ano_serie']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcasecmp((string) $a['nome'], (string) $b['nome']);
+        });
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,ra:string}>
+     */
+    private function alunosDaTurma(int $turmaId): array
+    {
+        try {
+            $rows = (new AlunoTurmaResolver())->listarAlunosPorTurma($turmaId);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($row['nome'] ?? '')),
+                'ra' => trim((string) ($row['ra'] ?? $row['matricula'] ?? '')),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{materia_id:int,nome:string,bloco:string,filha:bool,pai_nome:string}>
+     */
+    private function linhasDaSerie(int $serie): array
+    {
+        $catalogo = $this->catalogoMaterias();
+        $mapas = $this->mapasQuadro();
+        $ordemA = ['lingua portuguesa', 'educacao fisica', 'arte', 'ingles', 'fisica', 'biologia', 'sociologia'];
+        $ordemB = ['matematica', 'historia', 'geografia', 'quimica', 'filosofia'];
+        $linhas = [];
+        $vistos = [];
+        foreach ($catalogo as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            $nome = trim((string) ($materia['nome'] ?? ''));
+            $pai = (int) ($materia['pai_id'] ?? 0);
+            if ($id <= 0 || $nome === '' || $pai > 0) {
+                continue;
+            }
+            $bloco = isset($mapas['B'][$id]) && !isset($mapas['A'][$id]) ? 'b' : 'a';
+            if ($mapas['tem'] && !isset($mapas['A'][$id]) && !isset($mapas['B'][$id]) && !$this->ehPortugues($nome)) {
+                continue;
+            }
+            if (!$mapas['tem']) {
+                $chave = $this->chave($nome);
+                if (in_array($chave, $ordemB, true)) {
+                    $bloco = 'b';
+                } elseif (!in_array($chave, $ordemA, true) && !$this->ehPortugues($nome)) {
+                    continue;
+                }
+            }
+            $linhas[] = [
+                'materia_id' => $id,
+                'nome' => $nome,
+                'bloco' => $serie === 3 ? 'u' : $bloco,
+                'filha' => false,
+                'pai_nome' => '',
+            ];
+            $vistos[$id] = true;
+            if (!$this->ehPortugues($nome)) {
+                continue;
+            }
+            foreach ($catalogo as $filha) {
+                $fid = (int) ($filha['id'] ?? 0);
+                $fpai = (int) ($filha['pai_id'] ?? 0);
+                if ($fid <= 0 || $fpai !== $id || isset($vistos[$fid])) {
+                    continue;
+                }
+                $linhas[] = [
+                    'materia_id' => $fid,
+                    'nome' => trim((string) ($filha['nome'] ?? '')),
+                    'bloco' => $serie === 3 ? 'u' : $bloco,
+                    'filha' => true,
+                    'pai_nome' => $nome,
+                ];
+                $vistos[$fid] = true;
+            }
+        }
+        if ($serie === 3) {
+            return $linhas;
+        }
+        $peso = [];
+        foreach ($ordemA as $i => $nome) {
+            $peso['a|' . $nome] = $i;
+        }
+        foreach ($ordemB as $i => $nome) {
+            $peso['b|' . $nome] = $i;
+        }
+        usort($linhas, function (array $a, array $b) use ($peso): int {
+            $ba = (string) $a['bloco'];
+            $bb = (string) $b['bloco'];
+            if ($ba !== $bb) {
+                return $ba <=> $bb;
+            }
+            $pa = $peso[$ba . '|' . $this->chave((string) ($a['filha'] ? $a['pai_nome'] : $a['nome']))] ?? 50;
+            $pb = $peso[$bb . '|' . $this->chave((string) ($b['filha'] ? $b['pai_nome'] : $b['nome']))] ?? 50;
+            if ($pa !== $pb) {
+                return $pa <=> $pb;
+            }
+            $fa = !empty($a['filha']) ? 1 : 0;
+            $fb = !empty($b['filha']) ? 1 : 0;
+            if ($fa !== $fb) {
+                return $fa <=> $fb;
+            }
+
+            return strcasecmp((string) $a['nome'], (string) $b['nome']);
+        });
+
+        return $linhas;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function catalogoMaterias(): array
+    {
+        try {
+            return (new ComponenteCurricular())->getAll(true) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array{tem:bool,A:array<int,true>,B:array<int,true>}
+     */
+    private function mapasQuadro(): array
+    {
+        $out = ['tem' => false, 'A' => [], 'B' => []];
+        try {
+            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao(null);
+        } catch (\Throwable $e) {
+            return $out;
+        }
+        foreach (['A', 'B'] as $letra) {
+            foreach (is_array($bruto[$letra] ?? null) ? $bruto[$letra] : [] as $materia) {
+                $id = (int) ($materia['id'] ?? 0);
+                if ($id > 0) {
+                    $out[$letra][$id] = true;
+                    $out['tem'] = true;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @return array<int, list<array{bloco:string,semana:string}>>
+     */
+    private function rotulosQuadro(array $blocoIds): array
+    {
+        if ($blocoIds === []) {
+            return [];
+        }
+        try {
+            $rotulos = (new ExamBlock())->rotulosQuadroPorBlocoIds($blocoIds);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        return is_array($rotulos) ? $rotulos : [];
+    }
+
+    /**
+     * @param list<array{bloco_id:int,materia_id:int,nota:float}> $notas
+     * @return array<int, array<int, float>>
+     */
+    private function indexarNotas(array $notas): array
+    {
+        $out = [];
+        foreach ($notas as $nota) {
+            $bid = (int) $nota['bloco_id'];
+            $mid = (int) $nota['materia_id'];
+            if ($bid > 0 && $mid > 0) {
+                $out[$bid][$mid] = (float) $nota['nota'];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $prova
+     */
+    private function pecaDaProva(array $prova): string
+    {
+        $blob = $this->chave((string) ($prova['titulo'] ?? '') . ' ' . (string) ($prova['tipo_nome'] ?? ''));
+        if (str_contains($blob, 'semanal')) {
+            return 'semanal';
+        }
+        if (str_contains($blob, 'enac')) {
+            return 'enac';
+        }
+        if (str_contains($blob, 'recup')) {
+            return 'rec';
+        }
+        if (str_contains($blob, 'bimest') || str_contains($blob, 'prova bim')) {
+            return 'prova_bim';
+        }
+        $semana = (int) ($prova['semana'] ?? 0);
+        if ($semana >= 1 && $semana <= 6) {
+            return 'semanal';
+        }
+
+        return '';
+    }
+
+    /**
+     * @param list<array{bloco:string,semana:string}> $rotulos
+     */
+    private function semanaDaProva(array $prova, array $rotulos): int
+    {
+        $semana = (int) ($prova['semana'] ?? 0);
+        $letra = '';
+        foreach ($rotulos as $rotulo) {
+            if (!is_array($rotulo)) {
+                continue;
+            }
+            $nome = $this->chave((string) ($rotulo['bloco'] ?? ''));
+            if (str_contains($nome, 'bloco b') || preg_match('/\bb\b/', $nome) === 1) {
+                $letra = 'b';
+            } elseif (str_contains($nome, 'bloco a') || preg_match('/\ba\b/', $nome) === 1) {
+                $letra = 'a';
+            }
+            if (preg_match('/^s(\d+)$/', strtolower(trim((string) ($rotulo['semana'] ?? ''))), $m) === 1) {
+                $semana = (int) $m[1];
+            }
+        }
+        $impares = [1, 3, 5];
+        $pares = [2, 4, 6];
+        if ($letra === 'b' && in_array($semana, $impares, true)) {
+            $idx = array_search($semana, $impares, true);
+            return $pares[$idx] ?? 2;
+        }
+        if ($letra === 'a' && in_array($semana, $pares, true)) {
+            $idx = array_search($semana, $pares, true);
+            return $impares[$idx] ?? 1;
+        }
+        if ($semana >= 1 && $semana <= 6) {
+            return $semana;
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<int> $materias
+     * @param array<int, array<int, float>> $notas
+     * @param list<array{bloco_id:int,materia_id:int,n:int,q:int,nota:?float}> $acertos
+     * @param array<int, string> $blocoDaMateria
+     */
+    private function guardarSemana(array &$celulas, int $blocoId, int $semana, array $materias, array $notas, array $acertos, array $blocoDaMateria): void
+    {
+        $porMateria = [];
+        foreach ($acertos as $acerto) {
+            if ((int) $acerto['bloco_id'] !== $blocoId) {
+                continue;
+            }
+            $mid = (int) $acerto['materia_id'];
+            if ($mid <= 0) {
+                continue;
+            }
+            if (!isset($porMateria[$mid])) {
+                $porMateria[$mid] = ['n' => 0, 'q' => 0, 'nota' => null];
+            }
+            $porMateria[$mid]['n'] += (int) $acerto['n'];
+            $porMateria[$mid]['q'] += (int) $acerto['q'];
+            if ($acerto['nota'] !== null) {
+                $porMateria[$mid]['nota'] = (float) $acerto['nota'];
+            }
+        }
+        $destinos = $materias !== [] ? $materias : array_keys($porMateria);
+        foreach ($notas[$blocoId] ?? [] as $mid => $nota) {
+            if (!in_array((int) $mid, $destinos, true)) {
+                $destinos[] = (int) $mid;
+            }
+        }
+        foreach ($destinos as $mid) {
+            $mid = (int) $mid;
+            if ($mid <= 0) {
+                continue;
+            }
+            $sem = $this->semanaNoBloco($semana, (string) ($blocoDaMateria[$mid] ?? 'a'));
+            $nq = $porMateria[$mid] ?? ['n' => 0, 'q' => 0, 'nota' => null];
+            if (!isset($celulas[$mid]['semanas'][$sem])) {
+                $celulas[$mid]['semanas'][$sem] = ['n' => 0, 'q' => 0, 'notas' => []];
+            }
+            $celulas[$mid]['semanas'][$sem]['n'] += (int) $nq['n'];
+            $celulas[$mid]['semanas'][$sem]['q'] += (int) $nq['q'];
+            if (isset($notas[$blocoId][$mid])) {
+                $celulas[$mid]['semanas'][$sem]['notas'][] = (float) $notas[$blocoId][$mid];
+            } elseif ($nq['nota'] !== null && (int) $nq['q'] <= 0) {
+                $celulas[$mid]['semanas'][$sem]['notas'][] = (float) $nq['nota'];
+            }
+        }
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<int> $materias
+     * @param array<int, array<int, float>> $notas
+     * @param list<array{bloco_id:int,materia_id:int,n:int,q:int,nota:?float}> $acertos
+     */
+    private function guardarNota(array &$celulas, string $peca, int $blocoId, array $materias, array $notas, array $acertos): void
+    {
+        $valores = [];
+        foreach ($notas[$blocoId] ?? [] as $mid => $nota) {
+            $valores[(int) $mid][] = (float) $nota;
+        }
+        foreach ($acertos as $acerto) {
+            if ((int) $acerto['bloco_id'] !== $blocoId || $acerto['nota'] === null) {
+                continue;
+            }
+            $mid = (int) $acerto['materia_id'];
+            if ($mid > 0) {
+                $valores[$mid][] = (float) $acerto['nota'];
+            }
+        }
+        $destinos = $materias !== [] ? $materias : array_keys($valores);
+        foreach ($destinos as $mid) {
+            $mid = (int) $mid;
+            if ($mid <= 0 || empty($valores[$mid])) {
+                continue;
+            }
+            $celulas[$mid][$peca][] = array_sum($valores[$mid]) / count($valores[$mid]);
+        }
+    }
+
+    /**
+     * @return array<int, float>
+     */
+    private function jornadaPorMateria(int $alunoId, int $turmaId, int $bimestre, int $ano): array
+    {
+        try {
+            $jornada = new JourneyBoletimLancamento();
+            $ids = $jornada->listarIdsPorBimestre([$bimestre], $ano);
+            $notas = $jornada->notasPorMateriaAluno(
+                $alunoId,
+                $turmaId,
+                $ids,
+                null,
+                null,
+                10.0,
+                true,
+                'media',
+                [],
+                false,
+                null,
+                true
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach (is_array($notas['por_materia'] ?? null) ? $notas['por_materia'] : [] as $mid => $valor) {
+            if (is_numeric($valor)) {
+                $out[(int) $mid] = (float) $valor;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function faltasPorMateria(int $alunoId, int $turmaId, int $ano, int $bimestre): array
+    {
+        try {
+            $intervalo = PeriodoLetivo::intervalo($ano, $bimestre);
+            $inicio = (string) ($intervalo['inicio'] ?? '');
+            $fim = (string) ($intervalo['fim'] ?? '');
+            if ($inicio === '' || $fim === '') {
+                return [];
+            }
+            $mapa = (new FrequencyService())->alunoPorComponente($alunoId, $turmaId, $inicio, $fim);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($mapa as $mid => $info) {
+            $out[(int) $mid] = (int) ($info['faltas'] ?? 0);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array{materia_id:int,nome:string,bloco:string,filha:bool,pai_nome:string} $linha
+     * @param array<int, array<string,mixed>> $celulas
+     * @param array<int, float> $jornada
+     * @param array<int, int> $faltas
+     * @return array<string,mixed>
+     */
+    private function fecharLinha(array $linha, array $celulas, array $jornada, array $faltas, bool $terceira): array
+    {
+        $mid = (int) $linha['materia_id'];
+        $celula = $celulas[$mid] ?? [];
+        $semanas = [];
+        $totalN = 0;
+        $totalQ = 0;
+        $notasSemana = [];
+        foreach ([1, 2, 3, 4, 5, 6] as $numero) {
+            $semana = is_array($celula['semanas'][$numero] ?? null) ? $celula['semanas'][$numero] : null;
+            $n = $semana !== null ? (int) $semana['n'] : null;
+            $q = $semana !== null ? (int) $semana['q'] : null;
+            if ($q !== null && $q > 0) {
+                $totalN += (int) $n;
+                $totalQ += $q;
+            }
+            foreach (is_array($semana['notas'] ?? null) ? $semana['notas'] : [] as $nota) {
+                if (is_numeric($nota)) {
+                    $notasSemana[] = (float) $nota;
+                }
+            }
+            $semanas[$numero] = [
+                'n' => ($q !== null && $q > 0) ? $n : null,
+                'q' => ($q !== null && $q > 0) ? $q : null,
+            ];
+        }
+        $mediaSem = null;
+        if ($totalQ > 0) {
+            $mediaSem = $this->meio(10 * $totalN / $totalQ);
+        } elseif ($notasSemana !== []) {
+            $mediaSem = $this->meio(array_sum($notasSemana) / count($notasSemana));
+        }
+        $prova = $this->mediaLista($celula['prova_bim'] ?? []);
+        $enac = $this->mediaLista($celula['enac'] ?? []);
+        $rec = $this->mediaLista($celula['rec'] ?? []);
+        $notaJornada = isset($jornada[$mid]) ? $this->meio((float) $jornada[$mid]) : null;
+        $falta = $faltas[$mid] ?? null;
+        if ($terceira) {
+            $mediaBim = $this->mediaPresentes([$prova, $notaJornada]);
+            $resultado = $mediaBim;
+            if ($mediaBim !== null && $enac !== null) {
+                $comEnac = $this->meio(($mediaBim + $enac) / 2);
+                $resultado = $comEnac > $mediaBim ? $comEnac : $mediaBim;
+            }
+            if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+                $resultado = $rec;
+            }
+
+            return $linha + [
+                'semanas' => [],
+                'total_n' => null,
+                'total_q' => null,
+                'media_sem' => null,
+                'prova_bim' => $prova,
+                'jornada' => $notaJornada,
+                'media' => null,
+                'enac' => $enac,
+                'media_bim' => $mediaBim,
+                'rec' => $rec,
+                'resultado' => $resultado,
+                'faltas' => $falta,
+            ];
+        }
+        $media = $this->mediaPresentes([$mediaSem, $prova, $notaJornada]);
+        $mediaBim = $enac !== null && $media !== null
+            ? $this->meio(($media + $enac) / 2)
+            : $media;
+        $resultado = $mediaBim;
+        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+            $resultado = $rec;
+        }
+
+        return $linha + [
+            'semanas' => $semanas,
+            'total_n' => $totalQ > 0 ? $totalN : null,
+            'total_q' => $totalQ > 0 ? $totalQ : null,
+            'media_sem' => $mediaSem,
+            'prova_bim' => $prova,
+            'jornada' => $notaJornada,
+            'media' => $media,
+            'enac' => $enac,
+            'media_bim' => $mediaBim,
+            'rec' => $rec,
+            'resultado' => $resultado,
+            'faltas' => $falta,
+        ];
+    }
+
+    /**
+     * A área fica com a média das frentes (nota de 0 a 10) e a soma de N, Q e faltas.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function fecharAreaPortugues(array $linhas, bool $terceira): array
+    {
+        $grupos = [];
+        foreach ($linhas as $i => $linha) {
+            if (empty($linha['filha'])) {
+                continue;
+            }
+            $pai = (string) ($linha['pai_nome'] ?? '');
+            if ($pai === '') {
+                continue;
+            }
+            $grupos[$pai][] = $i;
+        }
+        foreach ($linhas as $i => $linha) {
+            if (!empty($linha['filha']) || !$this->ehPortugues((string) ($linha['nome'] ?? ''))) {
+                continue;
+            }
+            $idxs = $grupos[(string) $linha['nome']] ?? [];
+            if ($idxs === []) {
+                continue;
+            }
+            $filhas = [];
+            foreach ($idxs as $idx) {
+                $filhas[] = $linhas[$idx];
+            }
+            $linhas[$i] = $this->juntarFilhas($linha, $filhas, $terceira);
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * @param array<string,mixed> $pai
+     * @param list<array<string,mixed>> $filhas
+     * @return array<string,mixed>
+     */
+    private function juntarFilhas(array $pai, array $filhas, bool $terceira): array
+    {
+        $campos = ['prova_bim', 'jornada', 'enac', 'rec'];
+        foreach ($campos as $campo) {
+            $vals = [];
+            foreach ($filhas as $filha) {
+                if (is_numeric($filha[$campo] ?? null)) {
+                    $vals[] = (float) $filha[$campo];
+                }
+            }
+            if ($vals !== []) {
+                $pai[$campo] = $this->meio(array_sum($vals) / count($vals));
+            }
+        }
+        $faltas = 0;
+        $temFalta = false;
+        foreach ($filhas as $filha) {
+            if ($filha['faltas'] !== null) {
+                $faltas += (int) $filha['faltas'];
+                $temFalta = true;
+            }
+        }
+        if ($temFalta) {
+            $pai['faltas'] = $faltas;
+        }
+        if ($terceira) {
+            $pai['media_bim'] = $this->mediaPresentes([$pai['prova_bim'], $pai['jornada']]);
+            $pai['resultado'] = $pai['media_bim'];
+            if (is_numeric($pai['media_bim']) && is_numeric($pai['enac'])) {
+                $comEnac = $this->meio(((float) $pai['media_bim'] + (float) $pai['enac']) / 2);
+                $pai['resultado'] = $comEnac > (float) $pai['media_bim'] ? $comEnac : $pai['media_bim'];
+            }
+
+            return $pai;
+        }
+        $totalN = 0;
+        $totalQ = 0;
+        $semanas = [];
+        foreach ([1, 2, 3, 4, 5, 6] as $numero) {
+            $n = 0;
+            $q = 0;
+            foreach ($filhas as $filha) {
+                $cel = $filha['semanas'][$numero] ?? null;
+                if (!is_array($cel) || !is_numeric($cel['q'] ?? null) || (int) $cel['q'] <= 0) {
+                    continue;
+                }
+                $n += (int) ($cel['n'] ?? 0);
+                $q += (int) $cel['q'];
+            }
+            $semanas[$numero] = ['n' => $q > 0 ? $n : null, 'q' => $q > 0 ? $q : null];
+            $totalN += $n;
+            $totalQ += $q;
+        }
+        if ($totalQ > 0) {
+            $pai['semanas'] = $semanas;
+            $pai['total_n'] = $totalN;
+            $pai['total_q'] = $totalQ;
+            $pai['media_sem'] = $this->meio(10 * $totalN / $totalQ);
+        } else {
+            $mediaFilhas = $this->mediaCampo($filhas, 'media_sem');
+            if ($mediaFilhas !== null) {
+                $pai['media_sem'] = $mediaFilhas;
+            }
+        }
+        $pai['media'] = $this->mediaPresentes([$pai['media_sem'], $pai['prova_bim'], $pai['jornada']]);
+        $pai['media_bim'] = is_numeric($pai['enac']) && is_numeric($pai['media'])
+            ? $this->meio(((float) $pai['media'] + (float) $pai['enac']) / 2)
+            : $pai['media'];
+        $pai['resultado'] = $pai['media_bim'];
+        if (is_numeric($pai['rec']) && ($pai['resultado'] === null || (float) $pai['rec'] > (float) $pai['resultado'])) {
+            $pai['resultado'] = $pai['rec'];
+        }
+
+        return $pai;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array{titulo:string,semanas:list<int>,linhas:list<array<string,mixed>>}>
+     */
+    private function partirBlocos(array $linhas, bool $terceira): array
+    {
+        if ($terceira) {
+            return [[
+                'titulo' => 'Matérias',
+                'semanas' => [],
+                'linhas' => $linhas,
+            ]];
+        }
+        $a = [];
+        $b = [];
+        foreach ($linhas as $linha) {
+            if (($linha['bloco'] ?? '') === 'b') {
+                $b[] = $linha;
+            } else {
+                $a[] = $linha;
+            }
+        }
+
+        return [
+            ['titulo' => 'Matérias Bloco A', 'semanas' => [1, 3, 5], 'linhas' => $a],
+            ['titulo' => 'Matérias Bloco B', 'semanas' => [2, 4, 6], 'linhas' => $b],
+        ];
+    }
+
+    /**
+     * @param list<float> $valores
+     */
+    private function mediaLista(array $valores): ?float
+    {
+        $nums = [];
+        foreach ($valores as $valor) {
+            if (is_numeric($valor)) {
+                $nums[] = (float) $valor;
+            }
+        }
+        if ($nums === []) {
+            return null;
+        }
+
+        return $this->meio(array_sum($nums) / count($nums));
+    }
+
+    /**
+     * @param list<float|null> $valores
+     */
+    private function mediaPresentes(array $valores): ?float
+    {
+        return $this->mediaLista($valores);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function mediaCampo(array $linhas, string $campo): ?float
+    {
+        $vals = [];
+        foreach ($linhas as $linha) {
+            if (is_numeric($linha[$campo] ?? null)) {
+                $vals[] = (float) $linha[$campo];
+            }
+        }
+
+        return $this->mediaLista($vals);
+    }
+
+    private function semanaNoBloco(int $semana, string $bloco): int
+    {
+        $impares = [1 => 2, 3 => 4, 5 => 6];
+        $pares = [2 => 1, 4 => 3, 6 => 5];
+        if ($semana < 1 || $semana > 6) {
+            return $bloco === 'b' ? 2 : 1;
+        }
+        if ($bloco === 'b' && isset($impares[$semana])) {
+            return $impares[$semana];
+        }
+        if ($bloco === 'a' && isset($pares[$semana])) {
+            return $pares[$semana];
+        }
+
+        return $semana;
+    }
+
+    private function meio(float $valor): float
+    {
+        return round($valor * 2, 0, PHP_ROUND_HALF_UP) / 2;
+    }
+
+    private function anoSerie(string $serie, string $curso, string $turma): int
+    {
+        $cursoN = $this->chave($curso . ' ' . $serie . ' ' . $turma);
+        $medio = str_contains($cursoN, 'medio') || preg_match('/\bem\b/', $cursoN) === 1;
+        if (!$medio) {
+            return 0;
+        }
+        $serieN = $this->chave($serie . ' ' . $turma);
+        if (preg_match('/\b3\b|\bterceira\b/', $serieN) === 1) {
+            return 3;
+        }
+        if (preg_match('/\b2\b|\bsegunda\b/', $serieN) === 1) {
+            return 2;
+        }
+        if (preg_match('/\b1\b|\bprimeira\b/', $serieN) === 1) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private function ehPortugues(string $nome): bool
+    {
+        $chave = $this->chave($nome);
+
+        return str_contains($chave, 'lingua portuguesa') || $chave === 'portugues';
+    }
+
+    private function chave(string $nome): string
+    {
+        $nome = mb_strtolower(trim($nome));
+        $nome = strtr($nome, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c',
+            'ª' => 'a', 'º' => 'o',
+        ]);
+        $nome = preg_replace('/[^a-z0-9]+/', ' ', $nome) ?? $nome;
+
+        return trim((string) $nome);
+    }
+}

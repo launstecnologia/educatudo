@@ -190,6 +190,12 @@ if ($nomeMenuEscola === '') {
         </a>
         <?php endif; ?>
         <?php endif; ?>
+        <?php if (defined('TENANT_SLUG') && strtolower((string) TENANT_SLUG) === 'colag'): ?>
+        <a href="<?= URL ?>/admin/boletim-26-colag" class="<?= $linkCls($cp === 'boletim-26-colag') ?>">
+            <i class="fa-solid fa-table w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Boletim - colag</span>
+        </a>
+        <?php endif; ?>
         </div>
         </div>
     </div>
