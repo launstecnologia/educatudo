@@ -26,7 +26,7 @@ $academicoOpen = in_array($cur, [
     'agrupamentos-componentes', 'curso', 'cursos-series', 'grade_horaria', 'educasync', 'matriz-curricular',
     'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout', 'reports_boletim_coordenacao',
     'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao', 'implantar-academico',
-    'provas', 'provas_blocos', 'eventos-avaliativos',
+    'provas', 'provas_blocos', 'eventos-avaliativos', 'boletim-26-colag',
 ], true);
 $rotinaOpen = in_array($cur, [
     'rotina', 'exercises',
@@ -217,6 +217,12 @@ $gestaoOpen = $secretariaNavOpen;
         </div>
     </div>
 </div>
+<?php endif; ?>
+<?php if (!$secCan(['alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'agrupamentos_componentes', 'turmas', 'salas', 'professores', 'grade_horaria', 'materias', 'grupos_regras_notas', 'configuracao_boletim', 'provas_online']) && defined('TENANT_SLUG') && strtolower((string) TENANT_SLUG) === 'colag'): ?>
+<a href="<?= $urlBase ?>/admin/boletim-26-colag" class="flex items-center px-4 py-3 <?= $cur === 'boletim-26-colag' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
+    <i class="fa-solid fa-table w-5 h-5 mr-3 flex-shrink-0"></i>
+    <span class="sidebar-text">Boletim - colag</span>
+</a>
 <?php endif; ?>
 
 <?php if ($secCan(['diario_classe', 'faltas', 'presenca', 'ocorrencias'])): ?>

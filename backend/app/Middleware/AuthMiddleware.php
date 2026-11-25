@@ -77,12 +77,13 @@ class AuthMiddleware
         ) {
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
             $isLogout = ($path === '/logout' || strpos($path, '/logout') === 0);
+            $isBoletimColag = ($path === '/admin/boletim-26-colag' || strpos($path, '/admin/boletim-26-colag/') === 0);
             $isFinanceiroPath = strpos($path, '/admin/financeiro') === 0
                 || strpos($path, '/admin/finance') === 0;
             if (!class_exists('LayoutHelper', false)) {
             }
             $financeiroLigado = LayoutHelper::isModuleEnabled('financeiro');
-            if (!$isLogout) {
+            if (!$isLogout && !$isBoletimColag) {
                 if ($financeiroLigado && !$isFinanceiroPath) {
                     http_response_code(302);
                     header('Location: ' . URL . '/admin/financeiro-escolar');

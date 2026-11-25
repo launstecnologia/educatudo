@@ -372,6 +372,7 @@ class AdminPermissionMatrix
         return [
             '/logout',
             '/admin/ai-job',
+            '/admin/boletim-26-colag',
         ];
     }
 

@@ -59,6 +59,7 @@ class AdminSecretariaAccess
             '/admin/homologacoes',
             '/admin/documentos-periodo',
             '/admin/boletim',
+            '/admin/boletim-26-colag',
             '/admin/boletim-configuracao',
             '/admin/boletim-guia',
             '/admin/boletins',

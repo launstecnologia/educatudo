@@ -123,6 +123,7 @@
             'agrupamentos-componentes', 'regras-academicas', 'recuperacao', 'salas', 'serie', 'turmas',
             'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim-layout', 'reports_boletim_coordenacao',
             'provas', 'provas_blocos', 'eventos-avaliativos', 'leitor_gabarito',
+            'boletim-26-colag',
         ], true);
         $rotinaOpen = in_array($cp, [
             'rotina', 'exercises',

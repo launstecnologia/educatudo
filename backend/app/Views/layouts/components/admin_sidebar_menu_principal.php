@@ -201,6 +201,12 @@ if ($nomeMenuEscola === '') {
     </div>
 </div>
 <?php endif; ?>
+<?php if (empty($showAcademicoGroup) && defined('TENANT_SLUG') && strtolower((string) TENANT_SLUG) === 'colag'): ?>
+<a href="<?= URL ?>/admin/boletim-26-colag" class="flex items-center px-4 py-3 <?= ($cp ?? '') === 'boletim-26-colag' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
+    <i class="fa-solid fa-table w-5 h-5 mr-3"></i>
+    <span class="sidebar-text">Boletim - colag</span>
+</a>
+<?php endif; ?>
 
 <!-- Rotina -->
 <?php if (!empty($showRotinaGroup)): ?>
