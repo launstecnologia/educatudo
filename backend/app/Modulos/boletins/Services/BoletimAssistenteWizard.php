@@ -8268,6 +8268,7 @@ class BoletimAssistenteWizard
         }
 
         $comps = [];
+        $semanasComProva = [];
         foreach ((array) ($rascunho['componentes'] ?? []) as $componente) {
             if (!is_array($componente)) {
                 continue;
@@ -8276,6 +8277,10 @@ class BoletimAssistenteWizard
             if (preg_match('/^s([1-8])$/', $codigo, $mSem) === 1) {
                 $numero = (int) $mSem[1];
                 $ids = array_values(array_unique(array_map('intval', $porSemana[$numero] ?? [])));
+                if ($ids === []) {
+                    continue;
+                }
+                $semanasComProva[] = $codigo;
                 $componente['config'] = is_array($componente['config'] ?? null) ? $componente['config'] : [];
                 $componente['blocos_ids'] = $ids;
                 $componente['config']['blocos_ids'] = $ids;
@@ -8292,6 +8297,17 @@ class BoletimAssistenteWizard
             }
             $comps[] = $componente;
         }
+        foreach ($comps as &$componenteMedia) {
+            if (!is_array($componenteMedia)) {
+                continue;
+            }
+            if (strtolower(trim((string) ($componenteMedia['codigo'] ?? ''))) !== 'media_sem') {
+                continue;
+            }
+            $componenteMedia['config'] = is_array($componenteMedia['config'] ?? null) ? $componenteMedia['config'] : [];
+            $componenteMedia['config']['agregar_nq'] = $semanasComProva;
+        }
+        unset($componenteMedia);
         $rascunho['componentes'] = $comps;
     }
 
