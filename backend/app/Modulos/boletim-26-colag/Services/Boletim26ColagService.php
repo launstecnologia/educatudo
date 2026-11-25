@@ -129,12 +129,13 @@ class Boletim26ColagService
             $this->guardarNota($celulas, $peca, $blocoId, $materias, $notas, $acertos);
         }
 
+        $semanasBimestre = $terceira ? [] : $this->semanasDoBimestre($bimestre);
         $linhas = [];
         foreach ($linhasBase as $linha) {
-            $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira);
+            $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira, $semanasBimestre);
         }
-        $linhas = $this->fecharAreaPortugues($linhas, $terceira);
-        $blocos = $this->partirBlocos($linhas, $terceira, true);
+        $linhas = $this->fecharAreaPortugues($linhas, $terceira, $semanasBimestre);
+        $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
         return [
             'bimestre' => $bimestre,
@@ -605,7 +606,7 @@ class Boletim26ColagService
      * @param array<int, int> $faltas
      * @return array<string,mixed>
      */
-    private function fecharLinha(array $linha, array $celulas, array $jornada, array $faltas, bool $terceira): array
+    private function fecharLinha(array $linha, array $celulas, array $jornada, array $faltas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
     {
         $mid = (int) $linha['materia_id'];
         $celula = $celulas[$mid] ?? [];
@@ -613,7 +614,7 @@ class Boletim26ColagService
         $totalN = 0;
         $totalQ = 0;
         $notasSemana = [];
-        foreach ([1, 2, 3, 4, 5, 6] as $numero) {
+        foreach ($semanasContam as $numero) {
             $semana = is_array($celula['semanas'][$numero] ?? null) ? $celula['semanas'][$numero] : null;
             $n = $semana !== null ? (int) $semana['n'] : null;
             $q = $semana !== null ? (int) $semana['q'] : null;
@@ -699,7 +700,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
      */
-    private function fecharAreaPortugues(array $linhas, bool $terceira): array
+    private function fecharAreaPortugues(array $linhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
     {
         $grupos = [];
         foreach ($linhas as $i => $linha) {
@@ -724,7 +725,7 @@ class Boletim26ColagService
             foreach ($idxs as $idx) {
                 $filhas[] = $linhas[$idx];
             }
-            $linhas[$i] = $this->juntarFilhas($linha, $filhas, $terceira);
+            $linhas[$i] = $this->juntarFilhas($linha, $filhas, $terceira, $semanasContam);
         }
 
         return $linhas;
@@ -735,7 +736,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $filhas
      * @return array<string,mixed>
      */
-    private function juntarFilhas(array $pai, array $filhas, bool $terceira): array
+    private function juntarFilhas(array $pai, array $filhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
     {
         $campos = ['prova_bim', 'jornada', 'enac', 'rec'];
         foreach ($campos as $campo) {
@@ -773,7 +774,7 @@ class Boletim26ColagService
         $totalN = 0;
         $totalQ = 0;
         $semanas = [];
-        foreach ([1, 2, 3, 4, 5, 6] as $numero) {
+        foreach ($semanasContam as $numero) {
             $n = 0;
             $q = 0;
             foreach ($filhas as $filha) {
@@ -815,7 +816,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $linhas
      * @return list<array{titulo:string,semanas:list<int>,linhas:list<array<string,mixed>>}>
      */
-    private function partirBlocos(array $linhas, bool $terceira, bool $ocultarSemanaVazia = false): array
+    private function partirBlocos(array $linhas, bool $terceira, ?int $bimestre = null): array
     {
         if ($terceira) {
             return [[
@@ -833,39 +834,39 @@ class Boletim26ColagService
                 $a[] = $linha;
             }
         }
-        $semanasA = [1, 3, 5];
-        $semanasB = [2, 4, 6];
-        if ($ocultarSemanaVazia) {
-            $semanasA = $this->semanasComNota($a, $semanasA);
-            $semanasB = $this->semanasComNota($b, $semanasB);
-        }
+        $semanas = $this->semanasDoBimestre($bimestre ?? 1);
 
         return [
-            ['titulo' => 'Matérias Bloco A', 'semanas' => $semanasA, 'linhas' => $a],
-            ['titulo' => 'Matérias Bloco B', 'semanas' => $semanasB, 'linhas' => $b],
+            ['titulo' => 'Matérias Bloco A', 'semanas' => $this->semanasDoBloco($semanas, 'a'), 'linhas' => $a],
+            ['titulo' => 'Matérias Bloco B', 'semanas' => $this->semanasDoBloco($semanas, 'b'), 'linhas' => $b],
         ];
     }
 
     /**
-     * Semana sem N nem Q em nenhuma matéria não entra no quadro.
+     * 1ª e 2ª série: o 1º bimestre tem as seis semanas. Os outros param no S4.
      *
-     * @param list<array<string,mixed>> $linhas
-     * @param list<int> $candidatas
      * @return list<int>
      */
-    private function semanasComNota(array $linhas, array $candidatas): array
+    private function semanasDoBimestre(?int $bimestre): array
+    {
+        if ($bimestre === 1 || $bimestre === null) {
+            return [1, 2, 3, 4, 5, 6];
+        }
+
+        return [1, 2, 3, 4];
+    }
+
+    /**
+     * @param list<int> $semanas
+     * @return list<int>
+     */
+    private function semanasDoBloco(array $semanas, string $bloco): array
     {
         $out = [];
-        foreach ($candidatas as $semana) {
-            foreach ($linhas as $linha) {
-                $cel = $linha['semanas'][$semana] ?? null;
-                if (!is_array($cel)) {
-                    continue;
-                }
-                if (($cel['n'] ?? null) !== null || ($cel['q'] ?? null) !== null) {
-                    $out[] = (int) $semana;
-                    break;
-                }
+        foreach ($semanas as $semana) {
+            $par = $semana % 2 === 0;
+            if (($bloco === 'b' && $par) || ($bloco !== 'b' && !$par)) {
+                $out[] = $semana;
             }
         }
 
