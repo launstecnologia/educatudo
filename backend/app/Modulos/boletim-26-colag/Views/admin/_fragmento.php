@@ -6,7 +6,16 @@ $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ','
 $notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
 $notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
 $bimestreFiltro = (int) ($painel['bimestre'] ?? 0);
-$bimestresAbas = $bimestreFiltro === 0 ? [1, 2, 3, 4] : [];
+$bimestresPainel = [];
+foreach ((array) ($painel['bimestres'] ?? []) as $bimestrePainel) {
+    $bimestrePainel = (int) $bimestrePainel;
+    if ($bimestrePainel >= 1 && $bimestrePainel <= 4) {
+        $bimestresPainel[$bimestrePainel] = $bimestrePainel;
+    }
+}
+$bimestresPainel = array_values($bimestresPainel);
+sort($bimestresPainel);
+$bimestresAbas = count($bimestresPainel) > 1 ? $bimestresPainel : [];
 $fmt = static function ($valor): string {
     if ($valor === null || $valor === '' || !is_numeric($valor)) {
         return '—';

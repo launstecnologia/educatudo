@@ -53,11 +53,20 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = []): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
         $bimestreFiltro = ($bimestreFiltro >= 1 && $bimestreFiltro <= 4) ? $bimestreFiltro : 0;
+        $listaBimestres = [];
+        foreach ($bimestresLista as $numeroBimestre) {
+            $numeroBimestre = (int) $numeroBimestre;
+            if ($numeroBimestre >= 1 && $numeroBimestre <= 4) {
+                $listaBimestres[$numeroBimestre] = $numeroBimestre;
+            }
+        }
+        ksort($listaBimestres);
+        $listaBimestres = array_values($listaBimestres);
         $turmas = $this->turmasMedio();
         $turmasSerie = $serieFiltro > 0
             ? array_values(array_filter(
@@ -84,7 +93,8 @@ class Boletim26ColagService
             }
         }
         $notaCampo = $notaCampo === 'media_bim' ? 'media_bim' : 'resultado';
-        $bimestres = $bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4];
+        $bimestres = $listaBimestres !== [] ? $listaBimestres : ($bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4]);
+        $bimestreFiltro = count($bimestres) === 1 ? $bimestres[0] : 0;
         $relatorios = [];
         $carregarFundo = $abrir && !$montarRelatorios && ($turma !== null || $serieFiltro > 0);
         if ($abrir && $montarRelatorios && ($turma !== null || $serieFiltro > 0)) {
@@ -127,6 +137,7 @@ class Boletim26ColagService
             'ano' => $ano,
             'serie' => $serieFiltro,
             'bimestre' => $bimestreFiltro,
+            'bimestres' => $bimestres,
             'nota_minima' => $notaMinima,
             'nota_campo' => $notaCampo,
             'abrir' => $abrir,

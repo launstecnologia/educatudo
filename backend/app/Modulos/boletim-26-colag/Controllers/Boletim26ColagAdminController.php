@@ -50,7 +50,8 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['nota_minima'],
             $filtro['abrir'],
             $filtro['nota_campo'],
-            false
+            false,
+            $filtro['bimestres']
         );
 
         $this->viewWithLayout('admin', 'admin/boletim-26-colag/index', [
@@ -77,7 +78,9 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['bimestre'],
             $filtro['nota_minima'],
             true,
-            $filtro['nota_campo']
+            $filtro['nota_campo'],
+            true,
+            $filtro['bimestres']
         );
         $usuario = $this->auth->getUser();
         $this->servico->homologar(
@@ -108,7 +111,9 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['bimestre'],
             $filtro['nota_minima'],
             true,
-            $filtro['nota_campo']
+            $filtro['nota_campo'],
+            true,
+            $filtro['bimestres']
         );
         $linhas = is_array($painel['linhas_planilha'] ?? null) ? $painel['linhas_planilha'] : [];
         $nome = 'boletim-colag-' . (int) ($painel['ano'] ?? date('Y')) . '.csv';
@@ -160,7 +165,8 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['nota_minima'],
             true,
             $filtro['nota_campo'],
-            true
+            true,
+            $filtro['bimestres']
         );
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $this->responderJson([
@@ -182,12 +188,14 @@ class Boletim26ColagAdminController extends BaseController
         $notaBruta = trim(str_replace(',', '.', (string) ($corpo['nota_minima'] ?? '')));
         $notaCampo = (string) ($corpo['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
         $linhas = is_array($corpo['linhas'] ?? null) ? $corpo['linhas'] : [];
+        $exibirSituacao = (string) ($corpo['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
+        $bimestresSituacao = $this->bimestresDoFiltro($corpo, $exibirSituacao);
         $situacao = $this->servico->situacaoDasLinhas([
             'ano' => (int) ($corpo['ano'] ?? 0),
             'serie' => (int) ($corpo['serie'] ?? 0),
             'turma_id' => (int) ($corpo['turma_id'] ?? 0),
             'aluno_id' => (int) ($corpo['aluno_id'] ?? 0),
-            'bimestre' => (int) ($corpo['bimestre'] ?? 0),
+            'bimestre' => count($bimestresSituacao) === 1 ? $bimestresSituacao[0] : 0,
             'nota_campo' => $notaCampo,
             'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
         ], $linhas);
@@ -226,13 +234,17 @@ class Boletim26ColagAdminController extends BaseController
     {
         $fonte = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
         $notaBruta = trim(str_replace(',', '.', (string) ($fonte['nota_minima'] ?? '')));
+        $exibir = (string) ($fonte['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
+        $bimestres = $this->bimestresDoFiltro($fonte, $exibir);
 
         return [
             'ano' => (int) ($fonte['ano'] ?? 0),
             'serie' => (int) ($fonte['serie'] ?? 0),
             'turma_id' => (int) ($fonte['turma_id'] ?? 0),
             'aluno_id' => (int) ($fonte['aluno_id'] ?? 0),
-            'bimestre' => (int) ($fonte['bimestre'] ?? 0),
+            'bimestre' => count($bimestres) === 1 ? $bimestres[0] : 0,
+            'bimestres' => $bimestres,
+            'exibir' => $exibir,
             'nota_campo' => (string) ($fonte['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado',
             'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
             'abrir' => (string) ($fonte['abrir'] ?? '') === '1',
@@ -251,10 +263,40 @@ class Boletim26ColagAdminController extends BaseController
             'turma_id' => $filtro['turma_id'],
             'aluno_id' => $filtro['aluno_id'],
             'bimestre' => $filtro['bimestre'],
+            'bimestres' => $filtro['bimestres'],
+            'exibir' => $filtro['exibir'],
             'nota_campo' => $filtro['nota_campo'],
             'nota_minima' => $filtro['nota_minima'] === null ? '' : number_format($filtro['nota_minima'], 1, ',', ''),
             'abrir' => $abrir ? '1' : '0',
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $fonte
+     * @return list<int>
+     */
+    private function bimestresDoFiltro(array $fonte, string $exibir): array
+    {
+        if ($exibir !== 'boletim') {
+            $um = (int) ($fonte['bimestre'] ?? 0);
+
+            return ($um >= 1 && $um <= 4) ? [$um] : [1, 2, 3, 4];
+        }
+        $brutos = $fonte['bimestres'] ?? [];
+        if (!is_array($brutos)) {
+            $brutos = ($brutos === '' || $brutos === null) ? [] : [$brutos];
+        }
+        $lista = [];
+        foreach ($brutos as $item) {
+            $numero = (int) $item;
+            if ($numero >= 1 && $numero <= 4) {
+                $lista[$numero] = $numero;
+            }
+        }
+        ksort($lista);
+        $lista = array_values($lista);
+
+        return $lista === [] ? [1, 2, 3, 4] : $lista;
     }
 
     private function csvNota(mixed $valor): string

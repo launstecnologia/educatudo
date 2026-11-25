@@ -38,7 +38,8 @@ if (!$demoTemAbaixo) {
 }
 ?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8 boletim-painel vista-notas <?= $exibir === 'boletim' ? 'hidden' : '' ?> <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
+<?php $primeiraAba = (int) ($bimestresAbas[0] ?? 0); ?>
+<section class="mb-8 boletim-painel vista-notas <?= $exibir === 'boletim' ? 'hidden' : '' ?> <?= ($bimestresAbas !== [] && $primeiraAba > 0 && $bimestre !== $primeiraAba) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
         <?php if (!empty($demo['titulo'])): ?>
         <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
@@ -219,29 +220,34 @@ sort($bimestresBoletim);
         <span class="block text-sm font-normal text-gray-600"><?= $nomeAluno ?></span>
         <?php endif; ?>
     </h3>
-    <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
-        <table class="min-w-full text-sm text-center">
-            <thead class="bg-gray-50">
+    <?php $cabecaBoletim = 'px-2 py-2 uppercase font-semibold whitespace-nowrap'; ?>
+    <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white">
+        <table class="boletim-colag min-w-full text-sm text-center">
+            <thead>
                 <tr>
-                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" rowspan="2">Componente</th>
+                    <th class="<?= $cabecaBoletim ?> px-3 text-left" rowspan="2">Componente</th>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
-                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= (int) $bimestreColuna ?>º</th>
+                    <th class="<?= $cabecaBoletim ?>" colspan="2"><?= (int) $bimestreColuna ?>º</th>
                     <?php endforeach; ?>
                 </tr>
                 <tr>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
-                    <th class="px-2 py-1 text-center text-[10px] text-gray-400">Nota</th>
-                    <th class="px-2 py-1 text-center text-[10px] text-gray-400">Falta</th>
+                    <th class="<?= $cabecaBoletim ?>">Nota</th>
+                    <th class="<?= $cabecaBoletim ?>">Falta</th>
                     <?php endforeach; ?>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody>
                 <?php foreach ($ordemBoletim as $nomeGrade): ?>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-3 py-2 text-left font-medium text-gray-900 whitespace-nowrap"><?= htmlspecialchars($nomeGrade, ENT_QUOTES, 'UTF-8') ?></td>
+                <tr>
+                    <td class="px-3 py-2 text-left font-semibold text-gray-900 whitespace-nowrap"><?= htmlspecialchars($nomeGrade, ENT_QUOTES, 'UTF-8') ?></td>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
-                    <?php $celulaGrade = $gradeBoletim[$nomeGrade][$bimestreColuna] ?? ['resultado' => null, 'faltas' => null]; ?>
-                    <?= $celNota($celulaGrade['resultado'], 'resultado') ?>
+                    <?php
+                    $celulaGrade = $gradeBoletim[$nomeGrade][$bimestreColuna] ?? ['resultado' => null, 'faltas' => null];
+                    $notaGrade = $celulaGrade['resultado'];
+                    $notaBaixa = $notaMinima !== null && is_numeric($notaGrade) && (float) $notaGrade < $notaMinima;
+                    ?>
+                    <td class="px-2 py-2 <?= $notaBaixa ? 'vermelho' : (is_numeric($notaGrade) ? 'nota' : '') ?>"><?= $fmt($notaGrade) ?></td>
                     <td class="px-2 py-2"><?= $fmtInt($celulaGrade['faltas']) ?></td>
                     <?php endforeach; ?>
                 </tr>
@@ -249,5 +255,25 @@ sort($bimestresBoletim);
             </tbody>
         </table>
     </div>
+    <?php if ($alunoPainelId > 0): ?>
+    <?php
+    $obsBoletim = '';
+    try {
+        $obsCfg = new \App\Modulos\Boletins\Models\BoletimConfig();
+        $obsLinha = $obsCfg->getObservacaoCoordenacao($alunoPainelId);
+        $obsBoletim = trim((string) (is_array($obsLinha) ? ($obsLinha['conteudo'] ?? '') : ''));
+    } catch (\Throwable $e) {
+        $obsBoletim = '';
+    }
+    ?>
+    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4" data-obs-aluno="<?= $alunoPainelId ?>">
+        <h4 class="text-sm font-semibold text-gray-900 mb-2">Observação</h4>
+        <textarea rows="3" maxlength="5000" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Observação que fica no boletim deste aluno"><?= htmlspecialchars($obsBoletim, ENT_QUOTES, 'UTF-8') ?></textarea>
+        <div class="mt-2 flex items-center gap-3">
+            <button type="button" data-salvar-obs class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar observação</button>
+            <span data-obs-status class="text-xs text-gray-500"></span>
+        </div>
+    </div>
+    <?php endif; ?>
 </section>
 <?php endif; ?>

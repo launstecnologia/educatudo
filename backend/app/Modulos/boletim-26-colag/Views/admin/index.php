@@ -129,6 +129,7 @@ $rotuloSerie = static function (int $serie): string {
 .boletim-colag tbody tr:nth-child(odd) td { background: #fff; }
 .boletim-colag td.nota { color: #047857; font-weight: 600; }
 .boletim-colag tbody tr td.abaixo { color: #b45309; font-weight: 600; background: #fff7ed; }
+.boletim-colag tbody tr td.vermelho { color: #b91c1c; font-weight: 700; background: #fef2f2; }
 @keyframes boletim-status {
     0% { transform: translateX(-120%); }
     100% { transform: translateX(280%); }
@@ -236,7 +237,18 @@ $rotuloSerie = static function (int $serie): string {
                     <option value="boletim" <?= $exibir === 'boletim' ? 'selected' : '' ?>>Boletim</option>
                 </select>
             </div>
-            <div>
+            <?php
+            $bimestresMarcados = [];
+            if ($exibir === 'boletim') {
+                foreach ((array) ($_GET['bimestres'] ?? []) as $bimestreMarcado) {
+                    $bimestreMarcado = (int) $bimestreMarcado;
+                    if ($bimestreMarcado >= 1 && $bimestreMarcado <= 4) {
+                        $bimestresMarcados[$bimestreMarcado] = true;
+                    }
+                }
+            }
+            ?>
+            <div id="filtro-bimestre-um" class="<?= $exibir === 'boletim' ? 'hidden' : '' ?>">
                 <label for="boletim_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
                 <select id="boletim_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="0" <?= $bimestreFiltro === 0 ? 'selected' : '' ?>>Todos</option>
@@ -244,6 +256,18 @@ $rotuloSerie = static function (int $serie): string {
                     <option value="<?= $bimestreOpcao ?>" <?= $bimestreOpcao === $bimestreFiltro ? 'selected' : '' ?>><?= $bimestreOpcao ?>º bimestre</option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+            <div id="filtro-bimestre-varios" class="<?= $exibir === 'notas' ? 'hidden' : '' ?>">
+                <span class="block text-sm font-medium text-gray-700 mb-1.5">Bimestres do boletim</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <?php foreach ([1, 2, 3, 4] as $bimestreOpcao): ?>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="bimestres[]" value="<?= $bimestreOpcao ?>" <?= isset($bimestresMarcados[$bimestreOpcao]) ? 'checked' : '' ?>>
+                        <?= $bimestreOpcao ?>º bimestre
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+                <span class="mt-1 block text-xs text-gray-500">Marque os que quer ver. Nenhum marcado traz os quatro.</span>
             </div>
             <div>
                 <label for="boletim_nota_campo" class="block text-sm font-medium text-gray-700 mb-1.5">Nota mínima em</label>
@@ -284,7 +308,16 @@ $rotuloSerie = static function (int $serie): string {
 <?php
 $primeiroRelatorio = $relatorios[0] ?? null;
 $modeloVazio = !is_array($primeiroRelatorio) || !is_array($primeiroRelatorio['aluno'] ?? null);
-$bimestresAbas = (($carregarFundo || !$modeloVazio) && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
+$bimestresPainel = [];
+foreach ((array) ($painel['bimestres'] ?? []) as $bimestrePainel) {
+    $bimestrePainel = (int) $bimestrePainel;
+    if ($bimestrePainel >= 1 && $bimestrePainel <= 4) {
+        $bimestresPainel[$bimestrePainel] = $bimestrePainel;
+    }
+}
+$bimestresPainel = array_values($bimestresPainel);
+sort($bimestresPainel);
+$bimestresAbas = (($carregarFundo || !$modeloVazio) && count($bimestresPainel) > 1) ? $bimestresPainel : [];
 ?>
 <?php if (!$abrir): ?>
 <div class="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center mb-6">
@@ -355,6 +388,7 @@ function openBoletimFiltro() {
     document.body.style.overflow = 'hidden';
 }
 window.boletimVista = <?= json_encode($exibir) ?>;
+window.boletimAbaAtiva = <?= json_encode((string) ($bimestresAbas[0] ?? '1')) ?>;
 function aplicarVistaBoletim(vista) {
     window.boletimVista = vista === 'boletim' ? 'boletim' : 'notas';
     document.querySelectorAll('.vista-notas').forEach(function (painel) {
@@ -381,6 +415,35 @@ function aplicarVistaBoletim(vista) {
 document.querySelectorAll('[data-vista]').forEach(function (botao) {
     botao.addEventListener('click', function () {
         aplicarVistaBoletim(botao.getAttribute('data-vista'));
+    });
+});
+var campoExibir = document.getElementById('boletim_exibir');
+if (campoExibir) {
+    campoExibir.addEventListener('change', function () {
+        var boletim = campoExibir.value === 'boletim';
+        var um = document.getElementById('filtro-bimestre-um');
+        var varios = document.getElementById('filtro-bimestre-varios');
+        if (um) um.classList.toggle('hidden', boletim);
+        if (varios) varios.classList.toggle('hidden', !boletim);
+    });
+}
+document.addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-salvar-obs]');
+    if (!botao) return;
+    var caixa = botao.closest('[data-obs-aluno]');
+    var campo = caixa ? caixa.querySelector('textarea') : null;
+    var status = caixa ? caixa.querySelector('[data-obs-status]') : null;
+    var token = document.querySelector('#boletim-filtros [name="_token"]');
+    if (!caixa || !campo) return;
+    if (status) status.textContent = 'Salvando...';
+    fetch(<?= json_encode(URL) ?> + '/admin/students/' + caixa.getAttribute('data-obs-aluno') + '/boletim/observacao', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({_token: token ? token.value : '', conteudo: campo.value})
+    }).then(function (resposta) {
+        if (status) status.textContent = resposta.ok ? 'Observação salva.' : 'Não foi possível salvar.';
+    }).catch(function () {
+        if (status) status.textContent = 'Não foi possível salvar.';
     });
 });
 function closeBoletimFiltro() {
@@ -501,8 +564,20 @@ document.addEventListener('keydown', function (evento) {
         var token = form.querySelector('[name="_token"]');
         var payload = {};
         new FormData(form).forEach(function (valor, chave) {
+            if (Object.prototype.hasOwnProperty.call(payload, chave)) {
+                if (!Array.isArray(payload[chave])) {
+                    payload[chave] = [payload[chave]];
+                }
+                payload[chave].push(valor);
+                return;
+            }
             payload[chave] = valor;
         });
+        if (Array.isArray(payload['bimestres[]'])) {
+            payload.bimestres = payload['bimestres[]'];
+        } else if (payload['bimestres[]']) {
+            payload.bimestres = [payload['bimestres[]']];
+        }
         payload._token = token ? token.value : '';
         payload.linhas = linhas;
         fetch(<?= json_encode(URL . '/admin/boletim-26-colag/situacao') ?>, {
@@ -553,7 +628,6 @@ document.addEventListener('keydown', function (evento) {
 <?php endif; ?>
 <?php if ($bimestresAbas !== []): ?>
 <script>
-window.boletimAbaAtiva = '1';
 document.querySelectorAll('[data-boletim-aba]').forEach(function (botao) {
     botao.addEventListener('click', function () {
         var alvo = botao.getAttribute('data-boletim-aba');
