@@ -5,6 +5,20 @@ $demonstrativos = is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['d
 $nomeAluno = $alunoRel !== null ? htmlspecialchars((string) ($alunoRel['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
 $serieTurma = $rotuloSerie((int) ($turmaRel['ano_serie'] ?? 0));
 $alunoPainelId = (int) ($alunoRel['id'] ?? 0);
+$exibir = (string) ($exibir ?? ($_GET['exibir'] ?? 'notas')) === 'boletim' ? 'boletim' : 'notas';
+$frentePortugues = static function (array $linha): bool {
+    if (empty($linha['filha'])) {
+        return false;
+    }
+    $texto = mb_strtolower(trim((string) ($linha['nome'] ?? '') . ' ' . (string) ($linha['pai_nome'] ?? '')), 'UTF-8');
+    $texto = strtr($texto, ['á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'é' => 'e', 'ê' => 'e', 'í' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c']);
+
+    return str_contains($texto, 'gramatica')
+        || str_contains($texto, 'literatura')
+        || str_contains($texto, 'leitura')
+        || str_contains($texto, 'lingua portuguesa')
+        || str_contains($texto, 'portugues');
+};
 ?>
 <?php foreach ($demonstrativos as $indice => $demo): ?>
 <?php
@@ -24,7 +38,7 @@ if (!$demoTemAbaixo) {
 }
 ?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8 boletim-painel <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
+<section class="mb-8 boletim-painel vista-notas <?= $exibir === 'boletim' ? 'hidden' : '' ?> <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
         <?php if (!empty($demo['titulo'])): ?>
         <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
@@ -58,7 +72,13 @@ if (!$demoTemAbaixo) {
             }
         ));
     }
-    if ($notaMinima !== null && $linhas === []) {
+    $linhas = array_values(array_filter(
+        $linhas,
+        static function (array $linhaVisivel) use ($frentePortugues): bool {
+            return !$frentePortugues($linhaVisivel);
+        }
+    ));
+    if ($linhas === []) {
         continue;
     }
     ?>
@@ -136,3 +156,98 @@ if (!$demoTemAbaixo) {
     <?php endforeach; ?>
 </section>
 <?php endforeach; ?>
+<?php
+$gradeBoletim = [];
+$ordemBoletim = [];
+$bimestresBoletim = [];
+foreach ($demonstrativos as $demoBoletim) {
+    $bimestreGrade = (int) ($demoBoletim['bimestre'] ?? 0);
+    if ($bimestreGrade <= 0) {
+        continue;
+    }
+    $temLinha = false;
+    foreach (is_array($demoBoletim['blocos'] ?? null) ? $demoBoletim['blocos'] : [] as $blocoBoletim) {
+        foreach (is_array($blocoBoletim['linhas'] ?? null) ? $blocoBoletim['linhas'] : [] as $linhaBoletim) {
+            if (!is_array($linhaBoletim) || $frentePortugues($linhaBoletim)) {
+                continue;
+            }
+            if ($notaMinima !== null && !$linhaTemNotaAbaixo($linhaBoletim) && !empty($linhaBoletim['filha'])) {
+                continue;
+            }
+            if ($notaMinima !== null && !$linhaTemNotaAbaixo($linhaBoletim) && empty($linhaBoletim['filha'])) {
+                $filhaAbaixo = false;
+                foreach (is_array($blocoBoletim['linhas'] ?? null) ? $blocoBoletim['linhas'] : [] as $irmaBoletim) {
+                    if (!is_array($irmaBoletim) || empty($irmaBoletim['filha'])) {
+                        continue;
+                    }
+                    if ((string) ($irmaBoletim['pai_nome'] ?? '') === (string) ($linhaBoletim['nome'] ?? '') && $linhaTemNotaAbaixo($irmaBoletim)) {
+                        $filhaAbaixo = true;
+                        break;
+                    }
+                }
+                if (!$filhaAbaixo) {
+                    continue;
+                }
+            }
+            $nomeGrade = (string) ($linhaBoletim['nome'] ?? '');
+            if ($nomeGrade === '') {
+                continue;
+            }
+            if (!isset($gradeBoletim[$nomeGrade])) {
+                $gradeBoletim[$nomeGrade] = [];
+                $ordemBoletim[] = $nomeGrade;
+            }
+            $gradeBoletim[$nomeGrade][$bimestreGrade] = [
+                'resultado' => $linhaBoletim['resultado'] ?? null,
+                'faltas' => $linhaBoletim['faltas'] ?? null,
+            ];
+            $temLinha = true;
+        }
+    }
+    if ($temLinha) {
+        $bimestresBoletim[$bimestreGrade] = true;
+    }
+}
+$bimestresBoletim = array_keys($bimestresBoletim);
+sort($bimestresBoletim);
+?>
+<?php if ($ordemBoletim !== [] && $bimestresBoletim !== []): ?>
+<section class="mb-8 vista-boletim <?= $exibir === 'notas' ? 'hidden' : '' ?>">
+    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+        Boletim — <?= htmlspecialchars($serieTurma, ENT_QUOTES, 'UTF-8') ?>
+        <?php if ($nomeAluno !== ''): ?>
+        <span class="block text-sm font-normal text-gray-600"><?= $nomeAluno ?></span>
+        <?php endif; ?>
+    </h3>
+    <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+        <table class="min-w-full text-sm text-center">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" rowspan="2">Componente</th>
+                    <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= (int) $bimestreColuna ?>º</th>
+                    <?php endforeach; ?>
+                </tr>
+                <tr>
+                    <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
+                    <th class="px-2 py-1 text-center text-[10px] text-gray-400">Nota</th>
+                    <th class="px-2 py-1 text-center text-[10px] text-gray-400">Falta</th>
+                    <?php endforeach; ?>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                <?php foreach ($ordemBoletim as $nomeGrade): ?>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 text-left font-medium text-gray-900 whitespace-nowrap"><?= htmlspecialchars($nomeGrade, ENT_QUOTES, 'UTF-8') ?></td>
+                    <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
+                    <?php $celulaGrade = $gradeBoletim[$nomeGrade][$bimestreColuna] ?? ['resultado' => null, 'faltas' => null]; ?>
+                    <?= $celNota($celulaGrade['resultado'], 'resultado') ?>
+                    <td class="px-2 py-2"><?= $fmtInt($celulaGrade['faltas']) ?></td>
+                    <?php endforeach; ?>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>

@@ -11,6 +11,7 @@ $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ','
 $notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
 $notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
 $abrir = !empty($painel['abrir']);
+$exibir = (string) ($_GET['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
 $homologacao = is_array($painel['homologacao'] ?? null) ? $painel['homologacao'] : [];
 $homologacaoEm = '';
 if ((string) ($homologacao['em'] ?? '') !== '') {
@@ -30,6 +31,9 @@ if ($alunoId > 0) {
     $filtrosAtivos++;
 }
 if ($bimestreFiltro > 0) {
+    $filtrosAtivos++;
+}
+if ($exibir === 'boletim') {
     $filtrosAtivos++;
 }
 if ($notaMinima !== null) {
@@ -226,6 +230,13 @@ $rotuloSerie = static function (int $serie): string {
                 </select>
             </div>
             <div>
+                <label for="boletim_exibir" class="block text-sm font-medium text-gray-700 mb-1.5">Exibir</label>
+                <select id="boletim_exibir" name="exibir" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="notas" <?= $exibir === 'notas' ? 'selected' : '' ?>>Notas</option>
+                    <option value="boletim" <?= $exibir === 'boletim' ? 'selected' : '' ?>>Boletim</option>
+                </select>
+            </div>
+            <div>
                 <label for="boletim_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
                 <select id="boletim_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="0" <?= $bimestreFiltro === 0 ? 'selected' : '' ?>>Todos</option>
@@ -306,8 +317,14 @@ if ($abrir && $notaMinima !== null) {
 <?php if ($abrir && !$carregarFundo && $notaMinima !== null && $relatorios === []): ?>
 <p class="text-sm text-gray-600 mb-6">Nenhum aluno com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.</p>
 <?php endif; ?>
+<?php if ($abrir || $carregarFundo): ?>
+<div class="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Visão">
+    <button type="button" class="boletim-vista px-4 py-1.5 rounded-full text-sm font-medium <?= $exibir === 'notas' ? 'bg-blue-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-vista="notas" aria-selected="<?= $exibir === 'notas' ? 'true' : 'false' ?>">Notas</button>
+    <button type="button" class="boletim-vista px-4 py-1.5 rounded-full text-sm font-medium <?= $exibir === 'boletim' ? 'bg-blue-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-vista="boletim" aria-selected="<?= $exibir === 'boletim' ? 'true' : 'false' ?>">Boletim</button>
+</div>
+<?php endif; ?>
 <?php if ($bimestresAbas !== []): ?>
-<div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Bimestres">
+<div id="abas-bimestre" class="flex flex-wrap gap-2 mb-6 <?= $exibir === 'boletim' ? 'hidden' : '' ?>" role="tablist" aria-label="Bimestres">
     <?php foreach ($bimestresAbas as $indice => $bimestreAba): ?>
     <button type="button"
             class="boletim-aba px-4 py-1.5 rounded-full text-sm font-medium <?= $indice === 0 ? 'bg-blue-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
@@ -337,6 +354,35 @@ function openBoletimFiltro() {
     painel.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
 }
+window.boletimVista = <?= json_encode($exibir) ?>;
+function aplicarVistaBoletim(vista) {
+    window.boletimVista = vista === 'boletim' ? 'boletim' : 'notas';
+    document.querySelectorAll('.vista-notas').forEach(function (painel) {
+        var oculto = window.boletimVista !== 'notas';
+        if (!oculto && document.querySelector('[data-boletim-aba]')) {
+            oculto = painel.getAttribute('data-boletim-painel') !== (window.boletimAbaAtiva || '1');
+        }
+        painel.classList.toggle('hidden', oculto);
+    });
+    document.querySelectorAll('.vista-boletim').forEach(function (painel) {
+        painel.classList.toggle('hidden', window.boletimVista !== 'boletim');
+    });
+    var abas = document.getElementById('abas-bimestre');
+    if (abas) abas.classList.toggle('hidden', window.boletimVista !== 'notas');
+    document.querySelectorAll('[data-vista]').forEach(function (botao) {
+        var ativo = botao.getAttribute('data-vista') === window.boletimVista;
+        botao.classList.toggle('bg-blue-900', ativo);
+        botao.classList.toggle('text-white', ativo);
+        botao.classList.toggle('bg-gray-100', !ativo);
+        botao.classList.toggle('text-gray-700', !ativo);
+        botao.setAttribute('aria-selected', ativo ? 'true' : 'false');
+    });
+}
+document.querySelectorAll('[data-vista]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+        aplicarVistaBoletim(botao.getAttribute('data-vista'));
+    });
+});
 function closeBoletimFiltro() {
     var fundo = document.getElementById('boletimFiltroBackdrop');
     var painel = document.getElementById('boletimFiltroDrawer');
@@ -485,11 +531,8 @@ document.addEventListener('keydown', function (evento) {
         }).then(function (corpo) {
             if (corpo && corpo.html && destino) {
                 destino.insertAdjacentHTML('beforeend', corpo.html);
-                var abaAtiva = window.boletimAbaAtiva || '1';
-                if (document.querySelector('[data-boletim-aba]')) {
-                    document.querySelectorAll('[data-boletim-painel]').forEach(function (painel) {
-                        painel.classList.toggle('hidden', painel.getAttribute('data-boletim-painel') !== abaAtiva);
-                    });
+                if (typeof aplicarVistaBoletim === 'function') {
+                    aplicarVistaBoletim(window.boletimVista || 'notas');
                 }
             }
             if (corpo && Array.isArray(corpo.linhas)) {
@@ -523,9 +566,9 @@ document.querySelectorAll('[data-boletim-aba]').forEach(function (botao) {
             item.classList.toggle('text-gray-700', !ativo);
             item.setAttribute('aria-selected', ativo ? 'true' : 'false');
         });
-        document.querySelectorAll('[data-boletim-painel]').forEach(function (painel) {
-            painel.classList.toggle('hidden', painel.getAttribute('data-boletim-painel') !== alvo);
-        });
+        if (typeof aplicarVistaBoletim === 'function') {
+            aplicarVistaBoletim('notas');
+        }
     });
 });
 </script>
