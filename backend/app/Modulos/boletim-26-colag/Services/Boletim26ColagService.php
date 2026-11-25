@@ -767,7 +767,7 @@ class Boletim26ColagService
         foreach ($linhasBase as $linha) {
             $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira, $semanasBimestre);
         }
-        $linhas = $this->fecharGrupos($linhas, $terceira, $semanasBimestre);
+        $linhas = $this->fecharGrupos($linhas, $terceira, $semanasBimestre, $bimestre);
         $linhas = array_values(array_filter(
             $linhas,
             fn (array $linha): bool => !$this->ehRedacao((string) ($linha['nome'] ?? ''))
@@ -1538,7 +1538,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
      */
-    private function fecharGrupos(array $linhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
+    private function fecharGrupos(array $linhas, bool $terceira, array $semanasContam, int $bimestre): array
     {
         $grupos = [];
         foreach ($linhas as $i => $linha) {
@@ -1563,7 +1563,7 @@ class Boletim26ColagService
             foreach ($idxs as $idx) {
                 $filhas[] = $linhas[$idx];
             }
-            $linhas[$i] = $this->juntarFilhas($linha, $filhas, $terceira, $semanasContam);
+            $linhas[$i] = $this->juntarFilhas($linha, $filhas, $terceira, $semanasContam, $bimestre);
         }
 
         return $linhas;
@@ -1574,7 +1574,7 @@ class Boletim26ColagService
      * @param list<array<string,mixed>> $filhas
      * @return array<string,mixed>
      */
-    private function juntarFilhas(array $pai, array $filhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
+    private function juntarFilhas(array $pai, array $filhas, bool $terceira, array $semanasContam, int $bimestre): array
     {
         $provaFilhas = [];
         foreach ($filhas as $filha) {
@@ -1619,6 +1619,10 @@ class Boletim26ColagService
             $pai['resultado'] = $fechamento['resultado'];
 
             return $this->aplicarSoProvaSeEducacaoFisica($pai, true);
+        }
+        if ($bimestre === 3 && $this->ehPortugues((string) $pai['nome'])) {
+            // Literatura participa das demais avaliações, mas não das semanais deste bimestre.
+            $filhas = array_filter($filhas, fn (array $filha): bool => $this->chave($filha['nome']) !== 'literatura');
         }
         $totalN = 0;
         $totalQ = 0;
