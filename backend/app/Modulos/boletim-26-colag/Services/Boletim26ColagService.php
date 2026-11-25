@@ -1624,9 +1624,8 @@ class Boletim26ColagService
     }
 
     /**
-     * Na mesma matéria, soma a nota que cada professor da turma lançou.
-     * No lançamento da coordenação, a tela repete a nota gravada em quem ainda não tem a própria.
-     * Fora isso, professor sem nota não entra. Itinerário e nota de outra turma ficam de fora.
+     * Soma a nota gravada de cada professor da matéria na turma do aluno.
+     * Professor sem nota, de outra turma ou de itinerário não entra.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
@@ -1639,7 +1638,6 @@ class Boletim26ColagService
         }
         $porBloco = [];
         $blocos = [];
-        $copiaNota = [];
         foreach ($notas as $nota) {
             if ($this->pecaDaProva($nota) !== 'prova_bim') {
                 continue;
@@ -1648,16 +1646,13 @@ class Boletim26ColagService
             $mid = (int) $nota['materia_id'];
             $pid = (int) $nota['professor_id'];
             $tid = (int) ($nota['turma_id'] ?? 0);
-            if ($bid <= 0 || $mid <= 0 || !is_numeric($nota['nota'] ?? null)) {
+            if ($bid <= 0 || $mid <= 0 || $pid <= 0 || !is_numeric($nota['nota'] ?? null)) {
                 continue;
             }
             if ($turmaId > 0 && $tid > 0 && $tid !== $turmaId) {
                 continue;
             }
             $blocos[$bid] = $bid;
-            if ((string) ($nota['configuracao_nota'] ?? '') === 'coordenacao_calcula') {
-                $copiaNota[$bid] = true;
-            }
             $valor = (float) $nota['nota'];
             $atual = $porBloco[$bid][$mid][$pid] ?? null;
             if ($atual === null || $valor > $atual) {
@@ -1674,33 +1669,15 @@ class Boletim26ColagService
         $notaPorProfessor = [];
         foreach ($porBloco as $bid => $materias) {
             foreach ($materias as $mid => $porProfessor) {
-                $gravadas = [];
+                $vinculo = $ligados[$bid][$mid] ?? [];
                 foreach ($porProfessor as $pid => $valor) {
-                    if ((int) $pid > 0) {
-                        $gravadas[] = (float) $valor;
-                    }
-                }
-                if ($gravadas === []) {
-                    continue;
-                }
-                $referencia = max($gravadas);
-                $professores = array_values($ligados[$bid][$mid] ?? []);
-                if ($professores === []) {
-                    $professores = array_map('intval', array_keys($porProfessor));
-                }
-                $repeteNota = !empty($copiaNota[$bid]);
-                foreach ($professores as $pid) {
                     $pid = (int) $pid;
-                    if ($pid <= 0) {
+                    if ($pid <= 0 || ($vinculo !== [] && !isset($vinculo[$pid]))) {
                         continue;
                     }
-                    if (!isset($porProfessor[$pid]) && !$repeteNota) {
-                        continue;
-                    }
-                    $valor = isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $referencia;
                     $anterior = $notaPorProfessor[$mid][$pid] ?? null;
-                    if ($anterior === null || $valor > $anterior) {
-                        $notaPorProfessor[$mid][$pid] = $valor;
+                    if ($anterior === null || (float) $valor > $anterior) {
+                        $notaPorProfessor[$mid][$pid] = (float) $valor;
                     }
                 }
             }
