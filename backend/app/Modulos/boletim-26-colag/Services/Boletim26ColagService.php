@@ -629,6 +629,9 @@ class Boletim26ColagService
         foreach ($provas as $prova) {
             $blocoId = (int) ($prova['id'] ?? 0);
             $peca = $this->pecaDaProva($prova);
+            if ($terceira && $peca === 'semanal' && $this->ehLancamentoDeNota($prova)) {
+                $peca = 'prova_bim';
+            }
             if ($peca === '') {
                 continue;
             }
@@ -939,12 +942,32 @@ class Boletim26ColagService
         if (str_contains($blob, 'bimest') || str_contains($blob, 'prova bim')) {
             return 'prova_bim';
         }
-        $semana = (int) ($prova['semana'] ?? 0);
-        if ($semana >= 1 && $semana <= 6) {
+        if ($this->ehLancamentoDeNota($prova) && !$this->semanaPreenchida($prova)) {
+            return 'prova_bim';
+        }
+        if ($this->semanaPreenchida($prova)) {
             return 'semanal';
         }
 
         return '';
+    }
+
+    /**
+     * @param array<string,mixed> $prova
+     */
+    private function ehLancamentoDeNota(array $prova): bool
+    {
+        return strtolower(trim((string) ($prova['formato_evento'] ?? ''))) === 'lancamento_nota';
+    }
+
+    /**
+     * @param array<string,mixed> $prova
+     */
+    private function semanaPreenchida(array $prova): bool
+    {
+        $semana = (int) ($prova['semana'] ?? 0);
+
+        return $semana >= 1 && $semana <= 6;
     }
 
     /**

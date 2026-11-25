@@ -131,13 +131,14 @@ class Boletim26ColagLeitura
         $selectSemana = $this->colunaExiste('provas_blocos', 'semana') ? 'pb.semana' : 'NULL AS semana';
         $selectAno = $this->colunaExiste('provas_blocos', 'ano_letivo') ? 'pb.ano_letivo' : 'NULL AS ano_letivo';
         $selectBim = $this->colunaExiste('provas_blocos', 'bimestre') ? 'pb.bimestre' : 'NULL AS bimestre';
+        $selectFormato = $this->colunaExiste('provas_blocos', 'formato_evento') ? 'pb.formato_evento' : 'NULL AS formato_evento';
         $joinTipo = '';
         $selectTipo = 'NULL AS tipo_nome';
         if ($this->tabelaExiste('provas_tipos_avaliacao') && $this->colunaExiste('provas_blocos', 'tipo_avaliacao_id')) {
             $joinTipo = 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = pb.tipo_avaliacao_id AND pta.deleted_at IS NULL';
             $selectTipo = 'pta.nome AS tipo_nome';
         }
-        $sql = "SELECT pb.id, pb.titulo, pb.data_prova, {$selectSemana}, {$selectAno}, {$selectBim}, {$selectTipo}
+        $sql = "SELECT pb.id, pb.titulo, pb.data_prova, {$selectSemana}, {$selectAno}, {$selectBim}, {$selectFormato}, {$selectTipo}
                   FROM provas_blocos pb
                   {$joinTipo}
                  WHERE pb.deleted_at IS NULL
@@ -153,7 +154,7 @@ class Boletim26ColagLeitura
         }
         $sql = str_replace($selectBim . ' = :bim', 'pb.bimestre = :bim', $sql);
         if (!$this->colunaExiste('provas_blocos', 'ano_letivo')) {
-            $sql = "SELECT pb.id, pb.titulo, pb.data_prova, {$selectSemana}, NULL AS ano_letivo, pb.bimestre, {$selectTipo}
+            $sql = "SELECT pb.id, pb.titulo, pb.data_prova, {$selectSemana}, NULL AS ano_letivo, pb.bimestre, {$selectFormato}, {$selectTipo}
                       FROM provas_blocos pb
                       {$joinTipo}
                      WHERE pb.deleted_at IS NULL
@@ -217,9 +218,10 @@ class Boletim26ColagLeitura
         $ph = implode(',', array_fill(0, count($blocoIds), '?'));
         try {
             $rows = $this->db->fetchAll(
-                "SELECT bloco_id, materia_id, nota
+                "SELECT bloco_id, materia_id, SUM(nota) AS nota
                    FROM provas_blocos_notas_lancadas
-                  WHERE aluno_id = ? AND nota IS NOT NULL AND bloco_id IN ($ph)",
+                  WHERE aluno_id = ? AND nota IS NOT NULL AND bloco_id IN ($ph)
+                  GROUP BY bloco_id, materia_id",
                 array_merge([$alunoId], $blocoIds)
             ) ?: [];
         } catch (\Throwable $e) {
