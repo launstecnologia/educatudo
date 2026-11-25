@@ -90,7 +90,12 @@ class Boletim26ColagService
         foreach ($linhasBase as $linhaBase) {
             $blocoDaMateria[(int) $linhaBase['materia_id']] = (string) ($linhaBase['bloco'] ?? 'a');
         }
-        $provas = $this->leitura->provasDoBimestre((int) $turma['id'], $bimestre, $ano);
+        $provas = $this->juntarRecuperacaoDoSemestre(
+            $this->leitura->provasDoBimestre((int) $turma['id'], $bimestre, $ano),
+            (int) $turma['id'],
+            $bimestre,
+            $ano
+        );
         $blocoIds = [];
         foreach ($provas as $prova) {
             $id = (int) ($prova['id'] ?? 0);
@@ -355,6 +360,35 @@ class Boletim26ColagService
         }
 
         return $out;
+    }
+
+    /**
+     * A recuperação semestral do 1º semestre entra no 1º e no 2º bimestre.
+     * A do 2º semestre entra no 3º e no 4º.
+     *
+     * @param list<array<string,mixed>> $provas
+     * @return list<array<string,mixed>>
+     */
+    private function juntarRecuperacaoDoSemestre(array $provas, int $turmaId, int $bimestre, int $ano): array
+    {
+        $par = [1 => 2, 2 => 1, 3 => 4, 4 => 3][$bimestre] ?? 0;
+        if ($par < 1) {
+            return $provas;
+        }
+        $vistos = [];
+        foreach ($provas as $prova) {
+            $vistos[(int) ($prova['id'] ?? 0)] = true;
+        }
+        foreach ($this->leitura->provasDoBimestre($turmaId, $par, $ano) as $prova) {
+            $id = (int) ($prova['id'] ?? 0);
+            if ($id <= 0 || isset($vistos[$id]) || $this->pecaDaProva($prova) !== 'rec') {
+                continue;
+            }
+            $provas[] = $prova;
+            $vistos[$id] = true;
+        }
+
+        return $provas;
     }
 
     /**
