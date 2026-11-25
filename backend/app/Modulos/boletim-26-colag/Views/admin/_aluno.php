@@ -96,14 +96,12 @@ if (!$demoTemAbaixo) {
                     <th class="<?= $cabeca ?>" colspan="2">Total</th>
                     <th class="<?= $cabeca ?>" rowspan="2" title="Média semanal">Méd. Sem</th>
                     <?php endif; ?>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Prova bimestral">P. Bim</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Jornada do aluno">Jor. Aluno</th>
-                    <?php if (!$terceira): ?>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Média</th>
-                    <?php endif; ?>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="<?= $terceira ? 'Avaliação bimestral' : 'Prova bimestral' ?>"><?= $terceira ? 'Aval. Bim' : 'P. Bim' ?></th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Jornada do aluno"><?= $terceira ? 'Jornada' : 'Jor. Aluno' ?></th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="<?= $terceira ? 'Média da avaliação bimestral com a jornada' : 'Média' ?>">Média</th>
                     <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Enac</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Média bimestral">Méd. Bim</th>
-                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Recuperação semestral">Rec. Sem</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="<?= $terceira ? 'Média final com o ENAC' : 'Média bimestral' ?>"><?= $terceira ? 'Méd. Final' : 'Méd. Bim' ?></th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Recuperação semestral"><?= $terceira ? 'Rec' : 'Rec. Sem' ?></th>
                     <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Resultado final">Res. Final</th>
                     <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Faltas">Fal</th>
                 </tr>
@@ -138,9 +136,7 @@ if (!$demoTemAbaixo) {
                     <?php endif; ?>
                     <?= $celNota($linha['prova_bim'] ?? null, 'prova_bim') ?>
                     <?= $celNota($linha['jornada'] ?? null, 'jornada') ?>
-                    <?php if (!$terceira): ?>
                     <?= $celNota($linha['media'] ?? null, 'media') ?>
-                    <?php endif; ?>
                     <?= $celNota($linha['enac'] ?? null, 'enac') ?>
                     <?= $celNota($linha['media_bim'] ?? null, 'media_bim') ?>
                     <?= $celNota($linha['rec'] ?? null, 'rec') ?>

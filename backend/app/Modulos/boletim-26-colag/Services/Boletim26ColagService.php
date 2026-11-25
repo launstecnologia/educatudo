@@ -1368,15 +1368,7 @@ class Boletim26ColagService
             return $this->linhaSoProvaBim($linha, $semanas, $totalN, $totalQ, $mediaSem, $prova, $rec, $falta, $terceira);
         }
         if ($terceira) {
-            $mediaBim = $this->mediaPresentes([$prova, $notaJornada]);
-            $resultado = $mediaBim;
-            if ($mediaBim !== null && $enac !== null) {
-                $comEnac = $this->meio(($mediaBim + $enac) / 2);
-                $resultado = $comEnac > $mediaBim ? $comEnac : $mediaBim;
-            }
-            if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-                $resultado = $rec;
-            }
+            $fechamento = $this->fecharMediaTerceira($prova, $notaJornada, $enac, $rec);
 
             return $linha + [
                 'semanas' => [],
@@ -1385,11 +1377,11 @@ class Boletim26ColagService
                 'media_sem' => null,
                 'prova_bim' => $prova,
                 'jornada' => $notaJornada,
-                'media' => null,
+                'media' => $fechamento['media'],
                 'enac' => $enac,
-                'media_bim' => $mediaBim,
+                'media_bim' => $fechamento['media_bim'],
                 'rec' => $rec,
-                'resultado' => $resultado,
+                'resultado' => $fechamento['resultado'],
                 'faltas' => $falta,
             ];
         }
@@ -1493,16 +1485,15 @@ class Boletim26ColagService
             $pai['faltas'] = $faltas;
         }
         if ($terceira) {
-            $pai['media_bim'] = $this->mediaPresentes([$pai['prova_bim'], $pai['jornada']]);
-            $pai['resultado'] = $pai['media_bim'];
-            if (is_numeric($pai['media_bim']) && is_numeric($pai['enac'])) {
-                $comEnac = $this->meio(((float) $pai['media_bim'] + (float) $pai['enac']) / 2);
-                $pai['resultado'] = $comEnac > (float) $pai['media_bim'] ? $comEnac : $pai['media_bim'];
-            }
-
-            if (is_numeric($pai['rec']) && ($pai['resultado'] === null || (float) $pai['rec'] > (float) $pai['resultado'])) {
-                $pai['resultado'] = $pai['rec'];
-            }
+            $fechamento = $this->fecharMediaTerceira(
+                is_numeric($pai['prova_bim'] ?? null) ? (float) $pai['prova_bim'] : null,
+                is_numeric($pai['jornada'] ?? null) ? (float) $pai['jornada'] : null,
+                is_numeric($pai['enac'] ?? null) ? (float) $pai['enac'] : null,
+                is_numeric($pai['rec'] ?? null) ? (float) $pai['rec'] : null
+            );
+            $pai['media'] = $fechamento['media'];
+            $pai['media_bim'] = $fechamento['media_bim'];
+            $pai['resultado'] = $fechamento['resultado'];
 
             return $this->aplicarSoProvaSeEducacaoFisica($pai, true);
         }
@@ -1549,8 +1540,8 @@ class Boletim26ColagService
     }
 
     /**
-     * A prova bimestral soma a nota de cada professor da matéria.
-     * Se a tela de lançamento repetir a mesma nota nos dois professores, os dois entram na soma.
+     * A prova bimestral soma a nota gravada de cada professor da matéria.
+     * Professor sem nota própria não repete a nota do outro.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
@@ -1562,7 +1553,6 @@ class Boletim26ColagService
             return $linhas;
         }
         $porBloco = [];
-        $blocos = [];
         foreach ($notas as $nota) {
             $peca = $this->pecaDaProva($nota);
             if ($terceira && $peca === 'semanal' && $this->ehLancamentoDeNota($nota)) {
@@ -1574,10 +1564,9 @@ class Boletim26ColagService
             $bid = (int) $nota['bloco_id'];
             $mid = (int) $nota['materia_id'];
             $pid = (int) $nota['professor_id'];
-            if ($bid <= 0 || $mid <= 0) {
+            if ($bid <= 0 || $mid <= 0 || $pid <= 0) {
                 continue;
             }
-            $blocos[$bid] = $bid;
             if (!isset($porBloco[$bid][$mid][$pid])) {
                 $porBloco[$bid][$mid][$pid] = 0.0;
             }
@@ -1586,24 +1575,10 @@ class Boletim26ColagService
         if ($porBloco === []) {
             return $linhas;
         }
-        $ligados = [];
-        foreach ($this->leitura->professoresDasMaterias(array_values($blocos)) as $prof) {
-            $ligados[$prof['bloco_id']][$prof['materia_id']][$prof['professor_id']] = (int) $prof['professor_id'];
-        }
         $somaPorMateria = [];
-        foreach ($porBloco as $bid => $materias) {
+        foreach ($porBloco as $materias) {
             foreach ($materias as $mid => $porProfessor) {
-                $professores = array_values($ligados[$bid][$mid] ?? []);
-                if ($professores === []) {
-                    $professores = array_map('intval', array_keys($porProfessor));
-                }
-                $fallback = array_sum($porProfessor) / count($porProfessor);
-                $soma = 0.0;
-                foreach ($professores as $pid) {
-                    $pid = (int) $pid;
-                    $soma += isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $fallback;
-                }
-                $somaPorMateria[$mid] = ($somaPorMateria[$mid] ?? 0.0) + $soma;
+                $somaPorMateria[$mid] = ($somaPorMateria[$mid] ?? 0.0) + array_sum($porProfessor);
             }
         }
         $nomes = [];
@@ -1655,7 +1630,7 @@ class Boletim26ColagService
             }
             $linha['jornada'] = null;
             $linha['enac'] = null;
-            $linha['media'] = $terceira ? null : $prova;
+            $linha['media'] = $prova;
             $linha['media_bim'] = $prova;
             $linha['resultado'] = $resultado;
 
@@ -1665,17 +1640,10 @@ class Boletim26ColagService
         $enac = is_numeric($linha['enac'] ?? null) ? (float) $linha['enac'] : null;
         $rec = is_numeric($linha['rec'] ?? null) ? (float) $linha['rec'] : null;
         if ($terceira) {
-            $mediaBim = $this->mediaPresentes([$prova, $jornada]);
-            $resultado = $mediaBim;
-            if ($mediaBim !== null && $enac !== null) {
-                $comEnac = $this->meio(($mediaBim + $enac) / 2);
-                $resultado = $comEnac > $mediaBim ? $comEnac : $mediaBim;
-            }
-            if ($rec !== null && ($resultado === null || $rec > $resultado)) {
-                $resultado = $rec;
-            }
-            $linha['media_bim'] = $mediaBim;
-            $linha['resultado'] = $resultado;
+            $fechamento = $this->fecharMediaTerceira($prova, $jornada, $enac, $rec);
+            $linha['media'] = $fechamento['media'];
+            $linha['media_bim'] = $fechamento['media_bim'];
+            $linha['resultado'] = $fechamento['resultado'];
 
             return $linha;
         }
@@ -1712,7 +1680,7 @@ class Boletim26ColagService
         }
         $pai['jornada'] = null;
         $pai['enac'] = null;
-        $pai['media'] = $terceira ? null : $prova;
+        $pai['media'] = $prova;
         $pai['media_bim'] = $prova;
         $pai['resultado'] = $resultado;
 
@@ -1738,7 +1706,7 @@ class Boletim26ColagService
             'media_sem' => $terceira ? null : $mediaSem,
             'prova_bim' => $prova,
             'jornada' => null,
-            'media' => $terceira ? null : $prova,
+            'media' => $prova,
             'enac' => null,
             'media_bim' => $prova,
             'rec' => $rec,
@@ -1864,6 +1832,29 @@ class Boletim26ColagService
         }
 
         return $semana;
+    }
+
+    /**
+     * 3ª série: média da avaliação bimestral com a jornada.
+     * A média final recebe o ENAC só quando supera essa média.
+     * A recuperação substitui o resultado final só quando é maior.
+     *
+     * @return array{media:?float,media_bim:?float,resultado:?float}
+     */
+    private function fecharMediaTerceira(?float $prova, ?float $jornada, ?float $enac, ?float $rec): array
+    {
+        $media = $this->mediaPresentes([$prova, $jornada]);
+        $mediaFinal = $this->mediaBimComEnac($media, $enac);
+        $resultado = $mediaFinal;
+        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+            $resultado = $rec;
+        }
+
+        return [
+            'media' => $media,
+            'media_bim' => $mediaFinal,
+            'resultado' => $resultado,
+        ];
     }
 
     /**
