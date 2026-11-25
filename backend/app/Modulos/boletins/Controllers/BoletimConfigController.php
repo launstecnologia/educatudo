@@ -95,6 +95,8 @@ class BoletimConfigController extends BaseController
     /** @var array<int, array{a: list<int>, b: list<int>}> */
     private array $semanasQuadroCache = [];
     private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 200;
+    /** Provas e matrizes de um lote. A escola inteira de uma vez estoura o teto do worker CLI. */
+    private const TAMANHO_LOTE_CACHE_GERACAO = 40;
     private const INTERVALO_HEARTBEAT_SEGUNDOS = 2.0;
 
     public function __construct(bool $somenteGeracao = false)
@@ -3628,6 +3630,8 @@ class BoletimConfigController extends BaseController
         if (function_exists('set_time_limit')) {
             @set_time_limit(0);
         }
+        // O cron não carrega o bootstrap, que sobe o teto na web. O php.ini do worker fica em 256M.
+        $this->ampliarMemoriaDaGeracao();
         $this->jobIdHeartbeat = (int) ($payload['_job_id'] ?? 0);
         $this->registrarFalhaFatalDaGeracao();
         $this->renovarHeartbeatGeracao();
@@ -4154,29 +4158,160 @@ class BoletimConfigController extends BaseController
         }
         $usuarioVidaRaw = $this->usuarioGeracaoJob ?? $this->auth->getUser();
         $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
-        $this->prepararCacheGeracaoBoletim($regra, $alunos, $periodoRef, $dataInicio, $dataFim);
         $itensPersistir = [];
         $alunoIdsOk = [];
         $alunoIdsSync = [];
-        $totalAlunos = 0;
+        $alunosValidos = [];
         foreach ($alunos as $alunoContagem) {
             if ((int) ($alunoContagem['id'] ?? 0) > 0) {
-                $totalAlunos++;
+                $alunosValidos[] = $alunoContagem;
             }
         }
+        $totalAlunos = count($alunosValidos);
         $avaliados = 0;
         $this->gravarProgressoGeracao(0, $totalAlunos);
-        foreach ($alunos as $aluno) {
+        $loteCache = [];
+        foreach ($alunosValidos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
-            if ($alunoId <= 0) {
-                continue;
-            }
             $avaliados++;
             if ($avaliados === 1 || $avaliados % 8 === 0 || $avaliados === $totalAlunos) {
                 $this->gravarProgressoGeracao($avaliados, $totalAlunos);
             }
             if (isset($idsTravados[$alunoId])) {
                 $preservados++;
+                continue;
+            }
+            $loteCache[] = $aluno;
+            if (count($loteCache) >= self::TAMANHO_LOTE_CACHE_GERACAO) {
+                $this->calcularLoteGeracaoBoletim(
+                    $loteCache,
+                    $regra,
+                    $regraId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    $preview,
+                    $geracaoId,
+                    $logContexto,
+                    $avaliados,
+                    $totalAlunos,
+                    $itensPersistir,
+                    $alunoIdsOk,
+                    $gerados,
+                    $linhas,
+                    $erros,
+                    $errosAmostra,
+                    $alunoIdsSync
+                );
+                $loteCache = [];
+            }
+        }
+        if ($loteCache !== []) {
+            $this->calcularLoteGeracaoBoletim(
+                $loteCache,
+                $regra,
+                $regraId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                $preview,
+                $geracaoId,
+                $logContexto,
+                $avaliados,
+                $totalAlunos,
+                $itensPersistir,
+                $alunoIdsOk,
+                $gerados,
+                $linhas,
+                $erros,
+                $errosAmostra,
+                $alunoIdsSync
+            );
+        }
+
+        if (!$preview && $alunoIdsSync !== []) {
+            $this->liberarCachePesadoGeracaoBoletim();
+            $this->gravarProgressoGeracao($totalAlunos, $totalAlunos, 'fichas');
+            foreach (array_chunk($alunoIdsSync, self::TAMANHO_LOTE_CACHE_GERACAO) as $loteSync) {
+                $this->ultimoHeartbeatEm = 0.0;
+                $this->renovarHeartbeatGeracao();
+                $this->sincronizarFichasVidaEscolarLote($loteSync, $usuarioVida, $periodoRef, $regraId);
+            }
+        }
+
+        return [
+            'gerados' => $gerados,
+            'linhas' => $linhas,
+            'erros' => $erros,
+            'errosAmostra' => $errosAmostra,
+            'preservados' => $preservados,
+        ];
+    }
+
+    /**
+     * O cron da fila não passa pelo bootstrap, que sobe o teto na web. Sem isto o worker morre em 256 MB.
+     */
+    private function ampliarMemoriaDaGeracao(): void
+    {
+        $limite = ini_get('memory_limit');
+        if (!is_string($limite) || $limite === '-1') {
+            return;
+        }
+        $bytes = self::iniParaBytes($limite);
+        if ($bytes <= 0 || $bytes >= 1024 * 1024 * 1024) {
+            return;
+        }
+        @ini_set('memory_limit', '1024M');
+    }
+
+    private static function iniParaBytes(string $valor): int
+    {
+        $valor = trim($valor);
+        if ($valor === '') {
+            return 0;
+        }
+        $sufixo = strtolower(substr($valor, -1));
+        $numero = (float) $valor;
+
+        return match ($sufixo) {
+            'g' => (int) ($numero * 1024 * 1024 * 1024),
+            'm' => (int) ($numero * 1024 * 1024),
+            'k' => (int) ($numero * 1024),
+            default => (int) $numero,
+        };
+    }
+
+    /**
+     * @param list<array{id:int,nome?:string}> $lote
+     * @param list<array{aluno_id:int,colunas:list<array<string,mixed>>,linhas:list<array<string,mixed>>}> $itensPersistir
+     * @param list<int> $alunoIdsOk
+     * @param list<string> $errosAmostra
+     * @param list<int> $alunoIdsSync
+     */
+    private function calcularLoteGeracaoBoletim(
+        array $lote,
+        array $regra,
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        bool $preview,
+        ?int $geracaoId,
+        string $logContexto,
+        int $avaliados,
+        int $totalAlunos,
+        array &$itensPersistir,
+        array &$alunoIdsOk,
+        int &$gerados,
+        int &$linhas,
+        int &$erros,
+        array &$errosAmostra,
+        array &$alunoIdsSync
+    ): void {
+        $this->prepararCacheGeracaoBoletim($regra, $lote, $periodoRef, $dataInicio, $dataFim);
+        foreach ($lote as $aluno) {
+            $alunoId = (int) ($aluno['id'] ?? 0);
+            if ($alunoId <= 0) {
                 continue;
             }
             $this->renovarHeartbeatGeracao();
@@ -4192,6 +4327,7 @@ class BoletimConfigController extends BaseController
                 $alunoIdsOk[] = $alunoId;
                 $gerados++;
                 $linhas += count($rows);
+                unset($matriz, $colunas, $rows);
             } catch (\App\Services\FilaJobCanceladaException $e) {
                 throw $e;
             } catch (\Throwable $e) {
@@ -4202,11 +4338,10 @@ class BoletimConfigController extends BaseController
                 }
                 error_log('Boletim ' . $logContexto . ' aluno #' . $alunoId . ': ' . $e->getMessage());
             }
-            // A simulação de um aluno chama a dos períodos e guardava tudo até o fim. Isso estourava 256 MB no boletim oficial.
+            // A simulação de um aluno chama a dos períodos e guardava tudo até o fim.
             $this->simulacaoAlunoCache = [];
             if (count($itensPersistir) >= self::TAMANHO_LOTE_ALUNOS_PERSISTIR) {
-                $this->gravarProgressoGeracao($avaliados, $totalAlunos, 'gravando');
-                $this->persistirLoteSimulacao(
+                $this->persistirEZerarLoteSimulacao(
                     $regraId,
                     $periodoRef,
                     $dataInicio,
@@ -4216,20 +4351,19 @@ class BoletimConfigController extends BaseController
                     $preview,
                     $geracaoId,
                     $logContexto,
+                    $avaliados,
+                    $totalAlunos,
                     $gerados,
                     $linhas,
                     $erros,
                     $errosAmostra,
                     $alunoIdsSync
                 );
-                $itensPersistir = [];
-                $alunoIdsOk = [];
             }
         }
-
+        $this->liberarCachePesadoGeracaoBoletim();
         if ($itensPersistir !== []) {
-            $this->gravarProgressoGeracao($avaliados, $totalAlunos, 'gravando');
-            $this->persistirLoteSimulacao(
+            $this->persistirEZerarLoteSimulacao(
                 $regraId,
                 $periodoRef,
                 $dataInicio,
@@ -4239,6 +4373,8 @@ class BoletimConfigController extends BaseController
                 $preview,
                 $geracaoId,
                 $logContexto,
+                $avaliados,
+                $totalAlunos,
                 $gerados,
                 $linhas,
                 $erros,
@@ -4246,21 +4382,70 @@ class BoletimConfigController extends BaseController
                 $alunoIdsSync
             );
         }
+    }
 
-        if (!$preview && $alunoIdsSync !== []) {
-            $this->gravarProgressoGeracao($totalAlunos, $totalAlunos, 'fichas');
-            $this->ultimoHeartbeatEm = 0.0;
-            $this->renovarHeartbeatGeracao();
-            $this->sincronizarFichasVidaEscolarLote($alunoIdsSync, $usuarioVida, $periodoRef, $regraId);
+    /**
+     * @param list<array{aluno_id:int,colunas:list<array<string,mixed>>,linhas:list<array<string,mixed>>}> $itensPersistir
+     * @param list<int> $alunoIdsOk
+     * @param list<string> $errosAmostra
+     * @param list<int> $alunoIdsSync
+     */
+    private function persistirEZerarLoteSimulacao(
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array &$itensPersistir,
+        array &$alunoIdsOk,
+        bool $preview,
+        ?int $geracaoId,
+        string $logContexto,
+        int $avaliados,
+        int $totalAlunos,
+        int &$gerados,
+        int &$linhas,
+        int &$erros,
+        array &$errosAmostra,
+        array &$alunoIdsSync
+    ): void {
+        $this->gravarProgressoGeracao($avaliados, $totalAlunos, 'gravando');
+        $this->persistirLoteSimulacao(
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            $itensPersistir,
+            $alunoIdsOk,
+            $preview,
+            $geracaoId,
+            $logContexto,
+            $gerados,
+            $linhas,
+            $erros,
+            $errosAmostra,
+            $alunoIdsSync
+        );
+        $itensPersistir = [];
+        $alunoIdsOk = [];
+    }
+
+    private function liberarCachePesadoGeracaoBoletim(): void
+    {
+        $this->provasGeracaoCache = [];
+        $this->notasManuaisGeracaoCache = [];
+        $this->faltasEventoCache = [];
+        $this->eventosFaltasCache = [];
+        $this->totaisFaltasEventoCache = [];
+        $this->simulacaoAlunoCache = [];
+        $this->blocosFiltradosPorTurmaCache = [];
+        $this->turmasDoAlunoGeracaoCache = [];
+        $this->blocosDaTurmaDoAlunoCache = [];
+        $this->alunosPorIdCache = [];
+        $this->prefetchGeracaoPronto = false;
+        $this->notasManuaisGeracaoAtivo = false;
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
         }
-
-        return [
-            'gerados' => $gerados,
-            'linhas' => $linhas,
-            'erros' => $erros,
-            'errosAmostra' => $errosAmostra,
-            'preservados' => $preservados,
-        ];
     }
 
     /**
