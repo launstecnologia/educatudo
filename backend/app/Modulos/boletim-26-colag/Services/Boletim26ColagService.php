@@ -10,6 +10,7 @@ use App\Modulos\Boletins\Models\JourneyBoletimLancamento;
 use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
 use App\Modulos\Presenca\Services\FrequencyService;
 use App\Modulos\Provas\Models\ExamBlock;
+use App\Modulos\VidaEscolar\Models\SchoolAbsence;
 
 /**
  * Demonstrativo fixo do Colag. A conta já vem pronta: a escola não monta fórmula.
@@ -19,6 +20,15 @@ use App\Modulos\Provas\Models\ExamBlock;
 class Boletim26ColagService
 {
     private Boletim26ColagLeitura $leitura;
+
+    /** @var array<int, list<array<string,mixed>>> */
+    private array $linhasSerieCache = [];
+
+    /** @var list<array<string,mixed>>|null */
+    private ?array $listaEventosFaltas = null;
+
+    /** @var array<int, array<string, array{faltas:float,observacao:string}>> */
+    private array $mapaLancamentosFaltas = [];
 
     public function __construct()
     {
@@ -37,18 +47,29 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+        $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
+        $bimestreFiltro = ($bimestreFiltro >= 1 && $bimestreFiltro <= 4) ? $bimestreFiltro : 0;
         $turmas = $this->turmasMedio();
-        $alunos = $turmaId > 0 ? $this->alunosDaTurma($turmaId) : [];
+        $turmasSerie = $serieFiltro > 0
+            ? array_values(array_filter(
+                $turmas,
+                static fn (array $item): bool => (int) ($item['ano_serie'] ?? 0) === $serieFiltro
+            ))
+            : $turmas;
         $turma = null;
-        foreach ($turmas as $item) {
+        foreach ($turmasSerie as $item) {
             if ((int) $item['id'] === $turmaId) {
                 $turma = $item;
                 break;
             }
         }
+        if ($turma === null) {
+            $turmaId = 0;
+        }
+        $alunos = $this->alunosDoEscopo($turma !== null ? [$turma] : ($serieFiltro > 0 ? $turmasSerie : []));
         $aluno = null;
         foreach ($alunos as $item) {
             if ((int) $item['id'] === $alunoId) {
@@ -56,25 +77,84 @@ class Boletim26ColagService
                 break;
             }
         }
-        $demonstrativos = [];
-        if ($turma !== null && $aluno !== null) {
-            for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
-                $demonstrativos[] = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
+        $bimestres = $bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4];
+        $relatorios = [];
+        if ($turma !== null || $serieFiltro > 0) {
+            foreach ($aluno !== null ? [$aluno] : $alunos as $pessoa) {
+                $turmaPessoa = $turma ?? $this->turmaPorId($turmasSerie, (int) ($pessoa['turma_id'] ?? 0));
+                if ($turmaPessoa === null) {
+                    continue;
+                }
+                $demonstrativos = [];
+                foreach ($bimestres as $bimestre) {
+                    $demonstrativos[] = $this->montarBimestre($turmaPessoa, (int) $pessoa['id'], $bimestre, $ano);
+                }
+                $relatorios[] = [
+                    'aluno' => $pessoa,
+                    'turma' => $turmaPessoa,
+                    'demonstrativos' => $demonstrativos,
+                ];
             }
         } else {
-            $demonstrativos = $this->montarModelo();
+            $relatorios[] = [
+                'aluno' => null,
+                'turma' => null,
+                'demonstrativos' => $this->montarModelo(),
+            ];
         }
 
         return [
             'ano' => $ano,
+            'serie' => $serieFiltro,
+            'bimestre' => $bimestreFiltro,
+            'nota_minima' => $notaMinima,
             'turma_id' => $turmaId,
-            'aluno_id' => $alunoId,
-            'turmas' => $turmas,
+            'aluno_id' => $aluno !== null ? (int) $aluno['id'] : 0,
+            'turmas' => $turmasSerie,
             'alunos' => $alunos,
-            'turma' => $turma,
-            'aluno' => $aluno,
-            'demonstrativos' => $demonstrativos,
+            'relatorios' => $relatorios,
         ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $turmas
+     * @return list<array{id:int,nome:string,ra:string,turma_id:int,turma_nome:string}>
+     */
+    private function alunosDoEscopo(array $turmas): array
+    {
+        $alunos = [];
+        $vistos = [];
+        foreach ($turmas as $turma) {
+            $turmaId = (int) ($turma['id'] ?? 0);
+            foreach ($this->alunosDaTurma($turmaId) as $aluno) {
+                $id = (int) $aluno['id'];
+                if (isset($vistos[$id])) {
+                    continue;
+                }
+                $vistos[$id] = true;
+                $aluno['turma_id'] = $turmaId;
+                $aluno['turma_nome'] = (string) ($turma['nome'] ?? '');
+                $alunos[] = $aluno;
+            }
+        }
+        usort($alunos, static fn (array $a, array $b): int => strcasecmp((string) $a['nome'], (string) $b['nome']));
+
+        return $alunos;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $turmas
+     * @return array<string,mixed>|null
+     */
+    private function turmaPorId(array $turmas, int $turmaId): ?array
+    {
+        foreach ($turmas as $turma) {
+            if ((int) ($turma['id'] ?? 0) === $turmaId) {
+                return $turma;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -144,6 +224,10 @@ class Boletim26ColagService
             ));
         }
         $linhas = $this->fecharGrupos($linhas, $terceira, $semanasBimestre);
+        $linhas = array_values(array_filter(
+            $linhas,
+            fn (array $linha): bool => !$this->ehRedacao((string) ($linha['nome'] ?? ''))
+        ));
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
         return [
@@ -215,6 +299,9 @@ class Boletim26ColagService
      */
     private function linhasDaSerie(int $serie): array
     {
+        if (isset($this->linhasSerieCache[$serie])) {
+            return $this->linhasSerieCache[$serie];
+        }
         $catalogo = $this->catalogoMaterias();
         $mapas = $this->mapasQuadro();
         $ordemA = ['lingua portuguesa', 'educacao fisica', 'arte', 'ingles', 'fisica', 'biologia', 'sociologia'];
@@ -266,7 +353,7 @@ class Boletim26ColagService
             }
         }
         if ($serie === 3) {
-            return $linhas;
+            return $this->linhasSerieCache[$serie] = $linhas;
         }
         $peso = [];
         foreach ($ordemA as $i => $nome) {
@@ -295,7 +382,7 @@ class Boletim26ColagService
             return strcasecmp((string) $a['nome'], (string) $b['nome']);
         });
 
-        return $linhas;
+        return $this->linhasSerieCache[$serie] = $linhas;
     }
 
     /**
@@ -639,6 +726,115 @@ class Boletim26ColagService
      * @return array<int, int>
      */
     private function faltasPorMateria(int $alunoId, int $turmaId, int $ano, int $bimestre): array
+    {
+        $evento = $this->faltasDoEvento($alunoId, $turmaId, $ano, $bimestre);
+        $diario = $this->faltasDoDiario($alunoId, $turmaId, $ano, $bimestre);
+        if ($evento === []) {
+            return $diario;
+        }
+        foreach ($diario as $mid => $qtd) {
+            if (!isset($evento[$mid])) {
+                $evento[$mid] = $qtd;
+            }
+        }
+
+        return $evento;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function listaEventosFaltas(): array
+    {
+        if ($this->listaEventosFaltas !== null) {
+            return $this->listaEventosFaltas;
+        }
+        try {
+            $this->listaEventosFaltas = (new SchoolAbsence())->listEventos(300);
+        } catch (\Throwable $e) {
+            $this->listaEventosFaltas = [];
+        }
+
+        return $this->listaEventosFaltas;
+    }
+
+    /**
+     * @return array<string, array{faltas:float,observacao:string}>
+     */
+    private function mapaLancamentosDoEvento(int $eventoId): array
+    {
+        if ($eventoId <= 0) {
+            return [];
+        }
+        if (!isset($this->mapaLancamentosFaltas[$eventoId])) {
+            try {
+                $this->mapaLancamentosFaltas[$eventoId] = (new SchoolAbsence())->getLancamentosMapByEvento($eventoId);
+            } catch (\Throwable $e) {
+                $this->mapaLancamentosFaltas[$eventoId] = [];
+            }
+        }
+
+        return $this->mapaLancamentosFaltas[$eventoId];
+    }
+
+    /**
+     * Lançamento de faltas do boletim, o mesmo do demonstrativo oficial.
+     *
+     * @return array<int, int>
+     */
+    private function faltasDoEvento(int $alunoId, int $turmaId, int $ano, int $bimestre): array
+    {
+        try {
+            $daTurma = 0;
+            $geral = 0;
+            foreach ($this->listaEventosFaltas() as $evento) {
+                if ((int) ($evento['ano_letivo'] ?? 0) !== $ano) {
+                    continue;
+                }
+                if (!preg_match('/([1-4])/', (string) ($evento['bimestre'] ?? ''), $marca) || (int) $marca[1] !== $bimestre) {
+                    continue;
+                }
+                $id = (int) ($evento['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $turmas = array_map('intval', (array) ($evento['turmas_ids'] ?? []));
+                if ($turmas === []) {
+                    $geral = $geral > 0 ? $geral : $id;
+                    continue;
+                }
+                if (in_array($turmaId, $turmas, true)) {
+                    $daTurma = $id;
+                    break;
+                }
+            }
+            $eventoId = $daTurma > 0 ? $daTurma : $geral;
+            if ($eventoId <= 0) {
+                return [];
+            }
+            $out = [];
+            foreach ($this->mapaLancamentosDoEvento($eventoId) as $chave => $item) {
+                $partes = explode('_', (string) $chave, 2);
+                if ((int) ($partes[0] ?? 0) !== $alunoId) {
+                    continue;
+                }
+                $mid = (int) ($partes[1] ?? 0);
+                if ($mid <= 0 || !is_numeric($item['faltas'] ?? null)) {
+                    continue;
+                }
+                $out[$mid] = (int) round((float) $item['faltas']);
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function faltasDoDiario(int $alunoId, int $turmaId, int $ano, int $bimestre): array
     {
         try {
             $intervalo = PeriodoLetivo::intervalo($ano, $bimestre);
@@ -1217,6 +1413,11 @@ class Boletim26ColagService
         $chave = $this->chave($nome);
 
         return str_contains($chave, 'lingua portuguesa') || $chave === 'portugues';
+    }
+
+    private function ehRedacao(string $nome): bool
+    {
+        return str_contains($this->chave($nome), 'redacao');
     }
 
     private function ehLiteratura(string $nome): bool

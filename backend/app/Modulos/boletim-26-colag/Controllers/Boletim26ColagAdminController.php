@@ -43,7 +43,11 @@ class Boletim26ColagAdminController extends BaseController
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
         $alunoId = (int) ($_GET['aluno_id'] ?? 0);
         $ano = (int) ($_GET['ano'] ?? 0);
-        $painel = $this->servico->montarPainel($turmaId, $alunoId, $ano);
+        $serie = (int) ($_GET['serie'] ?? 0);
+        $bimestre = (int) ($_GET['bimestre'] ?? 0);
+        $notaBruta = trim(str_replace(',', '.', (string) ($_GET['nota_minima'] ?? '')));
+        $notaMinima = ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null;
+        $painel = $this->servico->montarPainel($turmaId, $alunoId, $ano, $serie, $bimestre, $notaMinima);
 
         $this->viewWithLayout('admin', 'admin/boletim-26-colag/index', [
             'title' => 'Boletim - colag',

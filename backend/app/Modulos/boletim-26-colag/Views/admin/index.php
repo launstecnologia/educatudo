@@ -2,12 +2,14 @@
 $painel = is_array($painel ?? null) ? $painel : [];
 $turmas = is_array($painel['turmas'] ?? null) ? $painel['turmas'] : [];
 $alunos = is_array($painel['alunos'] ?? null) ? $painel['alunos'] : [];
-$demonstrativos = is_array($painel['demonstrativos'] ?? null) ? $painel['demonstrativos'] : [];
+$relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
 $ano = (int) ($painel['ano'] ?? date('Y'));
+$serieFiltro = (int) ($painel['serie'] ?? 0);
+$bimestreFiltro = (int) ($painel['bimestre'] ?? 0);
+$notaMinima = is_numeric($painel['nota_minima'] ?? null) ? (float) $painel['nota_minima'] : null;
+$notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ',', '');
 $turmaId = (int) ($painel['turma_id'] ?? 0);
 $alunoId = (int) ($painel['aluno_id'] ?? 0);
-$aluno = is_array($painel['aluno'] ?? null) ? $painel['aluno'] : null;
-$turma = is_array($painel['turma'] ?? null) ? $painel['turma'] : null;
 
 $fmt = static function ($valor): string {
     if ($valor === null || $valor === '') {
@@ -24,11 +26,27 @@ $fmtInt = static function ($valor): string {
     }
     return (string) (int) $valor;
 };
-$celNota = static function ($valor) use ($fmt): string {
+$celNota = static function ($valor) use ($fmt, $notaMinima): string {
+    $abaixo = $notaMinima !== null && is_numeric($valor) && (float) $valor < $notaMinima;
+    if ($notaMinima !== null && !$abaixo) {
+        return '<td class="px-2 py-2">—</td>';
+    }
     $texto = $fmt($valor);
-    $classe = $texto === '—' ? '' : ' nota';
+    $classe = $texto === '—' ? '' : ($notaMinima === null ? ' nota' : ' abaixo');
 
     return '<td class="px-2 py-2' . $classe . '">' . $texto . '</td>';
+};
+$linhaTemNotaAbaixo = static function (array $linha) use ($notaMinima): bool {
+    if ($notaMinima === null) {
+        return true;
+    }
+    foreach (['media_sem', 'prova_bim', 'jornada', 'media', 'enac', 'media_bim', 'rec', 'resultado'] as $campo) {
+        if (is_numeric($linha[$campo] ?? null) && (float) $linha[$campo] < $notaMinima) {
+            return true;
+        }
+    }
+
+    return false;
 };
 $rotuloSerie = static function (int $serie): string {
     if ($serie === 1) {
@@ -59,14 +77,15 @@ $rotuloSerie = static function (int $serie): string {
 .boletim-colag tbody tr:nth-child(even) td { background: #f4f8fc; }
 .boletim-colag tbody tr:nth-child(odd) td { background: #fff; }
 .boletim-colag td.nota { color: #047857; font-weight: 600; }
+.boletim-colag tbody tr td.abaixo { color: #b45309; font-weight: 600; background: #fff7ed; }
 </style>
 <div class="mb-6">
     <h2 class="text-2xl font-bold text-gray-900 mb-1">Boletim - colag</h2>
     <p class="text-gray-600">Demonstrativo desta escola. A conta já está feita. A 1ª e a 2ª série separam Bloco A e Bloco B. A 3ª série fica numa lista só.</p>
 </div>
 
-<form method="get" action="<?= URL ?>/admin/boletim-26-colag" class="bg-white rounded-xl shadow-lg p-6 w-full mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<form method="get" action="<?= URL ?>/admin/boletim-26-colag" id="boletim-filtros" class="bg-white rounded-xl shadow-lg p-6 w-full mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <label class="block text-sm">
             <span class="font-medium text-gray-700">Ano</span>
             <select name="ano" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
@@ -76,9 +95,18 @@ $rotuloSerie = static function (int $serie): string {
             </select>
         </label>
         <label class="block text-sm">
+            <span class="font-medium text-gray-700">Série</span>
+            <select name="serie" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                <option value="0">Todas as séries</option>
+                <?php foreach ([1, 2, 3] as $serieOpcao): ?>
+                <option value="<?= $serieOpcao ?>" <?= $serieOpcao === $serieFiltro ? 'selected' : '' ?>><?= htmlspecialchars($rotuloSerie($serieOpcao), ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="block text-sm">
             <span class="font-medium text-gray-700">Turma</span>
             <select name="turma_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0">Escolha a turma</option>
+                <option value="0"><?= $serieFiltro > 0 ? 'Todas as turmas' : 'Escolha a turma' ?></option>
                 <?php foreach ($turmas as $item): ?>
                 <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $turmaId ? 'selected' : '' ?>>
                     <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
@@ -87,19 +115,36 @@ $rotuloSerie = static function (int $serie): string {
                 <?php endforeach; ?>
             </select>
         </label>
-        <label class="block text-sm md:col-span-2">
+        <label class="block text-sm">
             <span class="font-medium text-gray-700">Aluno</span>
             <select name="aluno_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0">Escolha o aluno</option>
+                <option value="0"><?= ($serieFiltro > 0 || $turmaId > 0) ? 'Todos os alunos' : 'Escolha o aluno' ?></option>
                 <?php foreach ($alunos as $item): ?>
                 <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $alunoId ? 'selected' : '' ?>>
                     <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                    <?php if ($turmaId === 0 && (string) ($item['turma_nome'] ?? '') !== ''): ?>
+                    · <?= htmlspecialchars((string) $item['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php endif; ?>
                     <?php if ((string) ($item['ra'] ?? '') !== ''): ?>
                     · RA <?= htmlspecialchars((string) $item['ra'], ENT_QUOTES, 'UTF-8') ?>
                     <?php endif; ?>
                 </option>
                 <?php endforeach; ?>
             </select>
+        </label>
+        <label class="block text-sm">
+            <span class="font-medium text-gray-700">Bimestre</span>
+            <select name="bimestre" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                <option value="0" <?= $bimestreFiltro === 0 ? 'selected' : '' ?>>Todos</option>
+                <?php foreach ([1, 2, 3, 4] as $bimestreOpcao): ?>
+                <option value="<?= $bimestreOpcao ?>" <?= $bimestreOpcao === $bimestreFiltro ? 'selected' : '' ?>><?= $bimestreOpcao ?>º bimestre</option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="block text-sm">
+            <span class="font-medium text-gray-700">Nota mínima</span>
+            <input type="text" name="nota_minima" inputmode="decimal" value="<?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: 6,5" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+            <span class="mt-1 block text-xs text-gray-500">Mostra só as notas abaixo desse valor.</span>
         </label>
     </div>
     <div class="mt-4">
@@ -108,23 +153,27 @@ $rotuloSerie = static function (int $serie): string {
 </form>
 
 <?php
-$nomeAluno = $aluno !== null ? htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
-$serieTurma = $rotuloSerie((int) ($turma['ano_serie'] ?? 0));
-$temAbas = false;
-foreach ($demonstrativos as $demoAba) {
-    if ((int) ($demoAba['bimestre'] ?? 0) > 0) {
-        $temAbas = true;
-        break;
-    }
-}
+$primeiroRelatorio = $relatorios[0] ?? null;
+$modeloVazio = !is_array($primeiroRelatorio) || !is_array($primeiroRelatorio['aluno'] ?? null);
+$bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
 ?>
-<?php if ($aluno === null): ?>
-<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a turma e o aluno para preencher com as notas.</p>
+<?php if ($modeloVazio && $serieFiltro === 0 && $turmaId === 0): ?>
+<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a série ou a turma para preencher com as notas.</p>
+<?php elseif ($serieFiltro > 0 || $turmaId > 0): ?>
+<p class="text-sm text-gray-600 mb-6">
+    <?php if ($alunoId > 0): ?>
+    Um aluno.
+    <?php else: ?>
+    Todos os alunos<?= $serieFiltro > 0 && $turmaId === 0 ? ' da série' : ' da turma' ?>.
+    <?php endif; ?>
+    <?php if ($notaMinima !== null): ?>
+    Só as notas abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.
+    <?php endif; ?>
+</p>
 <?php endif; ?>
-<?php if ($temAbas): ?>
+<?php if ($bimestresAbas !== []): ?>
 <div class="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Bimestres">
-    <?php foreach ($demonstrativos as $indice => $demoAba): ?>
-    <?php $bimestreAba = (int) ($demoAba['bimestre'] ?? 0); ?>
+    <?php foreach ($bimestresAbas as $indice => $bimestreAba): ?>
     <button type="button"
             class="boletim-aba px-4 py-1.5 rounded-full text-sm font-medium <?= $indice === 0 ? 'bg-blue-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"
             role="tab"
@@ -135,9 +184,18 @@ foreach ($demonstrativos as $demoAba) {
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
+<?php foreach ($relatorios as $relatorio): ?>
+<?php
+$alunoRel = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : null;
+$turmaRel = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : null;
+$demonstrativos = is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [];
+$nomeAluno = $alunoRel !== null ? htmlspecialchars((string) ($alunoRel['nome'] ?? ''), ENT_QUOTES, 'UTF-8') : '';
+$serieTurma = $rotuloSerie((int) ($turmaRel['ano_serie'] ?? 0));
+$alunoPainelId = (int) ($alunoRel['id'] ?? 0);
+?>
 <?php foreach ($demonstrativos as $indice => $demo): ?>
 <?php $bimestre = (int) ($demo['bimestre'] ?? 0); ?>
-<section class="mb-8 boletim-painel <?= ($temAbas && $indice > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
+<section class="mb-8 boletim-painel <?= ($bimestresAbas !== [] && $bimestre !== 1 && $bimestre > 0) ? 'hidden' : '' ?>" data-boletim-painel="<?= $bimestre ?>" id="<?= $bimestre > 0 ? 'bimestre-' . $bimestre . '-aluno-' . $alunoPainelId : 'modelo-' . (int) ($demo['serie'] ?? 0) ?>">
     <h3 class="text-lg font-semibold text-gray-900 mb-3">
         <?php if (!empty($demo['titulo'])): ?>
         <?= htmlspecialchars((string) $demo['titulo'], ENT_QUOTES, 'UTF-8') ?>
@@ -153,6 +211,24 @@ foreach ($demonstrativos as $demoAba) {
     $semanas = is_array($bloco['semanas'] ?? null) ? $bloco['semanas'] : [];
     $linhas = is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [];
     $terceira = !empty($demo['terceira']);
+    if ($notaMinima !== null) {
+        $paisAbaixo = [];
+        foreach ($linhas as $linhaFiltro) {
+            if (!empty($linhaFiltro['filha']) && $linhaTemNotaAbaixo($linhaFiltro)) {
+                $paisAbaixo[(string) ($linhaFiltro['pai_nome'] ?? '')] = true;
+            }
+        }
+        $linhas = array_values(array_filter(
+            $linhas,
+            static function (array $linhaFiltro) use ($linhaTemNotaAbaixo, $paisAbaixo): bool {
+                if ($linhaTemNotaAbaixo($linhaFiltro)) {
+                    return true;
+                }
+
+                return empty($linhaFiltro['filha']) && isset($paisAbaixo[(string) ($linhaFiltro['nome'] ?? '')]);
+            }
+        ));
+    }
     ?>
     <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">
         <?php $cabeca = 'px-2 py-2 uppercase font-semibold whitespace-nowrap'; ?>
@@ -220,7 +296,7 @@ foreach ($demonstrativos as $demoAba) {
                 </tr>
                 <?php endforeach; ?>
                 <?php if ($linhas === []): ?>
-                <tr><td class="px-3 py-4 text-gray-500" colspan="16">Nenhuma matéria deste bloco.</td></tr>
+                <tr><td class="px-3 py-4 text-gray-500" colspan="16"><?= $notaMinima !== null ? 'Nenhuma nota abaixo de ' . htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') . '.' : 'Nenhuma matéria deste bloco.' ?></td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -228,7 +304,34 @@ foreach ($demonstrativos as $demoAba) {
     <?php endforeach; ?>
 </section>
 <?php endforeach; ?>
-<?php if ($temAbas): ?>
+<?php endforeach; ?>
+<script>
+(function () {
+    var form = document.getElementById('boletim-filtros');
+    if (!form) return;
+    function aoMudar(nome, limpar) {
+        var campo = form.querySelector('[name="' + nome + '"]');
+        if (!campo) return;
+        campo.addEventListener('change', function () {
+            limpar.forEach(function (alvo) {
+                var item = form.querySelector('[name="' + alvo + '"]');
+                if (item) item.value = '0';
+            });
+            form.submit();
+        });
+    }
+    aoMudar('ano', []);
+    aoMudar('serie', ['turma_id', 'aluno_id']);
+    aoMudar('turma_id', ['aluno_id']);
+    aoMudar('aluno_id', []);
+    aoMudar('bimestre', []);
+    var minima = form.querySelector('[name="nota_minima"]');
+    if (minima) {
+        minima.addEventListener('change', function () { form.submit(); });
+    }
+})();
+</script>
+<?php if ($bimestresAbas !== []): ?>
 <script>
 document.querySelectorAll('[data-boletim-aba]').forEach(function (botao) {
     botao.addEventListener('click', function () {
