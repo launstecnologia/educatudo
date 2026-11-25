@@ -18,9 +18,7 @@ return [
         'boletim_colag' => '0',
     ],
     'feature_gate' => false,
-    'rotas' => [
-        '/admin/boletim-colag' => 'boletim_colag',
-    ],
+    'rotas' => [],
     'menu' => [],
     'controllers_dir' => __DIR__ . '/Controllers',
     'views_dir' => __DIR__ . '/Views',

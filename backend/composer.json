@@ -83,6 +83,7 @@
             "App\\Modulos\\EducaLabs\\": "app/Modulos/educalabs/",
             "App\\Modulos\\EventosAvaliativos\\": "app/Modulos/eventos-avaliativos/",
             "App\\Modulos\\BoletimColag\\": "app/Modulos/boletim-colag/",
+            "App\\Modulos\\Boletim26Colag\\": "app/Modulos/boletim-26-colag/",
             "App\\Modulos\\ExternalApps\\": "app/Modulos/external-apps/",
             "App\\Modulos\\Lex\\": "app/Modulos/lex/",
             "App\\Modulos\\Jogos\\": "app/Modulos/jogos/",

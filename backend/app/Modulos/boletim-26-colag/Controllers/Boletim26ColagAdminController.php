@@ -2,6 +2,9 @@
 
 namespace App\Modulos\Boletim26Colag\Controllers;
 
+require_once __DIR__ . '/../Models/Boletim26ColagLeitura.php';
+require_once __DIR__ . '/../Services/Boletim26ColagService.php';
+
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Modulos\Boletim26Colag\Services\Boletim26ColagService;
