@@ -1966,7 +1966,11 @@ class Boletim26ColagService
             }
         }
         if ($notas === []) {
-            return;
+            $unico = $this->enacUnicoDasOutrasMaterias($celulas, $linhasBase);
+            if ($unico === null) {
+                return;
+            }
+            $notas = [$unico];
         }
         foreach (array_keys($idsLinha) as $id) {
             foreach (is_array($celulas[$id]['enac'] ?? null) ? $celulas[$id]['enac'] : [] as $nota) {
@@ -1976,6 +1980,39 @@ class Boletim26ColagService
             }
             $celulas[$id]['enac'] = $notas;
         }
+    }
+
+    /**
+     * Na 2ª e na 3ª série o ENAC da Arte não veio no cadastro da matéria,
+     * mas as outras disciplinas do bimestre receberam a mesma nota.
+     *
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<array<string,mixed>> $linhasBase
+     */
+    private function enacUnicoDasOutrasMaterias(array $celulas, array $linhasBase): ?float
+    {
+        $vistos = [];
+        foreach ($linhasBase as $linha) {
+            $nome = (string) ($linha['nome'] ?? '');
+            if ($this->ehArte($nome) || $this->ehEducacaoFisica($nome) || !empty($linha['filha'])) {
+                continue;
+            }
+            $id = (int) ($linha['materia_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            foreach (is_array($celulas[$id]['enac'] ?? null) ? $celulas[$id]['enac'] : [] as $nota) {
+                if (!is_numeric($nota)) {
+                    continue;
+                }
+                $vistos[number_format($this->meio((float) $nota), 1, '.', '')] = $this->meio((float) $nota);
+            }
+        }
+        if (count($vistos) !== 1) {
+            return null;
+        }
+
+        return (float) reset($vistos);
     }
 
     private function chaveOrdem(string $nome): string
