@@ -8959,6 +8959,11 @@ class BoletimConfigController extends BaseController
                 $roundModeGrupo,
                 $arredGrupo
             );
+            $modoFormulaGrupo = (string) ($g['mode'] ?? 'media');
+            if ($this->maeDePortuguesNoColag((string) ($g['label'] ?? ''))) {
+                $paiNotas = $this->mediaSemanalMaePorAcertos($paiNotas, $roundModeGrupo);
+                $modoFormulaGrupo = 'media';
+            }
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
                 if (!is_numeric($valHerdado)) {
                     continue;
@@ -8985,7 +8990,7 @@ class BoletimConfigController extends BaseController
                 $paiNotas,
                 $regra,
                 $arredGrupo,
-                (string) ($g['mode'] ?? 'media')
+                $modoFormulaGrupo
             );
             $ordemGrupo = 1000000;
             foreach ((array) ($g['rotulo_ids'] ?? []) as $rid => $_) {
@@ -9361,6 +9366,70 @@ class BoletimConfigController extends BaseController
         }
 
         return null;
+    }
+
+    /**
+     * No Colag, a mãe de Língua Portuguesa segue o Boletim Colag:
+     * a média semanal sai dos acertos e das questões, e a fórmula roda depois.
+     */
+    private function maeDePortuguesNoColag(string $rotulo): bool
+    {
+        if (!defined('TENANT_SLUG') || strtolower(trim((string) TENANT_SLUG)) !== 'colag') {
+            return false;
+        }
+        $chave = $this->canonicalMateriaNomeKey($rotulo);
+
+        return str_contains($chave, 'lingua portuguesa') || $chave === 'portugues';
+    }
+
+    /**
+     * Troca a média vertical das frentes pela proporção do total de acertos e questões.
+     *
+     * @param array<string,mixed> $notas
+     * @return array<string,mixed>
+     */
+    private function mediaSemanalMaePorAcertos(array $notas, string $roundMode): array
+    {
+        $acertos = 0;
+        $questoes = 0;
+        foreach ($notas as $codigo => $valor) {
+            if (!is_numeric($valor)) {
+                continue;
+            }
+            $codigo = (string) $codigo;
+            if (str_ends_with($codigo, '__n')) {
+                $base = substr($codigo, 0, -3);
+                if (BoletimQuadroLayoutHelper::codigoEhSemana($base)) {
+                    $acertos += (int) $valor;
+                }
+            } elseif (str_ends_with($codigo, '__q')) {
+                $base = substr($codigo, 0, -3);
+                if (BoletimQuadroLayoutHelper::codigoEhSemana($base)) {
+                    $questoes += (int) $valor;
+                }
+            }
+        }
+        if ($questoes <= 0) {
+            return $notas;
+        }
+        $modo = $roundMode === 'none' ? 'half' : $roundMode;
+        $media = $this->applyRoundMode(10 * $acertos / $questoes, $modo);
+        if ($media === null) {
+            return $notas;
+        }
+        $trocou = false;
+        foreach (array_keys($notas) as $codigo) {
+            if ($this->pecaGrupoDoCodigoColuna((string) $codigo) !== 'semanal') {
+                continue;
+            }
+            $notas[$codigo] = $media;
+            $trocou = true;
+        }
+        if (!$trocou) {
+            $notas['media_sem'] = $media;
+        }
+
+        return $notas;
     }
 
     /**

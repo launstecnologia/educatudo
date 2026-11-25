@@ -132,35 +132,39 @@ foreach ($demonstrativos as $demoAba) {
     $terceira = !empty($demo['terceira']);
     ?>
     <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">
+        <?php $cabeca = 'px-2 py-2 bg-blue-900 text-white uppercase text-xs font-semibold tracking-wide whitespace-nowrap'; ?>
         <table class="min-w-full text-sm text-center">
             <thead>
-                <tr class="bg-blue-900 text-white">
-                    <th class="px-3 py-2 text-left" rowspan="2"><?= htmlspecialchars((string) ($bloco['titulo'] ?? 'Matérias'), ENT_QUOTES, 'UTF-8') ?></th>
-                    <?php if ($semanas !== []): ?>
-                    <th class="px-2 py-2" colspan="<?= count($semanas) * 2 ?>">Prova Semanal</th>
-                    <th class="px-2 py-2" colspan="2">Total</th>
-                    <th class="px-2 py-2" rowspan="2">Média Sem</th>
-                    <?php endif; ?>
-                    <th class="px-2 py-2 whitespace-nowrap" rowspan="2">Prova Bim</th>
-                    <th class="px-2 py-2 whitespace-nowrap" rowspan="2" title="Jornada do aluno">Jor. Aluno</th>
-                    <?php if (!$terceira): ?>
-                    <th class="px-2 py-2" rowspan="2">MÉDIA</th>
-                    <?php endif; ?>
-                    <th class="px-2 py-2" rowspan="2">ENAC</th>
-                    <th class="px-2 py-2 whitespace-nowrap" rowspan="2">Média Bim</th>
-                    <th class="px-2 py-2 whitespace-nowrap" rowspan="2" title="Recuperação Semestral">Rec Sem</th>
-                    <th class="px-2 py-2 whitespace-nowrap" rowspan="2" title="Resultado Final">Res. Final</th>
-                    <th class="px-2 py-2" rowspan="2">FAL</th>
-                </tr>
-                <tr class="text-xs">
+                <tr>
+                    <th class="<?= $cabeca ?> px-3 text-left"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>><?= htmlspecialchars((string) ($bloco['titulo'] ?? 'Matérias'), ENT_QUOTES, 'UTF-8') ?></th>
                     <?php foreach ($semanas as $semana): ?>
-                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold whitespace-nowrap" colspan="2">S<?= (int) $semana ?></th>
+                    <th class="<?= $cabeca ?>" colspan="2">S<?= (int) $semana ?></th>
                     <?php endforeach; ?>
                     <?php if ($semanas !== []): ?>
-                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold">N</th>
-                    <th class="px-2 py-1 bg-blue-100 text-blue-900 font-semibold">Q</th>
+                    <th class="<?= $cabeca ?>" colspan="2">Total</th>
+                    <th class="<?= $cabeca ?>" rowspan="2" title="Média semanal">Méd. Sem</th>
                     <?php endif; ?>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Prova bimestral">P. Bim</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Jornada do aluno">Jor. Aluno</th>
+                    <?php if (!$terceira): ?>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Média</th>
+                    <?php endif; ?>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>>Enac</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Média bimestral">Méd. Bim</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Recuperação semestral">Rec. Sem</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Resultado final">Res. Final</th>
+                    <th class="<?= $cabeca ?>"<?= $semanas !== [] ? ' rowspan="2"' : '' ?> title="Faltas">Fal</th>
                 </tr>
+                <?php if ($semanas !== []): ?>
+                <tr>
+                    <?php foreach ($semanas as $semana): ?>
+                    <th class="<?= $cabeca ?> py-1">N</th>
+                    <th class="<?= $cabeca ?> py-1">Q</th>
+                    <?php endforeach; ?>
+                    <th class="<?= $cabeca ?> py-1">N</th>
+                    <th class="<?= $cabeca ?> py-1">Q</th>
+                </tr>
+                <?php endif; ?>
             </thead>
             <tbody>
                 <?php foreach ($linhas as $linha): ?>
