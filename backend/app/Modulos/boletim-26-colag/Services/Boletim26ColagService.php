@@ -134,7 +134,13 @@ class Boletim26ColagService
         foreach ($linhasBase as $linha) {
             $linhas[] = $this->fecharLinha($linha, $celulas, $jornada, $faltas, $terceira, $semanasBimestre);
         }
-        $linhas = $this->fecharAreaPortugues($linhas, $terceira, $semanasBimestre);
+        if ($bimestre >= 3) {
+            $linhas = array_values(array_filter(
+                $linhas,
+                fn (array $linha): bool => !$this->ehLiteratura((string) ($linha['nome'] ?? ''))
+            ));
+        }
+        $linhas = $this->fecharGrupos($linhas, $terceira, $semanasBimestre);
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
         return [
@@ -220,11 +226,12 @@ class Boletim26ColagService
                 continue;
             }
             $bloco = isset($mapas['B'][$id]) && !isset($mapas['A'][$id]) ? 'b' : 'a';
-            if ($mapas['tem'] && !isset($mapas['A'][$id]) && !isset($mapas['B'][$id]) && !$this->ehPortugues($nome)) {
+            $fixa = $this->ehPortugues($nome) || $this->ehEducacaoFisica($nome) || $this->ehArte($nome);
+            if ($mapas['tem'] && !isset($mapas['A'][$id]) && !isset($mapas['B'][$id]) && !$fixa) {
                 continue;
             }
             if (!$mapas['tem']) {
-                $chave = $this->chave($nome);
+                $chave = $this->chaveOrdem($nome);
                 if (in_array($chave, $ordemB, true)) {
                     $bloco = 'b';
                 } elseif (!in_array($chave, $ordemA, true) && !$this->ehPortugues($nome)) {
@@ -239,9 +246,6 @@ class Boletim26ColagService
                 'pai_nome' => '',
             ];
             $vistos[$id] = true;
-            if (!$this->ehPortugues($nome)) {
-                continue;
-            }
             foreach ($catalogo as $filha) {
                 $fid = (int) ($filha['id'] ?? 0);
                 $fpai = (int) ($filha['pai_id'] ?? 0);
@@ -274,8 +278,8 @@ class Boletim26ColagService
             if ($ba !== $bb) {
                 return $ba <=> $bb;
             }
-            $pa = $peso[$ba . '|' . $this->chave((string) ($a['filha'] ? $a['pai_nome'] : $a['nome']))] ?? 50;
-            $pb = $peso[$bb . '|' . $this->chave((string) ($b['filha'] ? $b['pai_nome'] : $b['nome']))] ?? 50;
+            $pa = $peso[$ba . '|' . $this->chaveOrdem((string) ($a['filha'] ? $a['pai_nome'] : $a['nome']))] ?? 50;
+            $pb = $peso[$bb . '|' . $this->chaveOrdem((string) ($b['filha'] ? $b['pai_nome'] : $b['nome']))] ?? 50;
             if ($pa !== $pb) {
                 return $pa <=> $pb;
             }
@@ -347,7 +351,7 @@ class Boletim26ColagService
 
     /**
      * @param list<array{bloco_id:int,materia_id:int,nota:float}> $notas
-     * @return array<int, array<int, float>>
+     * @return array<int, array<int, list<float>>>
      */
     private function indexarNotas(array $notas): array
     {
@@ -355,8 +359,8 @@ class Boletim26ColagService
         foreach ($notas as $nota) {
             $bid = (int) $nota['bloco_id'];
             $mid = (int) $nota['materia_id'];
-            if ($bid > 0 && $mid > 0) {
-                $out[$bid][$mid] = (float) $nota['nota'];
+            if ($bid > 0 && $mid > 0 && is_numeric($nota['nota'] ?? null)) {
+                $out[$bid][$mid][] = (float) $nota['nota'];
             }
         }
 
@@ -459,7 +463,7 @@ class Boletim26ColagService
     /**
      * @param array<int, array<string,mixed>> $celulas
      * @param list<int> $materias
-     * @param array<int, array<int, float>> $notas
+     * @param array<int, array<int, list<float>>> $notas
      * @param list<array{bloco_id:int,materia_id:int,n:int,q:int,nota:?float}> $acertos
      * @param array<int, string> $blocoDaMateria
      */
@@ -501,8 +505,13 @@ class Boletim26ColagService
             }
             $celulas[$mid]['semanas'][$sem]['n'] += (int) $nq['n'];
             $celulas[$mid]['semanas'][$sem]['q'] += (int) $nq['q'];
-            if (isset($notas[$blocoId][$mid])) {
-                $celulas[$mid]['semanas'][$sem]['notas'][] = (float) $notas[$blocoId][$mid];
+            $lista = $notas[$blocoId][$mid] ?? [];
+            if (is_array($lista) && $lista !== []) {
+                foreach ($lista as $nota) {
+                    if (is_numeric($nota)) {
+                        $celulas[$mid]['semanas'][$sem]['notas'][] = (float) $nota;
+                    }
+                }
             } elseif ($nq['nota'] !== null && (int) $nq['q'] <= 0) {
                 $celulas[$mid]['semanas'][$sem]['notas'][] = (float) $nq['nota'];
             }
@@ -512,21 +521,26 @@ class Boletim26ColagService
     /**
      * @param array<int, array<string,mixed>> $celulas
      * @param list<int> $materias
-     * @param array<int, array<int, float>> $notas
+     * @param array<int, array<int, list<float>>> $notas
      * @param list<array{bloco_id:int,materia_id:int,n:int,q:int,nota:?float}> $acertos
      */
     private function guardarNota(array &$celulas, string $peca, int $blocoId, array $materias, array $notas, array $acertos): void
     {
         $valores = [];
-        foreach ($notas[$blocoId] ?? [] as $mid => $nota) {
-            $valores[(int) $mid][] = (float) $nota;
+        foreach ($notas[$blocoId] ?? [] as $mid => $lista) {
+            foreach (is_array($lista) ? $lista : [] as $nota) {
+                if (is_numeric($nota)) {
+                    $valores[(int) $mid][] = (float) $nota;
+                }
+            }
         }
+        $comLancamento = $valores;
         foreach ($acertos as $acerto) {
             if ((int) $acerto['bloco_id'] !== $blocoId || $acerto['nota'] === null) {
                 continue;
             }
             $mid = (int) $acerto['materia_id'];
-            if ($mid > 0) {
+            if ($mid > 0 && !isset($comLancamento[$mid])) {
                 $valores[$mid][] = (float) $acerto['nota'];
             }
         }
@@ -536,7 +550,10 @@ class Boletim26ColagService
             if ($mid <= 0 || empty($valores[$mid])) {
                 continue;
             }
-            $celulas[$mid][$peca][] = array_sum($valores[$mid]) / count($valores[$mid]);
+            $total = array_sum($valores[$mid]);
+            $celulas[$mid][$peca][] = $peca === 'prova_bim'
+                ? $total
+                : $total / count($valores[$mid]);
         }
     }
 
@@ -638,11 +655,14 @@ class Boletim26ColagService
         } elseif ($notasSemana !== []) {
             $mediaSem = $this->meio(array_sum($notasSemana) / count($notasSemana));
         }
-        $prova = $this->mediaLista($celula['prova_bim'] ?? []);
+        $prova = $this->somarLista($celula['prova_bim'] ?? []);
         $enac = $this->mediaLista($celula['enac'] ?? []);
         $rec = $this->mediaLista($celula['rec'] ?? []);
         $notaJornada = isset($jornada[$mid]) ? $this->meio((float) $jornada[$mid]) : null;
         $falta = $faltas[$mid] ?? null;
+        if ($this->ehEducacaoFisica((string) ($linha['nome'] ?? ''))) {
+            return $this->linhaSoProvaBim($linha, $semanas, $totalN, $totalQ, $mediaSem, $prova, $rec, $falta, $terceira);
+        }
         if ($terceira) {
             $mediaBim = $this->mediaPresentes([$prova, $notaJornada]);
             $resultado = $mediaBim;
@@ -695,12 +715,13 @@ class Boletim26ColagService
     }
 
     /**
-     * A área fica com a média das frentes (nota de 0 a 10) e a soma de N, Q e faltas.
+     * A mãe soma a prova bimestral das frentes. N, Q e faltas também somam.
+     * Jornada, ENAC e recuperação continuam na média das frentes.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
      */
-    private function fecharAreaPortugues(array $linhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
+    private function fecharGrupos(array $linhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
     {
         $grupos = [];
         foreach ($linhas as $i => $linha) {
@@ -714,7 +735,7 @@ class Boletim26ColagService
             $grupos[$pai][] = $i;
         }
         foreach ($linhas as $i => $linha) {
-            if (!empty($linha['filha']) || !$this->ehPortugues((string) ($linha['nome'] ?? ''))) {
+            if (!empty($linha['filha'])) {
                 continue;
             }
             $idxs = $grupos[(string) $linha['nome']] ?? [];
@@ -738,8 +759,16 @@ class Boletim26ColagService
      */
     private function juntarFilhas(array $pai, array $filhas, bool $terceira, array $semanasContam = [1, 2, 3, 4, 5, 6]): array
     {
-        $campos = ['prova_bim', 'jornada', 'enac', 'rec'];
-        foreach ($campos as $campo) {
+        $provaFilhas = [];
+        foreach ($filhas as $filha) {
+            if (is_numeric($filha['prova_bim'] ?? null)) {
+                $provaFilhas[] = (float) $filha['prova_bim'];
+            }
+        }
+        if ($provaFilhas !== []) {
+            $pai['prova_bim'] = $this->meio(array_sum($provaFilhas));
+        }
+        foreach (['jornada', 'enac', 'rec'] as $campo) {
             $vals = [];
             foreach ($filhas as $filha) {
                 if (is_numeric($filha[$campo] ?? null)) {
@@ -769,7 +798,11 @@ class Boletim26ColagService
                 $pai['resultado'] = $comEnac > (float) $pai['media_bim'] ? $comEnac : $pai['media_bim'];
             }
 
-            return $pai;
+            if (is_numeric($pai['rec']) && ($pai['resultado'] === null || (float) $pai['rec'] > (float) $pai['resultado'])) {
+                $pai['resultado'] = $pai['rec'];
+            }
+
+            return $this->aplicarSoProvaSeEducacaoFisica($pai, true);
         }
         $totalN = 0;
         $totalQ = 0;
@@ -809,7 +842,61 @@ class Boletim26ColagService
             $pai['resultado'] = $pai['rec'];
         }
 
+        return $this->aplicarSoProvaSeEducacaoFisica($pai, false);
+    }
+
+    /**
+     * Educação Física não entra jornada nem ENAC. O resultado é a prova bimestral.
+     *
+     * @param array<string,mixed> $pai
+     * @return array<string,mixed>
+     */
+    private function aplicarSoProvaSeEducacaoFisica(array $pai, bool $terceira): array
+    {
+        if (!$this->ehEducacaoFisica((string) ($pai['nome'] ?? ''))) {
+            return $pai;
+        }
+        $prova = is_numeric($pai['prova_bim'] ?? null) ? (float) $pai['prova_bim'] : null;
+        $rec = is_numeric($pai['rec'] ?? null) ? (float) $pai['rec'] : null;
+        $resultado = $prova;
+        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+            $resultado = $rec;
+        }
+        $pai['jornada'] = null;
+        $pai['enac'] = null;
+        $pai['media'] = $terceira ? null : $prova;
+        $pai['media_bim'] = $prova;
+        $pai['resultado'] = $resultado;
+
         return $pai;
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     * @param array<int, array{n:?int,q:?int}> $semanas
+     * @return array<string,mixed>
+     */
+    private function linhaSoProvaBim(array $linha, array $semanas, int $totalN, int $totalQ, ?float $mediaSem, ?float $prova, ?float $rec, ?int $falta, bool $terceira): array
+    {
+        $resultado = $prova;
+        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+            $resultado = $rec;
+        }
+
+        return $linha + [
+            'semanas' => $terceira ? [] : $semanas,
+            'total_n' => (!$terceira && $totalQ > 0) ? $totalN : null,
+            'total_q' => (!$terceira && $totalQ > 0) ? $totalQ : null,
+            'media_sem' => $terceira ? null : $mediaSem,
+            'prova_bim' => $prova,
+            'jornada' => null,
+            'media' => $terceira ? null : $prova,
+            'enac' => null,
+            'media_bim' => $prova,
+            'rec' => $rec,
+            'resultado' => $resultado,
+            'faltas' => $falta,
+        ];
     }
 
     /**
@@ -1049,11 +1136,55 @@ class Boletim26ColagService
         return 0;
     }
 
+    /**
+     * @param list<float|int|string|null> $valores
+     */
+    private function somarLista(array $valores): ?float
+    {
+        $nums = [];
+        foreach ($valores as $valor) {
+            if (is_numeric($valor)) {
+                $nums[] = (float) $valor;
+            }
+        }
+        if ($nums === []) {
+            return null;
+        }
+
+        return $this->meio(array_sum($nums));
+    }
+
     private function ehPortugues(string $nome): bool
     {
         $chave = $this->chave($nome);
 
         return str_contains($chave, 'lingua portuguesa') || $chave === 'portugues';
+    }
+
+    private function ehLiteratura(string $nome): bool
+    {
+        return str_contains($this->chave($nome), 'literatura');
+    }
+
+    private function ehEducacaoFisica(string $nome): bool
+    {
+        $chave = $this->chave($nome);
+
+        return str_contains($chave, 'educacao fisica') || preg_match('/\bed fisica\b/', $chave) === 1;
+    }
+
+    private function ehArte(string $nome): bool
+    {
+        $chave = $this->chave($nome);
+
+        return $chave === 'arte' || $chave === 'artes' || str_starts_with($chave, 'artes ');
+    }
+
+    private function chaveOrdem(string $nome): string
+    {
+        $chave = $this->chave($nome);
+
+        return $chave === 'artes' ? 'arte' : $chave;
     }
 
     private function chave(string $nome): string
