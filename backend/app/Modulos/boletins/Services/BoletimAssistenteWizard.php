@@ -8167,9 +8167,132 @@ class BoletimAssistenteWizard
         if ($semanas !== [] || $novos !== []) {
             $rascunho['componentes'] = array_merge($semanas, $atuais, $novos);
         }
+        $this->vincularEventosSemanaisColag($rascunho, $estado);
         $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
 
         return $rascunho;
+    }
+
+    /**
+     * A prova semanal marcada entra em S1, S3, S5 e S2, S4, S6.
+     * Sem o número da semana no evento, a ordem é a data da prova.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     */
+    private function vincularEventosSemanaisColag(array &$rascunho, array $estado): void
+    {
+        $opts = is_array($estado['pecas_opcoes']['semanal'] ?? null) ? $estado['pecas_opcoes']['semanal'] : [];
+        $manual = !empty($opts['blocos_ids_manual']);
+        $idsMarcados = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+        $bims = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
+        if ($bims === []) {
+            $bimEstado = (int) ($estado['bimestre'] ?? 0);
+            if ($bimEstado >= 1 && $bimEstado <= 4) {
+                $bims = [$bimEstado];
+            }
+        }
+        $ano = (int) ($estado['ano_letivo'] ?? 0);
+        $tipo = (int) ($opts['tipo_avaliacao_id'] ?? 0);
+        $buscaTipo = ($manual && $idsMarcados !== []) ? null : ($tipo > 0 ? $tipo : null);
+        $eventos = $this->ferramentas->listarEventosProva($buscaTipo, 4000, $ano);
+        $escolhidos = [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($manual && $idsMarcados !== []) {
+                if (!in_array($id, $idsMarcados, true)) {
+                    continue;
+                }
+            } else {
+                $blob = strtolower(trim(
+                    (string) ($ev['titulo'] ?? '') . ' '
+                    . (string) ($ev['tipo_avaliacao_nome'] ?? '') . ' '
+                    . (string) ($ev['chave_quadro'] ?? '')
+                ));
+                if (!str_contains($blob, 'semanal')) {
+                    continue;
+                }
+            }
+            $bimEv = (int) ($ev['bimestre'] ?? 0);
+            if ($bims !== [] && $bimEv > 0 && !in_array($bimEv, $bims, true)) {
+                continue;
+            }
+            $escolhidos[] = $ev;
+        }
+        if ($escolhidos === []) {
+            return;
+        }
+
+        $porSemana = [];
+        $semNumero = [];
+        foreach ($escolhidos as $ev) {
+            $sem = (int) ($ev['semana'] ?? 0);
+            if ($sem >= 1 && $sem <= 8) {
+                $porSemana[$sem][] = (int) $ev['id'];
+                continue;
+            }
+            $semNumero[] = $ev;
+        }
+        if ($porSemana === [] && $semNumero !== []) {
+            usort($semNumero, static function (array $a, array $b): int {
+                return strcmp((string) ($a['data_prova'] ?? ''), (string) ($b['data_prova'] ?? ''));
+            });
+            $datas = [];
+            foreach ($semNumero as $ev) {
+                $data = substr((string) ($ev['data_prova'] ?? ''), 0, 10);
+                if ($data !== '' && !in_array($data, $datas, true)) {
+                    $datas[] = $data;
+                }
+            }
+            $indice = [];
+            foreach ($datas as $i => $data) {
+                $indice[$data] = $i + 1;
+            }
+            foreach ($semNumero as $ev) {
+                $data = substr((string) ($ev['data_prova'] ?? ''), 0, 10);
+                $sem = (int) ($indice[$data] ?? 0);
+                if ($sem < 1 || $sem > 8) {
+                    continue;
+                }
+                $porSemana[$sem][] = (int) $ev['id'];
+            }
+        }
+        if ($porSemana === []) {
+            return;
+        }
+
+        $comps = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if (preg_match('/^s([1-8])$/', $codigo, $mSem) === 1) {
+                $numero = (int) $mSem[1];
+                $ids = array_values(array_unique(array_map('intval', $porSemana[$numero] ?? [])));
+                $componente['config'] = is_array($componente['config'] ?? null) ? $componente['config'] : [];
+                $componente['blocos_ids'] = $ids;
+                $componente['config']['blocos_ids'] = $ids;
+                $componente['config']['blocos_ids_manual'] = 1;
+                $componente['config']['semana'] = $numero;
+                $componente['usar_percentual'] = 1;
+                if ($bims !== []) {
+                    $componente['config']['prova_bimestres'] = $bims;
+                }
+                if ($tipo > 0) {
+                    $componente['tipo_avaliacao_id'] = $tipo;
+                    $componente['config']['tipo_avaliacao_id'] = $tipo;
+                }
+            }
+            $comps[] = $componente;
+        }
+        $rascunho['componentes'] = $comps;
     }
 
     /**
