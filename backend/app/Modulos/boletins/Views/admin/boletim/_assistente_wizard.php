@@ -4527,6 +4527,27 @@ $boletimWizardSteps = [
         return '';
     }
 
+    function codigosEquivalentesPalette(codigo) {
+        var cod = String(codigo || '').toLowerCase();
+        var aliases = {
+            bimestral: 'prova_bim',
+            prova_bim: 'bimestral',
+            semanal: 'media_sem',
+            media_sem: 'semanal',
+            recuperacao: 'rec',
+            rec: 'recuperacao',
+            trabalho: 'trab',
+            trab: 'trabalho',
+            participacao: 'part',
+            part: 'participacao'
+        };
+        var lista = [];
+        [cod, aliases[cod] || ''].forEach(function (item) {
+            if (item && lista.indexOf(item) < 0) lista.push(item);
+        });
+        return lista;
+    }
+
     function chaveCicloPalette(codigo) {
         var cod = String(codigo || '').toLowerCase();
         var m = cod.match(/^b([1-4])_/);
@@ -4537,6 +4558,7 @@ $boletimWizardSteps = [
             || cod === 'rec' || cod === 'recuperacao' || cod === 'rec_final') {
             return 'final';
         }
+        var equiv = codigosEquivalentesPalette(cod);
 
         // Blocos de cálculo (MU/MS…): ciclo = cabeçalho onde o chip está no quadro.
         var linhas = (estado && estado.linhas_layout) || [];
@@ -4545,7 +4567,7 @@ $boletimWizardSteps = [
             var lin = linhas[i];
             if (!lin || !Array.isArray(lin.colunas)) continue;
             var cols = lin.colunas.map(function (c) { return String(c || '').toLowerCase(); });
-            if (cols.indexOf(cod) < 0) continue;
+            if (!equiv.some(function (item) { return cols.indexOf(item) >= 0; })) continue;
             var j;
             for (j = 0; j < cols.length; j++) {
                 var mm = cols[j].match(/^b([1-4])_/);
@@ -4561,7 +4583,7 @@ $boletimWizardSteps = [
         // Fallback: layout_group / linha_cabecalho do componente no rascunho.
         var achou = '';
         (((rascunhoAtual || {}).componentes) || []).some(function (c) {
-            if (!c || String(c.codigo || '').toLowerCase() !== cod) return false;
+            if (!c || equiv.indexOf(String(c.codigo || '').toLowerCase()) < 0) return false;
             var cfg = configDoComp(c);
             achou = chaveCicloDeGrupoLayout(cfg.layout_group)
                 || chaveCicloDeNomeCabecalho(cfg.linha_cabecalho || c.linha_cabecalho);
@@ -4727,7 +4749,12 @@ $boletimWizardSteps = [
 
         (estado.pecas || []).forEach(function (k) {
             if (!k || ehCodigoBlocoCalc(k)) return;
-            add(k, pecaLabel(k));
+            var codigo = pecaCodigoQuadro(k);
+            if (typeof codigoExistentePecaColag === 'function' && ehQuadroPecasColag()) {
+                var existente = codigoExistentePecaColag(k);
+                if (existente) codigo = existente;
+            }
+            add(codigo, pecaNomeQuadro(k) || pecaLabel(k) || tituloColuna(codigo));
         });
         if ((estado.pecas || []).indexOf('semanal') >= 0) add('media_sem', nomeBlocoCalc('media_sem'));
 
@@ -6314,7 +6341,7 @@ $boletimWizardSteps = [
         if (ehBoletimComposto()) return previewLocalBoletim();
         var pecas = (estado && estado.pecas) ? estado.pecas.slice() : [];
         var semanasColag = ehQuadroPecasColag();
-        var temSemanal = semanasColag || (pecas.indexOf('semanal') >= 0 && !colunaOculta('_semanal') && !colunaOculta('media_sem'));
+        var temSemanal = pecas.indexOf('semanal') >= 0 && !colunaOculta('_semanal') && !colunaOculta('media_sem');
         var listaA = semanasColag ? [1, 3, 5] : [1, 3, 5, 7];
         var listaB = semanasColag ? [2, 4, 6] : [2, 4, 6, 8];
         var semanasA = temSemanal ? listaA.map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];

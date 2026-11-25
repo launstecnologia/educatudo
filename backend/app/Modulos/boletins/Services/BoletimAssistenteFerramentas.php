@@ -192,13 +192,6 @@ class BoletimAssistenteFerramentas
     public function listarJornadas(int $limit = 150): array
     {
         $limit = max(1, min($limit, 300));
-        $path = __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
-        if (!class_exists('JourneyBoletimLancamento', false) && is_file($path)) {
-            require_once $path;
-        }
-        if (!class_exists('JourneyBoletimLancamento', false)) {
-            return [];
-        }
 
         try {
             $jb = new JourneyBoletimLancamento();
@@ -254,13 +247,6 @@ class BoletimAssistenteFerramentas
         if ($bims === []) {
             return [];
         }
-        $path = __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
-        if (!class_exists('JourneyBoletimLancamento', false) && is_file($path)) {
-            require_once $path;
-        }
-        if (!class_exists('JourneyBoletimLancamento', false)) {
-            return [];
-        }
         try {
             return (new JourneyBoletimLancamento())->listarIdsPorBimestre($bims, $anoLetivo);
         } catch (\Throwable $e) {
@@ -276,13 +262,6 @@ class BoletimAssistenteFerramentas
      */
     public function listarJornadasDoBoletim(): array
     {
-        $path = __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
-        if (!class_exists('JourneyBoletimLancamento', false) && is_file($path)) {
-            require_once $path;
-        }
-        if (!class_exists('JourneyBoletimLancamento', false)) {
-            return [];
-        }
         try {
             $rows = (new JourneyBoletimLancamento())->listarResumoParaBoletim();
         } catch (\Throwable $e) {
@@ -548,6 +527,18 @@ class BoletimAssistenteFerramentas
         }
 
         return $this->anexarBlocoSemanaQuadro($out);
+    }
+
+    /**
+     * Mantém só as provas da turma do boletim. Prova de outra série sai.
+     *
+     * @param list<int> $blocoIds
+     * @param list<int> $turmaIds
+     * @return list<int>
+     */
+    public function filtrarBlocoIdsPorTurmas(array $blocoIds, array $turmaIds): array
+    {
+        return $this->boletimConfig->filtrarBlocoIdsPorTurmas($blocoIds, $turmaIds);
     }
 
     /**

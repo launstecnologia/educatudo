@@ -1107,8 +1107,23 @@ class BoletimAssistenteWizard
             return;
         }
 
+        $pecasAtuais = [];
+        foreach ((array) ($estado['pecas'] ?? []) as $peca) {
+            $peca = strtolower(trim((string) $peca));
+            if ($peca !== '' && !in_array($peca, $pecasAtuais, true)) {
+                $pecasAtuais[] = $peca;
+            }
+        }
+        $modelo = \App\Modulos\BoletimColag\Services\BoletimColagModelo::pecas();
+        // Quem já escolheu as peças e deixou a semanal de fora não recebe ela de volta.
+        if ($pecasAtuais !== [] && !in_array('semanal', $pecasAtuais, true)) {
+            $modelo = array_values(array_filter(
+                $modelo,
+                static fn (string $peca): bool => $peca !== 'semanal'
+            ));
+        }
         $pecas = [];
-        foreach (array_merge((array) ($estado['pecas'] ?? []), \App\Modulos\BoletimColag\Services\BoletimColagModelo::pecas()) as $peca) {
+        foreach (array_merge($pecasAtuais, $modelo) as $peca) {
             $peca = strtolower(trim((string) $peca));
             if ($peca !== '' && !in_array($peca, $pecas, true)) {
                 $pecas[] = $peca;
@@ -8133,6 +8148,12 @@ class BoletimAssistenteWizard
         if (!$this->ehTenantColag()) {
             return $rascunho;
         }
+        if (!in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
+            $this->tirarColunasSemanaisColag($rascunho);
+            $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
+
+            return $rascunho;
+        }
         $quadro = $this->montarQuadroDoEstado($estado);
         $presentes = [];
         $atuais = [];
@@ -8182,9 +8203,19 @@ class BoletimAssistenteWizard
      */
     private function vincularEventosSemanaisColag(array &$rascunho, array $estado): void
     {
+        if (!in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
+            $this->tirarColunasSemanaisColag($rascunho);
+
+            return;
+        }
         $opts = is_array($estado['pecas_opcoes']['semanal'] ?? null) ? $estado['pecas_opcoes']['semanal'] : [];
         $manual = !empty($opts['blocos_ids_manual']);
         $idsMarcados = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+        if ($manual && $idsMarcados === []) {
+            $this->tirarColunasSemanaisColag($rascunho);
+
+            return;
+        }
         $bims = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
         if ($bims === []) {
             $bimEstado = (int) ($estado['bimestre'] ?? 0);
@@ -8225,7 +8256,10 @@ class BoletimAssistenteWizard
             }
             $escolhidos[] = $ev;
         }
+        $escolhidos = $this->filtrarEventosSemanaisDaTurmaColag($escolhidos, $estado);
         if ($escolhidos === []) {
+            $this->tirarColunasSemanaisColag($rascunho);
+
             return;
         }
 
@@ -8264,6 +8298,8 @@ class BoletimAssistenteWizard
             }
         }
         if ($porSemana === []) {
+            $this->tirarColunasSemanaisColag($rascunho);
+
             return;
         }
 
@@ -8308,7 +8344,158 @@ class BoletimAssistenteWizard
             $componenteMedia['config']['agregar_nq'] = $semanasComProva;
         }
         unset($componenteMedia);
+        if ($semanasComProva === []) {
+            $this->tirarColunasSemanaisColag($rascunho);
+
+            return;
+        }
         $rascunho['componentes'] = $comps;
+    }
+
+    /**
+     * Sem prova semanal marcada, o quadro não leva S1–S6 nem a média semanal.
+     *
+     * @param array<string,mixed> $rascunho
+     */
+    private function tirarColunasSemanaisColag(array &$rascunho): void
+    {
+        $comps = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if ($codigo === 'media_sem' || $codigo === '_semanal' || preg_match('/^s[1-8]$/', $codigo) === 1) {
+                continue;
+            }
+            $tinhaCfg = is_array($componente['config'] ?? null);
+            $cfg = $tinhaCfg ? $componente['config'] : [];
+            $expr = trim((string) ($cfg['expressao'] ?? ''));
+            if ($expr !== '') {
+                $nova = $this->expressaoSemMediaSemanal($expr);
+                if ($nova !== '') {
+                    $cfg['expressao'] = $nova;
+                }
+            }
+            if (is_array($cfg['formula_materias'] ?? null)) {
+                foreach ($cfg['formula_materias'] as $mid => $exprMateria) {
+                    $novaMateria = $this->expressaoSemMediaSemanal((string) $exprMateria);
+                    if ($novaMateria !== '') {
+                        $cfg['formula_materias'][$mid] = $novaMateria;
+                    }
+                }
+            }
+            if ($tinhaCfg || $expr !== '') {
+                $componente['config'] = $cfg;
+            }
+            $comps[] = $componente;
+        }
+        $rascunho['componentes'] = $comps;
+    }
+
+    /**
+     * Tira media_sem da média e acerta o divisor. (media_sem + prova_bim + enac) / 3 vira (prova_bim + enac) / 2.
+     */
+    private function expressaoSemMediaSemanal(string $expr): string
+    {
+        $expr = strtolower(trim($expr));
+        if ($expr === '' || !preg_match('/\bmedia_sem\b/', $expr)) {
+            return $expr;
+        }
+        if ($expr === 'media_sem') {
+            return '';
+        }
+        if (preg_match('/^\(\s*(.+)\s*\)\s*\/\s*\d+(?:\.\d+)?\s*$/', $expr, $m)) {
+            $partes = [];
+            foreach (explode('+', $m[1]) as $parte) {
+                $parte = trim($parte);
+                if ($parte === '' || $parte === 'media_sem') {
+                    continue;
+                }
+                if (!preg_match('/^[a-z][a-z0-9_]*$/', $parte)) {
+                    return $this->retirarTermoMediaSemanal($expr);
+                }
+                $partes[] = $parte;
+            }
+
+            return $this->expressaoMedia($partes);
+        }
+
+        return $this->retirarTermoMediaSemanal($expr);
+    }
+
+    private function retirarTermoMediaSemanal(string $expr): string
+    {
+        $expr = preg_replace('/\bmedia_sem\b\s*\+\s*/', '', $expr) ?? $expr;
+        $expr = preg_replace('/\s*\+\s*\bmedia_sem\b/', '', $expr) ?? $expr;
+        $expr = preg_replace('/\(\s*\)/', '', $expr) ?? $expr;
+        $expr = trim((string) (preg_replace('/\s+/', ' ', $expr) ?? $expr));
+
+        return $expr;
+    }
+
+    /**
+     * Prova semanal de outra série não entra no quadro desta.
+     *
+     * @param list<array<string,mixed>> $eventos
+     * @param array<string,mixed> $estado
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarEventosSemanaisDaTurmaColag(array $eventos, array $estado): array
+    {
+        $turmas = $this->turmasDoBoletimColag($estado);
+        if ($turmas === [] || $eventos === []) {
+            return $eventos;
+        }
+        $ids = [];
+        foreach ($eventos as $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        $keep = array_flip($this->ferramentas->filtrarBlocoIdsPorTurmas($ids, $turmas));
+        $out = [];
+        foreach ($eventos as $ev) {
+            if (isset($keep[(int) ($ev['id'] ?? 0)])) {
+                $out[] = $ev;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @return list<int>
+     */
+    private function turmasDoBoletimColag(array $estado): array
+    {
+        $turmas = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($estado['turmas_ids'] ?? [])),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($turmas !== []) {
+            return $turmas;
+        }
+        $series = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($estado['series_ids'] ?? [])),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($series !== []) {
+            $out = [];
+            foreach ($this->ferramentas->listarTurmas(500) as $turma) {
+                $id = (int) ($turma['id'] ?? 0);
+                $sid = (int) ($turma['serie_id'] ?? 0);
+                if ($id > 0 && in_array($sid, $series, true)) {
+                    $out[] = $id;
+                }
+            }
+
+            return $out;
+        }
+
+        return [];
     }
 
     /**
