@@ -293,6 +293,101 @@ class Boletim26ColagLeitura
     }
 
     /**
+     * Cada professor da matéria, com a nota que ele lançou para o aluno no bimestre.
+     *
+     * @return list<array{bloco_id:int,professor_id:int,materia_id:int,nota:float,titulo:string,tipo_nome:string,semana:int,formato_evento:string}>
+     */
+    public function notasPorProfessorNoBimestre(int $alunoId, int $bimestre, int $ano): array
+    {
+        if ($alunoId <= 0 || $bimestre < 1 || !$this->tabelaExiste('provas_blocos_notas_lancadas') || !$this->tabelaExiste('provas_blocos')) {
+            return [];
+        }
+        if (!$this->colunaExiste('provas_blocos', 'bimestre')) {
+            return [];
+        }
+        $selectSemana = $this->colunaExiste('provas_blocos', 'semana') ? 'pb.semana' : '0 AS semana';
+        $selectFormato = $this->colunaExiste('provas_blocos', 'formato_evento') ? 'pb.formato_evento' : 'NULL AS formato_evento';
+        $joinTipo = '';
+        $selectTipo = 'NULL AS tipo_nome';
+        if ($this->tabelaExiste('provas_tipos_avaliacao') && $this->colunaExiste('provas_blocos', 'tipo_avaliacao_id')) {
+            $joinTipo = 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = pb.tipo_avaliacao_id AND pta.deleted_at IS NULL';
+            $selectTipo = 'pta.nome AS tipo_nome';
+        }
+        $anoSql = '';
+        $params = ['aluno' => $alunoId, 'bim' => $bimestre];
+        if ($this->colunaExiste('provas_blocos', 'ano_letivo')) {
+            $anoSql = ' AND (pb.ano_letivo IS NULL OR pb.ano_letivo = 0 OR pb.ano_letivo = :ano OR YEAR(pb.data_prova) = :ano_data)';
+            $params['ano'] = $ano;
+            $params['ano_data'] = $ano;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT n.bloco_id, n.professor_id, n.materia_id, n.nota, pb.titulo, {$selectSemana}, {$selectFormato}, {$selectTipo}
+                   FROM provas_blocos_notas_lancadas n
+                   INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                   {$joinTipo}
+                  WHERE n.aluno_id = :aluno AND n.nota IS NOT NULL AND pb.bimestre = :bim {$anoSql}",
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_numeric($row['nota'] ?? null)) {
+                continue;
+            }
+            $out[] = [
+                'bloco_id' => (int) ($row['bloco_id'] ?? 0),
+                'professor_id' => (int) ($row['professor_id'] ?? 0),
+                'materia_id' => (int) ($row['materia_id'] ?? 0),
+                'nota' => (float) $row['nota'],
+                'titulo' => (string) ($row['titulo'] ?? ''),
+                'tipo_nome' => (string) ($row['tipo_nome'] ?? ''),
+                'semana' => (int) ($row['semana'] ?? 0),
+                'formato_evento' => (string) ($row['formato_evento'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Professores ligados a cada matéria nos eventos do bimestre.
+     *
+     * @param list<int> $blocoIds
+     * @return list<array{bloco_id:int,professor_id:int,materia_id:int}>
+     */
+    public function professoresDasMaterias(array $blocoIds): array
+    {
+        $blocoIds = $this->ids($blocoIds);
+        if ($blocoIds === [] || !$this->tabelaExiste('provas_blocos_professores')) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($blocoIds), '?'));
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT bloco_id, professor_id, materia_id
+                   FROM provas_blocos_professores
+                  WHERE professor_id > 0 AND materia_id > 0 AND bloco_id IN ($ph)",
+                $blocoIds
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'bloco_id' => (int) ($row['bloco_id'] ?? 0),
+                'professor_id' => (int) ($row['professor_id'] ?? 0),
+                'materia_id' => (int) ($row['materia_id'] ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Notas já validadas de quem chegou no meio do ano.
      *
      * @return list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>

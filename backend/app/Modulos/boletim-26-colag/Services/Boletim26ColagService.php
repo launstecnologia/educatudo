@@ -665,6 +665,7 @@ class Boletim26ColagService
             $linhas,
             fn (array $linha): bool => !$this->ehRedacao((string) ($linha['nome'] ?? ''))
         ));
+        $linhas = $this->aplicarSomaDosProfessores($linhas, $alunoId, $bimestre, $ano, $terceira);
         $linhas = $this->aplicarNotaChegadaMeioAno($linhas, $alunoId, $bimestre, $ano);
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
@@ -1545,6 +1546,151 @@ class Boletim26ColagService
         }
 
         return $this->aplicarSoProvaSeEducacaoFisica($pai, false);
+    }
+
+    /**
+     * A prova bimestral soma a nota de cada professor da matéria.
+     * Se a tela de lançamento repetir a mesma nota nos dois professores, os dois entram na soma.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function aplicarSomaDosProfessores(array $linhas, int $alunoId, int $bimestre, int $ano, bool $terceira): array
+    {
+        $notas = $this->leitura->notasPorProfessorNoBimestre($alunoId, $bimestre, $ano);
+        if ($notas === []) {
+            return $linhas;
+        }
+        $porBloco = [];
+        $blocos = [];
+        foreach ($notas as $nota) {
+            $peca = $this->pecaDaProva($nota);
+            if ($terceira && $peca === 'semanal' && $this->ehLancamentoDeNota($nota)) {
+                $peca = 'prova_bim';
+            }
+            if ($peca !== 'prova_bim') {
+                continue;
+            }
+            $bid = (int) $nota['bloco_id'];
+            $mid = (int) $nota['materia_id'];
+            $pid = (int) $nota['professor_id'];
+            if ($bid <= 0 || $mid <= 0) {
+                continue;
+            }
+            $blocos[$bid] = $bid;
+            if (!isset($porBloco[$bid][$mid][$pid])) {
+                $porBloco[$bid][$mid][$pid] = 0.0;
+            }
+            $porBloco[$bid][$mid][$pid] += (float) $nota['nota'];
+        }
+        if ($porBloco === []) {
+            return $linhas;
+        }
+        $ligados = [];
+        foreach ($this->leitura->professoresDasMaterias(array_values($blocos)) as $prof) {
+            $ligados[$prof['bloco_id']][$prof['materia_id']][$prof['professor_id']] = (int) $prof['professor_id'];
+        }
+        $somaPorMateria = [];
+        foreach ($porBloco as $bid => $materias) {
+            foreach ($materias as $mid => $porProfessor) {
+                $professores = array_values($ligados[$bid][$mid] ?? []);
+                if ($professores === []) {
+                    $professores = array_map('intval', array_keys($porProfessor));
+                }
+                $fallback = array_sum($porProfessor) / count($porProfessor);
+                $soma = 0.0;
+                foreach ($professores as $pid) {
+                    $pid = (int) $pid;
+                    $soma += isset($porProfessor[$pid]) ? (float) $porProfessor[$pid] : $fallback;
+                }
+                $somaPorMateria[$mid] = ($somaPorMateria[$mid] ?? 0.0) + $soma;
+            }
+        }
+        $nomes = [];
+        foreach ($this->catalogoMaterias() as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            $nome = trim((string) ($materia['nome'] ?? ''));
+            if ($id > 0 && $nome !== '') {
+                $nomes[$id] = $nome;
+            }
+        }
+        foreach ($linhas as $i => $linha) {
+            if (!empty($linha['filha'])) {
+                continue;
+            }
+            $id = (int) ($linha['materia_id'] ?? 0);
+            $soma = 0.0;
+            $tem = false;
+            foreach ($somaPorMateria as $mid => $valor) {
+                $nomeNota = $nomes[(int) $mid] ?? '';
+                $mesmo = (int) $mid === $id
+                    || ($nomeNota !== '' && $this->mesmoNomeDeMateria((string) ($linha['nome'] ?? ''), $nomeNota));
+                if (!$mesmo) {
+                    continue;
+                }
+                $soma += (float) $valor;
+                $tem = true;
+            }
+            if (!$tem) {
+                continue;
+            }
+            $linhas[$i] = $this->trocarProvaBim($linha, $this->meio($soma), $terceira);
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     * @return array<string,mixed>
+     */
+    private function trocarProvaBim(array $linha, float $prova, bool $terceira): array
+    {
+        $linha['prova_bim'] = $prova;
+        if ($this->ehEducacaoFisica((string) ($linha['nome'] ?? ''))) {
+            $rec = is_numeric($linha['rec'] ?? null) ? (float) $linha['rec'] : null;
+            $resultado = $prova;
+            if ($rec !== null && $rec > $resultado) {
+                $resultado = $rec;
+            }
+            $linha['jornada'] = null;
+            $linha['enac'] = null;
+            $linha['media'] = $terceira ? null : $prova;
+            $linha['media_bim'] = $prova;
+            $linha['resultado'] = $resultado;
+
+            return $linha;
+        }
+        $jornada = is_numeric($linha['jornada'] ?? null) ? (float) $linha['jornada'] : null;
+        $enac = is_numeric($linha['enac'] ?? null) ? (float) $linha['enac'] : null;
+        $rec = is_numeric($linha['rec'] ?? null) ? (float) $linha['rec'] : null;
+        if ($terceira) {
+            $mediaBim = $this->mediaPresentes([$prova, $jornada]);
+            $resultado = $mediaBim;
+            if ($mediaBim !== null && $enac !== null) {
+                $comEnac = $this->meio(($mediaBim + $enac) / 2);
+                $resultado = $comEnac > $mediaBim ? $comEnac : $mediaBim;
+            }
+            if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+                $resultado = $rec;
+            }
+            $linha['media_bim'] = $mediaBim;
+            $linha['resultado'] = $resultado;
+
+            return $linha;
+        }
+        $mediaSem = is_numeric($linha['media_sem'] ?? null) ? (float) $linha['media_sem'] : null;
+        $media = $this->mediaPresentes([$mediaSem, $prova, $jornada]);
+        $mediaBim = $this->mediaBimComEnac($media, $enac);
+        $resultado = $mediaBim;
+        if ($rec !== null && ($resultado === null || $rec > $resultado)) {
+            $resultado = $rec;
+        }
+        $linha['media'] = $media;
+        $linha['media_bim'] = $mediaBim;
+        $linha['resultado'] = $resultado;
+
+        return $linha;
     }
 
     /**
