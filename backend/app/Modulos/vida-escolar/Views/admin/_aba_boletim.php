@@ -8,6 +8,18 @@ $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
 if (!class_exists('PeriodoLetivo')) {
 }
 $anoFicha = (int) ($ficha['ano_letivo'] ?? date('Y'));
+$resultadosColag = [];
+if (empty($boletim_somente_leitura)
+    && class_exists(\App\Modulos\Boletim26Colag\Services\Boletim26ColagService::class)
+    && \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
+) {
+    $servicoColag = new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService();
+    $resultadosColag = $servicoColag->resultadosPorBimestre(
+        (int) ($aluno_id ?? ($aluno['id'] ?? 0)),
+        (int) ($ficha['turma_id'] ?? 0),
+        $anoFicha
+    );
+}
 $infoPeriodo = \App\Core\PeriodoLetivo::doAno($anoFicha);
 $periodos = $infoPeriodo['rotulos'];
 $periodosQuadro = [];
@@ -506,7 +518,19 @@ $rotuloAbaFicha = static function (array $f): array {
                             if ($numCel < 1 || !is_array($celLayout)) {
                                 continue;
                             }
-                            $mediasPeriodo[$numCel] = ($celLayout['nota'] === null || $celLayout['nota'] === '') ? null : (float) $celLayout['nota'];
+                            $notaPeriodo = ($celLayout['nota'] === null || $celLayout['nota'] === '') ? null : (float) $celLayout['nota'];
+                            if (isset($servicoColag) && $resultadosColag !== []) {
+                                $notaColagPeriodo = $servicoColag->buscarResultado(
+                                    $resultadosColag,
+                                    $numCel,
+                                    (int) ($linha['materia_id'] ?? 0),
+                                    (string) ($linha['componente_nome'] ?? '')
+                                );
+                                if ($notaColagPeriodo !== null) {
+                                    $notaPeriodo = $notaColagPeriodo;
+                                }
+                            }
+                            $mediasPeriodo[$numCel] = $notaPeriodo;
                             $faltasPeriodo[$numCel] = ($celLayout['faltas'] === null || $celLayout['faltas'] === '') ? null : (int) $celLayout['faltas'];
                         }
                         $finalMedia = $layoutCalc->calcularFormula($layoutFormula, $mediasPeriodo);
@@ -522,6 +546,21 @@ $rotuloAbaFicha = static function (array $f): array {
                                 $peca = (string) ($colLayout['peca'] ?? '');
                                 $periodoCol = (int) ($colLayout['periodo'] ?? 0);
                                 $c = $periodoCol > 0 ? ($cels[$periodoCol] ?? null) : null;
+                                if ($peca === 'media' && $periodoCol > 0 && isset($servicoColag) && $resultadosColag !== []) {
+                                    $notaColag = $servicoColag->buscarResultado(
+                                        $resultadosColag,
+                                        $periodoCol,
+                                        (int) ($linha['materia_id'] ?? 0),
+                                        (string) ($linha['componente_nome'] ?? '')
+                                    );
+                                    if ($notaColag !== null) {
+                                        if (!is_array($c)) {
+                                            $c = ['nota' => $notaColag, 'faltas' => null, 'status' => 'fechada', 'origem' => 'colag'];
+                                        } else {
+                                            $c['nota'] = $notaColag;
+                                        }
+                                    }
+                                }
                                 $aberta = is_array($c) && in_array($c['status'] ?? '', ['aberta', 'reaberta'], true);
                                 $editavel = $aberta && $editavelFicha && in_array($peca, ['media', 'faltas'], true);
                                 $formId = is_array($c) ? ('ve-cel-' . (int) $c['id']) : '';
@@ -610,6 +649,21 @@ $rotuloAbaFicha = static function (array $f): array {
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap"><?= $esc($linha['componente_nome'] ?? '') ?></td>
                         <?php foreach ($periodosQuadro as $p):
                             $c = $cels[$p] ?? null;
+                            if (isset($servicoColag) && $resultadosColag !== []) {
+                                $notaColag = $servicoColag->buscarResultado(
+                                    $resultadosColag,
+                                    (int) $p,
+                                    (int) ($linha['materia_id'] ?? 0),
+                                    (string) ($linha['componente_nome'] ?? '')
+                                );
+                                if ($notaColag !== null) {
+                                    if (!is_array($c)) {
+                                        $c = ['nota' => $notaColag, 'faltas' => null, 'status' => 'fechada', 'origem' => 'colag'];
+                                    } else {
+                                        $c['nota'] = $notaColag;
+                                    }
+                                }
+                            }
                             $origem = (string) ($c['origem'] ?? 'vazia');
                             $aberta = $c && in_array($c['status'] ?? '', ['aberta', 'reaberta'], true) && $p !== 0;
                             $formId = $c ? ('ve-cel-' . (int) $c['id']) : '';

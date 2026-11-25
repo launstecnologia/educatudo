@@ -2,9 +2,12 @@
 
 namespace App\Modulos\Boletim26Colag\Services;
 
+require_once __DIR__ . '/../Models/Boletim26ColagHomologacao.php';
+
 use App\Core\PeriodoLetivo;
 use App\Dominio\Escola\Models\ComponenteCurricular;
 use App\Dominio\Pessoas\Services\AlunoTurmaResolver;
+use App\Modulos\Boletim26Colag\Models\Boletim26ColagHomologacao;
 use App\Modulos\Boletim26Colag\Models\Boletim26ColagLeitura;
 use App\Modulos\Boletins\Models\JourneyBoletimLancamento;
 use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
@@ -29,6 +32,9 @@ class Boletim26ColagService
 
     /** @var array<int, array<string, array{faltas:float,observacao:string}>> */
     private array $mapaLancamentosFaltas = [];
+
+    /** @var array<string, array<int, array<string, float>>> */
+    private array $cacheResultadoOficial = [];
 
     public function __construct()
     {
@@ -103,6 +109,18 @@ class Boletim26ColagService
                 'demonstrativos' => $this->montarModelo(),
             ];
         }
+        if ($abrir && $notaMinima !== null) {
+            $relatorios = $this->filtrarRelatoriosAbaixo($relatorios, $notaMinima, $notaCampo);
+        }
+        $filtroHomologacao = [
+            'ano' => $ano,
+            'serie' => $serieFiltro,
+            'turma_id' => $turmaId,
+            'aluno_id' => $aluno !== null ? (int) $aluno['id'] : 0,
+            'bimestre' => $bimestreFiltro,
+            'nota_campo' => $notaCampo,
+            'nota_minima' => $notaMinima,
+        ];
 
         return [
             'ano' => $ano,
@@ -116,7 +134,342 @@ class Boletim26ColagService
             'turmas' => $turmasSerie,
             'alunos' => $alunos,
             'relatorios' => $relatorios,
+            'homologacao' => $abrir ? $this->situacaoHomologacao($filtroHomologacao, $relatorios) : ['estado' => 'fechado'],
+            'linhas_planilha' => $abrir ? $this->linhasDaPlanilha($relatorios) : [],
         ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarRelatoriosAbaixo(array $relatorios, float $notaMinima, string $notaCampo): array
+    {
+        $saida = [];
+        foreach ($relatorios as $relatorio) {
+            $demonstrativos = [];
+            foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+                $blocos = [];
+                foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                    $linhas = is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [];
+                    $pais = [];
+                    foreach ($linhas as $linha) {
+                        if (!empty($linha['filha']) && $this->notaAbaixo($linha, $notaMinima, $notaCampo)) {
+                            $pais[(string) ($linha['pai_nome'] ?? '')] = true;
+                        }
+                    }
+                    $linhas = array_values(array_filter(
+                        $linhas,
+                        function (array $linha) use ($notaMinima, $notaCampo, $pais): bool {
+                            if ($this->notaAbaixo($linha, $notaMinima, $notaCampo)) {
+                                return true;
+                            }
+
+                            return empty($linha['filha']) && isset($pais[(string) ($linha['nome'] ?? '')]);
+                        }
+                    ));
+                    if ($linhas === []) {
+                        continue;
+                    }
+                    $bloco['linhas'] = $linhas;
+                    $blocos[] = $bloco;
+                }
+                if ($blocos === []) {
+                    continue;
+                }
+                $demo['blocos'] = $blocos;
+                $demonstrativos[] = $demo;
+            }
+            if ($demonstrativos === []) {
+                continue;
+            }
+            $relatorio['demonstrativos'] = $demonstrativos;
+            $saida[] = $relatorio;
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     */
+    private function notaAbaixo(array $linha, float $notaMinima, string $notaCampo): bool
+    {
+        return is_numeric($linha[$notaCampo] ?? null) && (float) $linha[$notaCampo] < $notaMinima;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array<string,mixed>>
+     */
+    public function linhasDaPlanilha(array $relatorios): array
+    {
+        $linhas = [];
+        foreach ($relatorios as $relatorio) {
+            $aluno = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : [];
+            $turma = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : [];
+            foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+                if (!is_array($aluno) || $aluno === [] || !empty($demo['titulo'])) {
+                    continue;
+                }
+                foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                    foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                        $linhas[] = [
+                            'aluno_id' => (int) ($aluno['id'] ?? 0),
+                            'aluno' => (string) ($aluno['nome'] ?? ''),
+                            'turma' => (string) ($turma['nome'] ?? ''),
+                            'bimestre' => (int) ($demo['bimestre'] ?? 0),
+                            'bloco' => (string) ($bloco['titulo'] ?? ''),
+                            'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                            'materia' => (string) ($linha['nome'] ?? ''),
+                            'filha' => !empty($linha['filha']) ? 1 : 0,
+                            'media_sem' => $this->notaTexto($linha['media_sem'] ?? null),
+                            'prova_bim' => $this->notaTexto($linha['prova_bim'] ?? null),
+                            'jornada' => $this->notaTexto($linha['jornada'] ?? null),
+                            'media' => $this->notaTexto($linha['media'] ?? null),
+                            'enac' => $this->notaTexto($linha['enac'] ?? null),
+                            'media_bim' => $this->notaTexto($linha['media_bim'] ?? null),
+                            'rec' => $this->notaTexto($linha['rec'] ?? null),
+                            'resultado' => $this->notaTexto($linha['resultado'] ?? null),
+                            'faltas' => is_numeric($linha['faltas'] ?? null) ? (int) $linha['faltas'] : null,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float} $filtro
+     * @param list<array<string,mixed>> $relatorios
+     * @return array{estado:string,em:string,usuario:string}
+     */
+    private function situacaoHomologacao(array $filtro, array $relatorios): array
+    {
+        $vazio = ['estado' => 'nenhuma', 'em' => '', 'usuario' => ''];
+        try {
+            $repo = new Boletim26ColagHomologacao();
+            if (!$repo->tabelaPronta()) {
+                return ['estado' => 'sem_tabela', 'em' => '', 'usuario' => ''];
+            }
+            $ultima = $repo->ultima($filtro);
+        } catch (\Throwable $e) {
+            return $vazio;
+        }
+        if ($ultima === null) {
+            return $vazio;
+        }
+        $salvo = json_decode((string) ($ultima['resumo_json'] ?? ''), true);
+        $atual = $this->linhasDaPlanilha($relatorios);
+        $igual = is_array($salvo) && $this->resumoCanonico($salvo) === $this->resumoCanonico($atual);
+
+        return [
+            'estado' => $igual ? 'igual' : 'alterada',
+            'em' => (string) ($ultima['criado_em'] ?? ''),
+            'usuario' => (string) ($ultima['usuario_nome'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function resumoCanonico(array $linhas): string
+    {
+        $limpo = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $limpo[] = [
+                'aluno_id' => (int) ($linha['aluno_id'] ?? 0),
+                'bimestre' => (int) ($linha['bimestre'] ?? 0),
+                'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                'filha' => (int) ($linha['filha'] ?? 0),
+                'media_sem' => $linha['media_sem'] ?? null,
+                'prova_bim' => $linha['prova_bim'] ?? null,
+                'jornada' => $linha['jornada'] ?? null,
+                'media' => $linha['media'] ?? null,
+                'enac' => $linha['enac'] ?? null,
+                'media_bim' => $linha['media_bim'] ?? null,
+                'rec' => $linha['rec'] ?? null,
+                'resultado' => $linha['resultado'] ?? null,
+                'faltas' => $linha['faltas'] ?? null,
+            ];
+        }
+
+        return json_encode($limpo, JSON_UNESCAPED_UNICODE) ?: '';
+    }
+
+    private function notaTexto(mixed $valor): ?string
+    {
+        if (!is_numeric($valor)) {
+            return null;
+        }
+
+        return number_format((float) $valor, 1, '.', '');
+    }
+
+    /**
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float} $filtro
+     * @param list<array<string,mixed>> $relatorios
+     */
+    public function homologar(array $filtro, array $relatorios, int $usuarioId, string $usuarioNome): bool
+    {
+        $repo = new Boletim26ColagHomologacao();
+        if (!$repo->tabelaPronta()) {
+            return false;
+        }
+        $repo->registrar($filtro, $this->linhasDaPlanilha($relatorios), $usuarioId, $usuarioNome);
+
+        return true;
+    }
+
+    /**
+     * Resultado final do Colag por bimestre, para o boletim e as notas do detalhe do aluno.
+     * Pais e aluno não usam este mapa.
+     *
+     * @return array<int, array<string, float>>
+     */
+    public function resultadosPorBimestre(int $alunoId, int $turmaId, int $ano): array
+    {
+        if (!self::ativo() || $alunoId <= 0 || $ano < 2000) {
+            return [];
+        }
+        if ($turmaId <= 0) {
+            $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
+        }
+        if ($turmaId <= 0) {
+            return [];
+        }
+        $chave = $alunoId . ':' . $turmaId . ':' . $ano;
+        if (isset($this->cacheResultadoOficial[$chave])) {
+            return $this->cacheResultadoOficial[$chave];
+        }
+        $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
+        if ($turma === null) {
+            return $this->cacheResultadoOficial[$chave] = [];
+        }
+        $mapa = [];
+        for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
+            $demo = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
+            $porChave = [];
+            foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                    if (!is_numeric($linha['resultado'] ?? null)) {
+                        continue;
+                    }
+                    $valor = (float) $linha['resultado'];
+                    $mid = (int) ($linha['materia_id'] ?? 0);
+                    $nome = $this->chave((string) ($linha['nome'] ?? ''));
+                    if ($mid > 0) {
+                        $porChave['id:' . $mid] = $valor;
+                    }
+                    if ($nome !== '') {
+                        $porChave['nome:' . $nome] = $valor;
+                    }
+                }
+            }
+            $mapa[$bimestre] = $porChave;
+        }
+
+        return $this->cacheResultadoOficial[$chave] = $mapa;
+    }
+
+    /**
+     * @param array<int, array<string, float>> $porBimestre
+     */
+    public function buscarResultado(array $porBimestre, int $bimestre, int $materiaId, string $nome): ?float
+    {
+        $mapa = $porBimestre[$bimestre] ?? [];
+        if ($mapa === []) {
+            return null;
+        }
+        if ($materiaId > 0 && isset($mapa['id:' . $materiaId])) {
+            return $mapa['id:' . $materiaId];
+        }
+        $chave = $this->chave($nome);
+        if ($chave !== '' && isset($mapa['nome:' . $chave])) {
+            return $mapa['nome:' . $chave];
+        }
+
+        return null;
+    }
+
+    /**
+     * Troca a coluna de resultado final da simulação oficial pelo resultado do Colag.
+     *
+     * @param array<string,mixed> $simulacao
+     * @return array<string,mixed>
+     */
+    public function aplicarResultadoNaSimulacao(array $simulacao, int $alunoId, int $turmaId, int $bimestre, int $ano): array
+    {
+        if (!self::ativo() || $bimestre < 1 || $bimestre > 4) {
+            return $simulacao;
+        }
+        $mapa = $this->resultadosPorBimestre($alunoId, $turmaId, $ano)[$bimestre] ?? [];
+        if ($mapa === []) {
+            return $simulacao;
+        }
+        foreach (['matriz_materias', 'matriz_materias_boletim'] as $chaveMatriz) {
+            if (!is_array($simulacao[$chaveMatriz] ?? null)) {
+                continue;
+            }
+            $simulacao[$chaveMatriz] = $this->aplicarResultadoNaMatriz($simulacao[$chaveMatriz], $mapa);
+        }
+
+        return $simulacao;
+    }
+
+    /**
+     * @param array<string,mixed> $matriz
+     * @param array<string, float> $mapa
+     * @return array<string,mixed>
+     */
+    private function aplicarResultadoNaMatriz(array $matriz, array $mapa): array
+    {
+        $codigos = [];
+        foreach (is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [] as $coluna) {
+            if (!is_array($coluna)) {
+                continue;
+            }
+            if (!\App\Helpers\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($coluna)
+                && !\App\Helpers\BoletimQuadroLayoutHelper::colunaEhResultadoFinalOficial($coluna)) {
+                continue;
+            }
+            $codigo = trim((string) ($coluna['codigo'] ?? ''));
+            if ($codigo !== '') {
+                $codigos[$codigo] = true;
+            }
+        }
+        if ($codigos === []) {
+            return $matriz;
+        }
+        $linhas = [];
+        foreach (is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [] as $linha) {
+            if (!is_array($linha)) {
+                $linhas[] = $linha;
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            $nome = $this->chave((string) ($linha['materia_nome'] ?? ''));
+            $valor = $mid > 0 ? ($mapa['id:' . $mid] ?? null) : null;
+            if ($valor === null && $nome !== '') {
+                $valor = $mapa['nome:' . $nome] ?? null;
+            }
+            if ($valor !== null) {
+                $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                foreach (array_keys($codigos) as $codigo) {
+                    $notas[$codigo] = $valor;
+                }
+                $linha['notas'] = $notas;
+            }
+            $linhas[] = $linha;
+        }
+        $matriz['linhas'] = $linhas;
+
+        return $matriz;
     }
 
     /**

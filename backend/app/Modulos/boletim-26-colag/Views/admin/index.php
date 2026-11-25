@@ -11,8 +11,31 @@ $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ','
 $notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
 $notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
 $abrir = !empty($painel['abrir']);
+$homologacao = is_array($painel['homologacao'] ?? null) ? $painel['homologacao'] : [];
+$homologacaoEm = '';
+if ((string) ($homologacao['em'] ?? '') !== '') {
+    $quando = strtotime((string) $homologacao['em']);
+    $homologacaoEm = $quando ? date('d/m/Y H:i', $quando) : (string) $homologacao['em'];
+}
 $turmaId = (int) ($painel['turma_id'] ?? 0);
 $alunoId = (int) ($painel['aluno_id'] ?? 0);
+$filtrosAtivos = 0;
+if ($serieFiltro > 0) {
+    $filtrosAtivos++;
+}
+if ($turmaId > 0) {
+    $filtrosAtivos++;
+}
+if ($alunoId > 0) {
+    $filtrosAtivos++;
+}
+if ($bimestreFiltro > 0) {
+    $filtrosAtivos++;
+}
+if ($notaMinima !== null) {
+    $filtrosAtivos++;
+}
+$reabrirFiltro = (string) ($_GET['filtro_aberto'] ?? '') === '1' && !$abrir;
 
 $fmt = static function ($valor): string {
     if ($valor === null || $valor === '') {
@@ -95,95 +118,149 @@ $rotuloSerie = static function (int $serie): string {
 <div id="boletim-carregando" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.78);">
     <div class="bg-white rounded-xl shadow-lg px-6 py-4 text-sm font-medium text-gray-800">Carregando o demonstrativo...</div>
 </div>
-<div class="mb-6">
-    <h2 class="text-2xl font-bold text-gray-900 mb-1">Boletim - colag</h2>
-    <p class="text-gray-600">Demonstrativo desta escola. A conta já está feita. A 1ª e a 2ª série separam Bloco A e Bloco B. A 3ª série fica numa lista só.</p>
+<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+        <h2 class="text-2xl font-bold text-gray-900 mb-1">Notas do Aluno</h2>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+        <button type="button" data-csp-click="openBoletimFiltro"
+                class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+            Filtros
+            <?php if ($filtrosAtivos > 0): ?>
+            <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
+            <?php endif; ?>
+        </button>
+        <?php if ($abrir): ?>
+        <button type="submit" form="boletim-filtros" formmethod="get" formaction="<?= URL ?>/admin/boletim-26-colag/exportar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-file-excel mr-2 text-gray-500"></i>
+            Exportar Excel
+        </button>
+        <button type="submit" form="boletim-filtros" formmethod="post" formaction="<?= URL ?>/admin/boletim-26-colag/homologar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-stamp mr-2 text-gray-500"></i>
+            Homologar
+        </button>
+        <?php endif; ?>
+    </div>
 </div>
 
-<form method="get" action="<?= URL ?>/admin/boletim-26-colag" id="boletim-filtros" class="bg-white rounded-xl shadow-lg p-6 w-full mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Ano</span>
-            <select name="ano" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <?php for ($y = (int) date('Y') + 1; $y >= (int) date('Y') - 2; $y--): ?>
-                <option value="<?= $y ?>" <?= $y === $ano ? 'selected' : '' ?>><?= $y ?></option>
-                <?php endfor; ?>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Série</span>
-            <select name="serie" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0">Escolha a série</option>
-                <?php foreach ([1, 2, 3] as $serieOpcao): ?>
-                <option value="<?= $serieOpcao ?>" <?= $serieOpcao === $serieFiltro ? 'selected' : '' ?>><?= htmlspecialchars($rotuloSerie($serieOpcao), ENT_QUOTES, 'UTF-8') ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Turma</span>
-            <select name="turma_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0"><?= $serieFiltro > 0 ? 'Todas as turmas' : 'Escolha a turma' ?></option>
-                <?php foreach ($turmas as $item): ?>
-                <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $turmaId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                    · <?= htmlspecialchars($rotuloSerie((int) ($item['ano_serie'] ?? 0)), ENT_QUOTES, 'UTF-8') ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Aluno</span>
-            <select name="aluno_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0"><?= ($serieFiltro > 0 || $turmaId > 0) ? 'Todos os alunos' : 'Escolha o aluno' ?></option>
-                <?php foreach ($alunos as $item): ?>
-                <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $alunoId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                    <?php if ($turmaId === 0 && (string) ($item['turma_nome'] ?? '') !== ''): ?>
-                    · <?= htmlspecialchars((string) $item['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
-                    <?php endif; ?>
-                    <?php if ((string) ($item['ra'] ?? '') !== ''): ?>
-                    · RA <?= htmlspecialchars((string) $item['ra'], ENT_QUOTES, 'UTF-8') ?>
-                    <?php endif; ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Bimestre</span>
-            <select name="bimestre" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="0" <?= $bimestreFiltro === 0 ? 'selected' : '' ?>>Todos</option>
-                <?php foreach ([1, 2, 3, 4] as $bimestreOpcao): ?>
-                <option value="<?= $bimestreOpcao ?>" <?= $bimestreOpcao === $bimestreFiltro ? 'selected' : '' ?>><?= $bimestreOpcao ?>º bimestre</option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Nota mínima em</span>
-            <select name="nota_campo" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="media_bim" <?= $notaCampo === 'media_bim' ? 'selected' : '' ?>>Média bimestral</option>
-                <option value="resultado" <?= $notaCampo === 'resultado' ? 'selected' : '' ?>>Resultado final</option>
-            </select>
-        </label>
-        <label class="block text-sm">
-            <span class="font-medium text-gray-700">Nota mínima</span>
-            <input type="text" name="nota_minima" inputmode="decimal" value="<?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: 6,5" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-            <span class="mt-1 block text-xs text-gray-500">Deixe vazio para ver todas. O cálculo da linha continua visível.</span>
-        </label>
+<div id="boletimFiltroBackdrop" class="fixed inset-0 bg-black/40 z-40 <?= $reabrirFiltro ? '' : 'hidden' ?>" data-csp-click="closeBoletimFiltro"></div>
+<aside id="boletimFiltroDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform <?= $reabrirFiltro ? '' : 'translate-x-full' ?> transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="<?= $reabrirFiltro ? 'false' : 'true' ?>">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Filtrar demonstrativo</h3>
+        <button type="button" data-csp-click="closeBoletimFiltro" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
     </div>
-    <div class="mt-4">
-        <button type="submit" name="abrir" value="1" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium">Abrir demonstrativo</button>
-    </div>
-</form>
+    <form method="get" action="<?= URL ?>/admin/boletim-26-colag" id="boletim-filtros" class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
+                <label for="boletim_ano" class="block text-sm font-medium text-gray-700 mb-1.5">Ano</label>
+                <select id="boletim_ano" name="ano" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <?php for ($y = (int) date('Y') + 1; $y >= (int) date('Y') - 2; $y--): ?>
+                    <option value="<?= $y ?>" <?= $y === $ano ? 'selected' : '' ?>><?= $y ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                <select id="boletim_serie" name="serie" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0">Escolha a série</option>
+                    <?php foreach ([1, 2, 3] as $serieOpcao): ?>
+                    <option value="<?= $serieOpcao ?>" <?= $serieOpcao === $serieFiltro ? 'selected' : '' ?>><?= htmlspecialchars($rotuloSerie($serieOpcao), ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_turma" class="block text-sm font-medium text-gray-700 mb-1.5">Turma</label>
+                <select id="boletim_turma" name="turma_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0"><?= $serieFiltro > 0 ? 'Todas as turmas' : 'Escolha a turma' ?></option>
+                    <?php foreach ($turmas as $item): ?>
+                    <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $turmaId ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        · <?= htmlspecialchars($rotuloSerie((int) ($item['ano_serie'] ?? 0)), ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_aluno" class="block text-sm font-medium text-gray-700 mb-1.5">Aluno</label>
+                <select id="boletim_aluno" name="aluno_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0"><?= ($serieFiltro > 0 || $turmaId > 0) ? 'Todos os alunos' : 'Escolha o aluno' ?></option>
+                    <?php foreach ($alunos as $item): ?>
+                    <option value="<?= (int) $item['id'] ?>" <?= (int) $item['id'] === $alunoId ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) ($item['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        <?php if ($turmaId === 0 && (string) ($item['turma_nome'] ?? '') !== ''): ?>
+                        · <?= htmlspecialchars((string) $item['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
+                        <?php endif; ?>
+                        <?php if ((string) ($item['ra'] ?? '') !== ''): ?>
+                        · RA <?= htmlspecialchars((string) $item['ra'], ENT_QUOTES, 'UTF-8') ?>
+                        <?php endif; ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
+                <select id="boletim_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0" <?= $bimestreFiltro === 0 ? 'selected' : '' ?>>Todos</option>
+                    <?php foreach ([1, 2, 3, 4] as $bimestreOpcao): ?>
+                    <option value="<?= $bimestreOpcao ?>" <?= $bimestreOpcao === $bimestreFiltro ? 'selected' : '' ?>><?= $bimestreOpcao ?>º bimestre</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_nota_campo" class="block text-sm font-medium text-gray-700 mb-1.5">Nota mínima em</label>
+                <select id="boletim_nota_campo" name="nota_campo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="media_bim" <?= $notaCampo === 'media_bim' ? 'selected' : '' ?>>Média bimestral</option>
+                    <option value="resultado" <?= $notaCampo === 'resultado' ? 'selected' : '' ?>>Resultado final</option>
+                </select>
+            </div>
+            <div>
+                <label for="boletim_nota_minima" class="block text-sm font-medium text-gray-700 mb-1.5">Nota mínima</label>
+                <input type="text" id="boletim_nota_minima" name="nota_minima" inputmode="decimal" value="<?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: 6,5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <span class="mt-1 block text-xs text-gray-500">Deixe vazio para ver todas. O cálculo da linha continua visível.</span>
+            </div>
+        </div>
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? '')), ENT_QUOTES, 'UTF-8') ?>" disabled>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
+            <a href="<?= URL ?>/admin/boletim-26-colag" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors text-center">Limpar</a>
+            <button type="submit" name="abrir" value="1" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">Aplicar filtro</button>
+        </div>
+    </form>
+</aside>
+
+<?php if ($abrir && ($serieFiltro > 0 || $turmaId > 0)): ?>
+<?php $estadoHomologacao = (string) ($homologacao['estado'] ?? 'nenhuma'); ?>
+<?php if ($estadoHomologacao === 'alterada'): ?>
+<p class="mb-6 rounded-lg px-4 py-3 text-sm" style="background:#fff7ed;color:#9a3412;border:1px solid #fdba74;">Houve alteração de nota desde a homologação de <?= htmlspecialchars($homologacaoEm, ENT_QUOTES, 'UTF-8') ?>. Homologue de novo.</p>
+<?php elseif ($estadoHomologacao === 'igual'): ?>
+<p class="mb-6 rounded-lg px-4 py-3 text-sm" style="background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;">Homologado em <?= htmlspecialchars($homologacaoEm, ENT_QUOTES, 'UTF-8') ?><?= (string) ($homologacao['usuario'] ?? '') !== '' ? ' por ' . htmlspecialchars((string) $homologacao['usuario'], ENT_QUOTES, 'UTF-8') : '' ?>. Nenhuma nota mudou desde então.</p>
+<?php elseif ($estadoHomologacao === 'sem_tabela'): ?>
+<p class="mb-6 rounded-lg px-4 py-3 text-sm" style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;">A homologação ainda não está disponível neste ambiente. Rode a migration do boletim Colag no Master.</p>
+<?php else: ?>
+<p class="mb-6 text-sm text-gray-600">Este resultado ainda não foi homologado.</p>
+<?php endif; ?>
+<?php endif; ?>
 
 <?php
 $primeiroRelatorio = $relatorios[0] ?? null;
 $modeloVazio = !is_array($primeiroRelatorio) || !is_array($primeiroRelatorio['aluno'] ?? null);
 $bimestresAbas = (!$modeloVazio && $bimestreFiltro === 0) ? [1, 2, 3, 4] : [];
 ?>
-<?php if (!$abrir && ($serieFiltro > 0 || $turmaId > 0)): ?>
-<p class="text-sm text-gray-600 mb-6"><?= count($alunos) ?> aluno(s) nesta lista. Clique em Abrir demonstrativo para ver as notas.</p>
-<?php elseif ($modeloVazio && $serieFiltro === 0 && $turmaId === 0): ?>
-<p class="text-sm text-gray-600 mb-6">Este é o modelo do demonstrativo. Escolha a série ou a turma para preencher com as notas.</p>
+<?php if (!$abrir): ?>
+<div class="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center mb-6">
+    <p class="text-base font-medium text-gray-800">Aplique o filtro para ver o demonstrativo.</p>
+    <?php if ($serieFiltro > 0 || $turmaId > 0): ?>
+    <p class="mt-2 text-sm text-gray-500"><?= count($alunos) ?> aluno(s) nesta lista.</p>
+    <?php endif; ?>
+    <button type="button" data-csp-click="openBoletimFiltro" class="mt-5 inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+        <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+        Filtros
+    </button>
+</div>
 <?php elseif ($abrir && ($serieFiltro > 0 || $turmaId > 0)): ?>
 <p class="text-sm text-gray-600 mb-6">
     <?php if ($alunoId > 0): ?>
@@ -217,6 +294,7 @@ if ($abrir && $notaMinima !== null) {
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
+<?php if ($abrir): ?>
 <?php foreach ($relatorios as $relatorio): ?>
 <?php
 $alunoRel = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : null;
@@ -357,7 +435,31 @@ if (!$demoTemAbaixo) {
 </section>
 <?php endforeach; ?>
 <?php endforeach; ?>
+<?php endif; ?>
 <script>
+function openBoletimFiltro() {
+    var fundo = document.getElementById('boletimFiltroBackdrop');
+    var painel = document.getElementById('boletimFiltroDrawer');
+    if (!fundo || !painel) return;
+    fundo.classList.remove('hidden');
+    painel.classList.remove('translate-x-full');
+    painel.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeBoletimFiltro() {
+    var fundo = document.getElementById('boletimFiltroBackdrop');
+    var painel = document.getElementById('boletimFiltroDrawer');
+    if (!fundo || !painel) return;
+    fundo.classList.add('hidden');
+    painel.classList.add('translate-x-full');
+    painel.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function (evento) {
+    if (evento.key === 'Escape') {
+        closeBoletimFiltro();
+    }
+});
 (function () {
     var form = document.getElementById('boletim-filtros');
     if (!form) return;
@@ -367,7 +469,18 @@ if (!$demoTemAbaixo) {
         tela.hidden = false;
         tela.style.display = 'flex';
     }
-    form.addEventListener('submit', carregando);
+    form.addEventListener('submit', function (evento) {
+        var botao = evento.submitter;
+        var destino = botao ? (botao.getAttribute('formaction') || '') : '';
+        if (destino.indexOf('/exportar') !== -1) {
+            return;
+        }
+        if (destino.indexOf('/homologar') !== -1) {
+            var token = form.querySelector('[name="_token"]');
+            if (token) token.disabled = false;
+        }
+        carregando();
+    });
     function aoMudar(nome, limpar) {
         var campo = form.querySelector('[name="' + nome + '"]');
         if (!campo) return;
@@ -376,6 +489,11 @@ if (!$demoTemAbaixo) {
                 var item = form.querySelector('[name="' + alvo + '"]');
                 if (item) item.value = '0';
             });
+            var aberto = document.createElement('input');
+            aberto.type = 'hidden';
+            aberto.name = 'filtro_aberto';
+            aberto.value = '1';
+            form.appendChild(aberto);
             carregando();
             form.submit();
         });
@@ -383,6 +501,9 @@ if (!$demoTemAbaixo) {
     aoMudar('ano', []);
     aoMudar('serie', ['turma_id', 'aluno_id']);
     aoMudar('turma_id', ['aluno_id']);
+    if (document.getElementById('boletimFiltroDrawer') && !document.getElementById('boletimFiltroDrawer').classList.contains('translate-x-full')) {
+        document.body.style.overflow = 'hidden';
+    }
 })();
 </script>
 <?php if ($bimestresAbas !== []): ?>

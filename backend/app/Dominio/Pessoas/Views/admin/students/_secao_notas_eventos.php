@@ -269,6 +269,17 @@ $simularQuadroAluno = static function (
             return null;
         }
         $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+        if (class_exists(\App\Modulos\Boletim26Colag\Services\Boletim26ColagService::class)
+            && \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
+        ) {
+            $simulacao = (new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService())->aplicarResultadoNaSimulacao(
+                $simulacao,
+                $alunoId,
+                0,
+                (int) ($regra['bimestre'] ?? 0),
+                (int) ($regra['ano_letivo'] ?? 0)
+            );
+        }
         $simulacao['_regra_nome'] = (string) ($regra['nome'] ?? '');
         $simulacao['_decimal_places'] = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
         $simulacaoQuadroCache[$chaveSim] = $simulacao;
