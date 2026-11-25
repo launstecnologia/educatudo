@@ -9369,6 +9369,14 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * No Colag, a prova bimestral de uma matéria dividida em frentes soma os dois professores.
+     */
+    private function colagSomaProvaDasFrentes(): bool
+    {
+        return defined('TENANT_SLUG') && strtolower(trim((string) TENANT_SLUG)) === 'colag';
+    }
+
+    /**
      * No Colag, a mãe de Língua Portuguesa segue o Boletim Colag:
      * a média semanal sai dos acertos e das questões, e a fórmula roda depois.
      */
@@ -9474,6 +9482,9 @@ class BoletimConfigController extends BaseController
             }
             if ($modoCol !== 'soma') {
                 $modoCol = 'media';
+            }
+            if ($pecaCol === 'bimestral' && $this->colagSomaProvaDasFrentes()) {
+                $modoCol = 'soma';
             }
             if ($ehNq || $ehFaltas) {
                 $soma = array_sum($vals);
