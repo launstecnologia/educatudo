@@ -801,7 +801,7 @@ class Boletim26ColagService
         $out = [];
         foreach ($rows as $row) {
             $id = (int) ($row['id'] ?? 0);
-            if ($id <= 0) {
+            if ($id <= 0 || !$this->alunoAtivo($row)) {
                 continue;
             }
             $out[] = [
@@ -812,6 +812,19 @@ class Boletim26ColagService
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $aluno
+     */
+    private function alunoAtivo(array $aluno): bool
+    {
+        if (array_key_exists('ativo', $aluno) && $aluno['ativo'] !== null && $aluno['ativo'] !== '') {
+            return (int) $aluno['ativo'] === 1;
+        }
+        $status = strtoupper(trim((string) ($aluno['status'] ?? '')));
+
+        return $status !== 'INACTIVE';
     }
 
     /**
