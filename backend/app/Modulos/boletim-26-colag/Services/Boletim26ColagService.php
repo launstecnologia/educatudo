@@ -644,6 +644,7 @@ class Boletim26ColagService
             $this->guardarNota($celulas, $peca, $blocoId, $materias, $notas, $acertos);
         }
         $this->completarEnacDaArte($celulas, $linhasBase);
+        $this->somarProvaDeProfessoresDaMesmaMateria($celulas, $linhasBase);
 
         $semanasBimestre = $terceira ? [] : $this->semanasDoBimestre($bimestre);
         $linhas = [];
@@ -1828,6 +1829,105 @@ class Boletim26ColagService
         }
 
         return 0;
+    }
+
+    /**
+     * Dois professores da mesma matéria lançam em cadastros diferentes.
+     * A prova bimestral da linha visível passa a ser a soma desses cadastros.
+     *
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<array<string,mixed>> $linhasBase
+     */
+    private function somarProvaDeProfessoresDaMesmaMateria(array &$celulas, array &$linhasBase): void
+    {
+        $oficial = [];
+        $filha = [];
+        foreach ($linhasBase as $linha) {
+            $id = (int) ($linha['materia_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if (!empty($linha['filha'])) {
+                $filha[$id] = true;
+                continue;
+            }
+            $nome = trim((string) ($linha['nome'] ?? ''));
+            if ($nome !== '') {
+                $oficial[$id] = $nome;
+            }
+        }
+        $nomePorId = $oficial;
+        foreach ($this->catalogoMaterias() as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            $nome = trim((string) ($materia['nome'] ?? ''));
+            if ($id > 0 && $nome !== '' && !isset($nomePorId[$id])) {
+                $nomePorId[$id] = $nome;
+            }
+        }
+        $remover = [];
+        $jaUsado = [];
+        foreach ($oficial as $id => $nome) {
+            $chave = $this->chaveOrdem($nome);
+            if ($chave === '' || isset($jaUsado[$chave])) {
+                if ($chave !== '' && isset($jaUsado[$chave])) {
+                    $this->anexarProva($celulas, (int) $jaUsado[$chave], $celulas[$id]['prova_bim'] ?? []);
+                    $remover[$id] = true;
+                }
+                continue;
+            }
+            $jaUsado[$chave] = $id;
+        }
+        foreach ($nomePorId as $id => $nome) {
+            $id = (int) $id;
+            if ($id <= 0 || isset($oficial[$id]) || !empty($filha[$id])) {
+                continue;
+            }
+            $destino = 0;
+            foreach ($oficial as $oficialId => $oficialNome) {
+                if (isset($remover[$oficialId])) {
+                    continue;
+                }
+                if ($this->mesmoNomeDeMateria($oficialNome, $nome)) {
+                    $destino = (int) $oficialId;
+                    break;
+                }
+            }
+            if ($destino <= 0) {
+                continue;
+            }
+            $this->anexarProva($celulas, $destino, $celulas[$id]['prova_bim'] ?? []);
+        }
+        if ($remover === []) {
+            return;
+        }
+        $linhasBase = array_values(array_filter(
+            $linhasBase,
+            static fn (array $linha): bool => !isset($remover[(int) ($linha['materia_id'] ?? 0)])
+        ));
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $celulas
+     * @param list<float|int|string|null> $notas
+     */
+    private function anexarProva(array &$celulas, int $destino, array $notas): void
+    {
+        foreach ($notas as $nota) {
+            if (is_numeric($nota)) {
+                $celulas[$destino]['prova_bim'][] = (float) $nota;
+            }
+        }
+    }
+
+    private function mesmoNomeDeMateria(string $oficial, string $outra): bool
+    {
+        $a = $this->chaveOrdem($oficial);
+        $b = $this->chaveOrdem($outra);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+
+        return $a === $b || str_starts_with($b, $a . ' ');
     }
 
     /**
