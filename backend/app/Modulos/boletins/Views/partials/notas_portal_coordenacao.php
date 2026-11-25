@@ -169,6 +169,12 @@ if ($alunoIdPortal > 0) {
             }
             $anoRegra = (int) ($regraPortal['ano_letivo'] ?? 0);
             $bimRegra = (int) ($regraPortal['bimestre'] ?? 0);
+            if ($bimRegra === 4
+                && class_exists(\App\Modulos\BoletimColag\Services\BoletimColagModelo::class)
+                && \App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()
+            ) {
+                continue;
+            }
             if ($anoFiltroPortal > 0 && $anoRegra !== $anoFiltroPortal) {
                 continue;
             }
@@ -211,6 +217,12 @@ foreach ($boletins_gerados_notas as $evPortal) {
         continue;
     }
     if (strtolower(trim((string) ($evPortal['exibir_em'] ?? 'notas'))) !== 'notas') {
+        continue;
+    }
+    if ((int) ($evPortal['bimestre'] ?? 0) === 4
+        && class_exists(\App\Modulos\BoletimColag\Services\BoletimColagModelo::class)
+        && \App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()
+    ) {
         continue;
     }
     $montarEventoPortal(

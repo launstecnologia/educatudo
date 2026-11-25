@@ -20,6 +20,19 @@ foreach ($periodos as $numPeriodo => $rotuloPeriodo) {
 if ($periodosQuadro === []) {
     $periodosQuadro = [1, 2, 3, 4];
 }
+$ocultarPeriodosPortal = [];
+foreach ((array) ($ocultar_periodos_portal ?? []) as $periodoOculto) {
+    $periodoOculto = (int) $periodoOculto;
+    if ($periodoOculto >= 1) {
+        $ocultarPeriodosPortal[$periodoOculto] = true;
+    }
+}
+if ($ocultarPeriodosPortal !== []) {
+    $periodosQuadro = array_values(array_filter(
+        $periodosQuadro,
+        static fn ($periodo) => !isset($ocultarPeriodosPortal[(int) $periodo])
+    ));
+}
 $rotuloPeriodoCampo = mb_strtolower((string) ($infoPeriodo['rotulo_campo'] ?? 'bimestre'), 'UTF-8');
 $fichas = is_array($fichas ?? null) ? $fichas : [];
 $somenteLeitura = !empty($boletim_somente_leitura);
@@ -46,6 +59,31 @@ $rotuloAcao = [
 ];
 $layoutExibicao = is_array($quadro['layout_exibicao'] ?? null) ? $quadro['layout_exibicao'] : null;
 $layoutFaixas = is_array($layoutExibicao['faixas'] ?? null) ? $layoutExibicao['faixas'] : [];
+if (($ocultarPeriodosPortal ?? []) !== [] && $layoutFaixas !== []) {
+    $faixasVisiveis = [];
+    foreach ($layoutFaixas as $faixaLayout) {
+        if (!is_array($faixaLayout)) {
+            continue;
+        }
+        $colunasVisiveis = [];
+        foreach ((array) ($faixaLayout['colunas'] ?? []) as $colunaLayout) {
+            if (!is_array($colunaLayout)) {
+                continue;
+            }
+            $periodoColuna = (int) ($colunaLayout['periodo'] ?? 0);
+            if ($periodoColuna > 0 && isset($ocultarPeriodosPortal[$periodoColuna])) {
+                continue;
+            }
+            $colunasVisiveis[] = $colunaLayout;
+        }
+        if ($colunasVisiveis === []) {
+            continue;
+        }
+        $faixaLayout['colunas'] = $colunasVisiveis;
+        $faixasVisiveis[] = $faixaLayout;
+    }
+    $layoutFaixas = $faixasVisiveis;
+}
 $layoutMinima = (float) ($layoutExibicao['media_minima'] ?? 6);
 $layoutFormula = (string) ($layoutExibicao['formula_final_media'] ?? '');
 // Título: layout de impressão (quadro montado) tem prioridade sobre o nome da regra de aprovação.

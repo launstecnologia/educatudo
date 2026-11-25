@@ -180,6 +180,140 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * 3ª série do ensino médio no Colag: média da prova com a jornada,
+     * e o ENAC só substitui o resultado quando fica maior.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function aplicarCalculoTerceiraSerieColag(array &$estado): void
+    {
+        if (!$this->boletimEhTerceiraSerieColag($estado)) {
+            return;
+        }
+        if (!is_array($estado['formulas_blocos'] ?? null)) {
+            $estado['formulas_blocos'] = [];
+        }
+        if (!is_array($estado['pecas_opcoes'] ?? null)) {
+            $estado['pecas_opcoes'] = [];
+        }
+        if (!is_array($estado['blocos_calc'] ?? null)) {
+            $estado['blocos_calc'] = [];
+        }
+        $mediaVazia = !is_array($estado['formulas_blocos']['media_bim'] ?? null)
+            || $estado['formulas_blocos']['media_bim'] === [];
+        $finalVazia = !is_array($estado['formulas_blocos']['media_final'] ?? null)
+            || $estado['formulas_blocos']['media_final'] === [];
+        if (!$mediaVazia && !$finalVazia) {
+            return;
+        }
+        $this->definirPapelPecaColag($estado, 'bimestral', 'media');
+        $this->definirPapelPecaColag($estado, 'jornada', 'media');
+        $this->definirPapelPecaColag($estado, 'enac', 'so_melhora');
+        if ($mediaVazia) {
+            $estado['formulas_blocos']['media_bim'] = $this->tokensDaExpressao('(prova_bim + jornada) / 2');
+        }
+        if ($finalVazia) {
+            $estado['formulas_blocos']['media_final'] = $this->tokensDaExpressao('max(media_bim, (media_bim + enac) / 2)');
+        }
+        foreach (['media_bim', 'media_final'] as $codigo) {
+            if (!in_array($codigo, $estado['blocos_calc'], true)) {
+                $estado['blocos_calc'][] = $codigo;
+            }
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function definirPapelPecaColag(array &$estado, string $peca, string $papel): void
+    {
+        if (!isset($estado['pecas_opcoes'][$peca]) || !is_array($estado['pecas_opcoes'][$peca])) {
+            $estado['pecas_opcoes'][$peca] = [];
+        }
+        $estado['pecas_opcoes'][$peca]['papel'] = $papel;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function boletimEhTerceiraSerieColag(array $estado): bool
+    {
+        if (!$this->ehTenantColag()) {
+            return false;
+        }
+        $series = [];
+        foreach ((array) ($estado['series_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $series[$id] = true;
+            }
+        }
+        $turmas = [];
+        foreach ((array) ($estado['turmas_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $turmas[$id] = true;
+            }
+        }
+        if ($series === [] && $turmas === []) {
+            return false;
+        }
+        $vistas = [];
+        foreach ($this->ferramentas->listarTurmas(500) as $turma) {
+            $sid = (int) ($turma['serie_id'] ?? 0);
+            $tid = (int) ($turma['id'] ?? 0);
+            if ($sid <= 0 || isset($vistas[$sid])) {
+                continue;
+            }
+            if (!isset($series[$sid]) && !isset($turmas[$tid])) {
+                continue;
+            }
+            $vistas[$sid] = $this->nomeEhTerceiraSerieMedio(
+                (string) ($turma['serie_nome'] ?? ''),
+                (string) ($turma['curso_nome'] ?? '')
+            );
+        }
+        if ($vistas === []) {
+            return false;
+        }
+        foreach ($series as $sid => $_) {
+            if (!isset($vistas[$sid]) || $vistas[$sid] !== true) {
+                return false;
+            }
+        }
+        foreach ($vistas as $ok) {
+            if ($ok !== true) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function nomeEhTerceiraSerieMedio(string $serie, string $curso): bool
+    {
+        $texto = mb_strtolower(trim($serie . ' ' . $curso), 'UTF-8');
+        $texto = strtr($texto, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u',
+            'º' => '', 'ª' => '',
+        ]);
+        if (preg_match('/\banos\b/', $texto) === 1) {
+            return false;
+        }
+        if (preg_match('/fundamental/', $texto) === 1 && preg_match('/medio/', $texto) !== 1) {
+            return false;
+        }
+
+        return preg_match('/\b3\s*(a\s*)?serie\b/', $texto) === 1
+            || (preg_match('/\b3\s*(o\s*)?ano\b/', $texto) === 1 && preg_match('/medio/', $texto) === 1)
+            || preg_match('/\bterceira\s+serie\b/', $texto) === 1
+            || preg_match('/\b3\s*em\b/', $texto) === 1
+            || preg_match('/\bem\s*3\b/', $texto) === 1;
+    }
+
+    /**
      * @return array<string, array{tipo:string,quantidade:int,rotulo_campo:string,rotulo_campo_plural:string,rotulos:array<string,string>}>
      */
     private function catalogoPeriodos(): array
@@ -1287,6 +1421,7 @@ class BoletimAssistenteWizard
     {
         $estado = $this->normalizarEstado($estado);
         $this->aplicarEstruturaColag($estado);
+        $this->aplicarCalculoTerceiraSerieColag($estado);
         $this->aplicarNomeAutomatico($estado);
         $this->aplicarEscopoDoBoletimCadastro($estado);
         $this->aplicarMinimaResolvida($estado);
@@ -8148,6 +8283,7 @@ class BoletimAssistenteWizard
         if (!$this->ehTenantColag()) {
             return $rascunho;
         }
+        $this->vincularPecasMarcadasColag($rascunho, $estado);
         if (!in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
             $this->tirarColunasSemanaisColag($rascunho);
             $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
@@ -8192,6 +8328,116 @@ class BoletimAssistenteWizard
         $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
 
         return $rascunho;
+    }
+
+    /**
+     * A prova, o ENAC e a jornada marcados no passo das peças entram na coluna do quadro.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     */
+    private function vincularPecasMarcadasColag(array &$rascunho, array $estado): void
+    {
+        $mapa = [
+            'bimestral' => 'prova_bim',
+            'enac' => 'enac',
+            'trabalho' => 'trab',
+            'participacao' => 'part',
+            'recuperacao' => 'rec',
+            'jornada' => 'jornada',
+        ];
+        $porCodigo = [];
+        foreach ($mapa as $peca => $codigo) {
+            if (in_array($peca, (array) ($estado['pecas'] ?? []), true)) {
+                $porCodigo[$codigo] = $peca;
+            }
+        }
+        if ($porCodigo === []) {
+            return;
+        }
+
+        $comps = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                $comps[] = $componente;
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            $peca = $porCodigo[$codigo] ?? '';
+            if ($peca === '') {
+                $comps[] = $componente;
+                continue;
+            }
+            $opts = is_array($estado['pecas_opcoes'][$peca] ?? null) ? $estado['pecas_opcoes'][$peca] : [];
+            $componente['config'] = is_array($componente['config'] ?? null) ? $componente['config'] : [];
+            if ($peca === 'jornada') {
+                $componente['source_type'] = 'jornadas';
+                $idsJornada = ((string) ($estado['jornada_modo'] ?? '')) === 'selecionadas'
+                    ? $this->normalizarIdsLista($estado['jornada_ids'] ?? [])
+                    : $this->resolverIdsJornadaPorBimestre($estado);
+                if ($idsJornada !== []) {
+                    $componente['config']['jornada_ids'] = $idsJornada;
+                    $bimsJornada = $this->bimestresJornadaDoEstado($estado);
+                    if ($bimsJornada !== []) {
+                        $componente['config']['jornada_bimestres'] = $bimsJornada;
+                    }
+                }
+                $componente['config_json'] = json_encode($componente['config'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $comps[] = $componente;
+                continue;
+            }
+
+            $componente['source_type'] = 'provas_sistema';
+            $manual = !empty($opts['blocos_ids_manual']);
+            $ids = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+            $bims = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
+            if ($bims === []) {
+                $bimEstado = (int) ($estado['bimestre'] ?? 0);
+                if ($bimEstado >= 1 && $bimEstado <= 4) {
+                    $bims = [$bimEstado];
+                }
+            }
+            $tipo = (int) ($opts['tipo_avaliacao_id'] ?? $componente['tipo_avaliacao_id'] ?? $componente['config']['tipo_avaliacao_id'] ?? 0);
+            if ($bims !== []) {
+                $componente['config']['prova_bimestres'] = $bims;
+            }
+            if ($tipo > 0) {
+                $componente['tipo_avaliacao_id'] = $tipo;
+                $componente['config']['tipo_avaliacao_id'] = $tipo;
+            }
+            if ($manual && $ids !== []) {
+                $componente['blocos_ids'] = $ids;
+                $componente['config']['blocos_ids'] = $ids;
+                $componente['config']['blocos_ids_manual'] = 1;
+            } elseif ($tipo > 0) {
+                $resolvido = $this->ferramentas->resolverBlocosPorTipo(
+                    $tipo,
+                    null,
+                    null,
+                    4000,
+                    null,
+                    $bims,
+                    (int) ($estado['ano_letivo'] ?? 0)
+                );
+                $achados = $this->normalizarIdsLista($resolvido['blocos_ids'] ?? []);
+                if ($achados !== []) {
+                    $componente['blocos_ids'] = $achados;
+                    $componente['config']['blocos_ids'] = $achados;
+                    unset($componente['config']['blocos_ids_manual']);
+                }
+            }
+            $herdado = $this->fechamentoParaPeca($peca, $tipo);
+            if ($herdado !== null) {
+                $componente['calc_type'] = $herdado['calc_type'];
+                $componente['usar_percentual'] = $herdado['usar_percentual'];
+            } else {
+                $componente['calc_type'] = 'ultima';
+                $componente['usar_percentual'] = 0;
+            }
+            $componente['config_json'] = json_encode($componente['config'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $comps[] = $componente;
+        }
+        $rascunho['componentes'] = $comps;
     }
 
     /**

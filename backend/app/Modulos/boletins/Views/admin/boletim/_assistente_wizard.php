@@ -1263,6 +1263,91 @@ $boletimWizardSteps = [
         return !!(catalogo && catalogo.quadro_pecas_colag);
     }
 
+    function nomeEhTerceiraSerieMedio(serie, curso) {
+        var texto = (String(serie || '') + ' ' + String(curso || '')).toLowerCase();
+        if (typeof texto.normalize === 'function') {
+            texto = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+        texto = texto.replace(/[ºª]/g, '');
+        if (/\banos\b/.test(texto)) return false;
+        if (/fundamental/.test(texto) && !/medio/.test(texto)) return false;
+        return /\b3\s*(a\s*)?serie\b/.test(texto)
+            || (/\b3\s*(o\s*)?ano\b/.test(texto) && /medio/.test(texto))
+            || /\bterceira\s+serie\b/.test(texto)
+            || /\b3\s*em\b/.test(texto)
+            || /\bem\s*3\b/.test(texto);
+    }
+
+    function boletimEhTerceiraSerieColag() {
+        if (!ehQuadroPecasColag() || !estado) return false;
+        var series = {};
+        (estado.series_ids || []).forEach(function (id) { series[Number(id)] = true; });
+        var turmas = {};
+        (estado.turmas_ids || []).forEach(function (id) { turmas[Number(id)] = true; });
+        if (!Object.keys(series).length && !Object.keys(turmas).length) return false;
+        var vistas = {};
+        (catalogo.turmas || []).forEach(function (t) {
+            var sid = Number(t && t.serie_id || 0);
+            var tid = Number(t && t.id || 0);
+            if (!sid || vistas[sid] !== undefined) return;
+            if (!series[sid] && !turmas[tid]) return;
+            var serie = null;
+            (catalogo.series || []).forEach(function (s) {
+                if (Number(s && s.id) === sid) serie = s;
+            });
+            vistas[sid] = nomeEhTerceiraSerieMedio(
+                (serie && serie.nome) || t.serie_nome || '',
+                (serie && serie.curso_nome) || ''
+            );
+        });
+        var ids = Object.keys(vistas);
+        if (!ids.length) return false;
+        if (Object.keys(series).length) {
+            var falta = Object.keys(series).some(function (id) { return vistas[id] !== true; });
+            if (falta) return false;
+        }
+        return ids.every(function (id) { return vistas[id] === true; });
+    }
+
+    function garantirCalculoTerceiraSerieColag() {
+        if (!boletimEhTerceiraSerieColag()) return;
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
+        if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
+        var mediaVazia = !Array.isArray(estado.formulas_blocos.media_bim) || !estado.formulas_blocos.media_bim.length;
+        var finalVazia = !Array.isArray(estado.formulas_blocos.media_final) || !estado.formulas_blocos.media_final.length;
+        if (!mediaVazia && !finalVazia) return;
+        function papel(peca, valor) {
+            if (!estado.pecas_opcoes[peca]) estado.pecas_opcoes[peca] = pecasOpcoesPadraoJs(peca);
+            estado.pecas_opcoes[peca].papel = valor;
+        }
+        papel('bimestral', 'media');
+        papel('jornada', 'media');
+        papel('enac', 'so_melhora');
+        function peca(codigo, label) { return { type: 'peca', value: codigo, label: label }; }
+        function op(valor, label) { return { type: 'op', value: valor, label: label || valor }; }
+        if (mediaVazia) {
+            estado.formulas_blocos.media_bim = [
+                op('('), peca('prova_bim', 'Prova Bim'), op('+'), peca('jornada', 'Jornada do aluno'), op(')'), op('/', '÷'), { type: 'num', value: '2', label: '2' }
+            ];
+        }
+        if (finalVazia) {
+            estado.formulas_blocos.media_final = [
+                { type: 'fn', value: 'max', label: 'maior (' },
+                peca('media_bim', 'Média Bim'), op(','), op('('),
+                peca('media_bim', 'Média Bim'), op('+'), peca('enac', 'ENAC'),
+                op(')'), op('/', '÷'), { type: 'num', value: '2', label: '2' }, op(')')
+            ];
+        }
+        if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+        ['media_bim', 'media_final'].forEach(function (cod) {
+            if (estado.blocos_calc.indexOf(cod) < 0) estado.blocos_calc.push(cod);
+        });
+        var bloco = String(estado.bloco_calc || '');
+        if ((bloco === 'media_bim' || bloco === 'media_final') && !(estado.formula_tokens || []).length) {
+            estado.formula_tokens = (estado.formulas_blocos[bloco] || []).slice();
+        }
+    }
+
     function codigosPeriodoNota() {
         var bim = Number((estado && estado.bimestre) || 0);
         var ids = {};
@@ -12494,6 +12579,7 @@ $boletimWizardSteps = [
         }
 
         if (passo === 'formula') {
+            garantirCalculoTerceiraSerieColag();
             if (estado.origem === 'clonar') {
                 html += '<p class="text-sm text-gray-600">No modo clonar, a ordem e as fórmulas do evento de origem são mantidas. Avance para revisar.</p>';
             } else if (ehDemonstrativoNotas()) {
@@ -13817,6 +13903,7 @@ $boletimWizardSteps = [
                     estado.nome = nomeManual;
                     estado.nome_automatico = false;
                 }
+                garantirCalculoTerceiraSerieColag();
                 garantirEstado();
                 atualizarCabecalhoEvento();
                 var campoNome = document.getElementById('bw-nome');

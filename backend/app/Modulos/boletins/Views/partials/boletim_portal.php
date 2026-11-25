@@ -14,6 +14,13 @@ if (is_array($dadosBoletimOficial['observacao'] ?? null)) {
     $boletim_observacao = $dadosBoletimOficial['observacao'];
 }
 $boletim_somente_leitura = true;
+// 4º bimestre fica fora do portal do aluno e dos pais no Colag, até a escola liberar.
+$ocultar_periodos_portal = [];
+if (class_exists(\App\Modulos\BoletimColag\Services\BoletimColagModelo::class)
+    && \App\Modulos\BoletimColag\Services\BoletimColagModelo::ativo()
+) {
+    $ocultar_periodos_portal = [4];
+}
 // Portal do aluno (Grupo Seb) não tem o AJAX admin — evita spinner eterno.
 if (class_exists(\App\Modulos\GrupoSeb\Services\GrupoSebService::class)
     && \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()
