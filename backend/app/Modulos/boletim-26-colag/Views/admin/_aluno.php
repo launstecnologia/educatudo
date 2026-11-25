@@ -228,6 +228,7 @@ sort($bimestresBoletim);
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
                     <th class="<?= $cabecaBoletim ?>" colspan="2"><?= (int) $bimestreColuna ?>º</th>
                     <?php endforeach; ?>
+                    <th class="<?= $cabecaBoletim ?>" rowspan="2" title="Média dos 4 bimestres">Média</th>
                 </tr>
                 <tr>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
@@ -249,6 +250,23 @@ sort($bimestresBoletim);
                     <td class="px-2 py-2 <?= $notaBaixa ? 'vermelho' : (is_numeric($notaGrade) ? 'nota' : '') ?>"><?= $fmt($notaGrade) ?></td>
                     <td class="px-2 py-2"><?= $fmtInt($celulaGrade['faltas']) ?></td>
                     <?php endforeach; ?>
+                    <?php
+                    $somaMedia = 0.0;
+                    $qtdMedia = 0;
+                    foreach ($bimestresBoletim as $bimestreMedia) {
+                        $notaMedia = $gradeBoletim[$nomeGrade][$bimestreMedia]['resultado'] ?? null;
+                        if (!is_numeric($notaMedia)) {
+                            continue;
+                        }
+                        $somaMedia += (float) $notaMedia;
+                        $qtdMedia++;
+                    }
+                    $mediaAnual = $qtdMedia > 0
+                        ? (round(($somaMedia / $qtdMedia) * 2, 0, PHP_ROUND_HALF_UP) / 2)
+                        : null;
+                    $mediaBaixa = $notaCampo === 'media_anual' && $notaMinima !== null && $mediaAnual !== null && $mediaAnual < $notaMinima;
+                    ?>
+                    <td class="px-2 py-2 font-semibold <?= $mediaBaixa ? 'vermelho' : ($mediaAnual !== null ? 'nota' : '') ?>"><?= $fmt($mediaAnual) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

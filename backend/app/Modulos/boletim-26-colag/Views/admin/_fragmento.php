@@ -3,8 +3,9 @@ $painel = is_array($painel ?? null) ? $painel : [];
 $relatorios = is_array($relatorios ?? null) ? $relatorios : [];
 $notaMinima = is_numeric($painel['nota_minima'] ?? null) ? (float) $painel['nota_minima'] : null;
 $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ',', '');
-$notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
-$notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
+$notaCampo = (string) ($painel['nota_campo'] ?? 'resultado');
+$notaCampo = ($notaCampo === 'media_bim' || $notaCampo === 'media_anual') ? $notaCampo : 'resultado';
+$notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : ($notaCampo === 'media_anual' ? 'média dos 4 bimestres' : 'resultado final');
 $bimestreFiltro = (int) ($painel['bimestre'] ?? 0);
 $bimestresPainel = [];
 foreach ((array) ($painel['bimestres'] ?? []) as $bimestrePainel) {

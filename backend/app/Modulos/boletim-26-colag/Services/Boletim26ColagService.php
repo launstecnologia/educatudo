@@ -95,7 +95,7 @@ class Boletim26ColagService
                 break;
             }
         }
-        $notaCampo = $notaCampo === 'media_bim' ? 'media_bim' : 'resultado';
+        $notaCampo = $this->campoNotaMinima($notaCampo);
         $bimestres = $listaBimestres !== [] ? $listaBimestres : ($bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4]);
         $bimestreFiltro = count($bimestres) === 1 ? $bimestres[0] : 0;
         $relatorios = [];
@@ -157,12 +157,24 @@ class Boletim26ColagService
         ];
     }
 
+    private function campoNotaMinima(string $campo): string
+    {
+        if ($campo === 'media_bim' || $campo === 'media_anual') {
+            return $campo;
+        }
+
+        return 'resultado';
+    }
+
     /**
      * @param list<array<string,mixed>> $relatorios
      * @return list<array<string,mixed>>
      */
     private function filtrarRelatoriosAbaixo(array $relatorios, float $notaMinima, string $notaCampo): array
     {
+        if ($notaCampo === 'media_anual') {
+            return $this->filtrarPelaMediaAnual($relatorios, $notaMinima);
+        }
         $saida = [];
         foreach ($relatorios as $relatorio) {
             $demonstrativos = [];
@@ -192,6 +204,85 @@ class Boletim26ColagService
                             return empty($linha['filha']) && isset($pais[(string) ($linha['nome'] ?? '')]);
                         }
                     ));
+                    if ($linhas === []) {
+                        continue;
+                    }
+                    $bloco['linhas'] = $linhas;
+                    $blocos[] = $bloco;
+                }
+                if ($blocos === []) {
+                    continue;
+                }
+                $demo['blocos'] = $blocos;
+                $demonstrativos[] = $demo;
+            }
+            if ($demonstrativos === []) {
+                continue;
+            }
+            $relatorio['demonstrativos'] = $demonstrativos;
+            $saida[] = $relatorio;
+        }
+
+        return $saida;
+    }
+
+    /**
+     * Mantém a matéria cuja média dos bimestres fica abaixo do mínimo.
+     *
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarPelaMediaAnual(array $relatorios, float $notaMinima): array
+    {
+        $saida = [];
+        foreach ($relatorios as $relatorio) {
+            $somas = [];
+            $quantidades = [];
+            foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+                foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                    foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                        if ($this->frentePortuguesOculta($linha) || !empty($linha['filha'])) {
+                            continue;
+                        }
+                        $nome = (string) ($linha['nome'] ?? '');
+                        if ($nome === '' || !is_numeric($linha['resultado'] ?? null)) {
+                            continue;
+                        }
+                        $somas[$nome] = ($somas[$nome] ?? 0.0) + (float) $linha['resultado'];
+                        $quantidades[$nome] = ($quantidades[$nome] ?? 0) + 1;
+                    }
+                }
+            }
+            $abaixo = [];
+            foreach ($somas as $nome => $soma) {
+                $quantidade = (int) ($quantidades[$nome] ?? 0);
+                if ($quantidade < 1) {
+                    continue;
+                }
+                $media = round(($soma / $quantidade) * 2, 0, PHP_ROUND_HALF_UP) / 2;
+                if ($media < $notaMinima) {
+                    $abaixo[$nome] = $media;
+                }
+            }
+            if ($abaixo === []) {
+                continue;
+            }
+            $demonstrativos = [];
+            foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+                $blocos = [];
+                foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                    $linhas = [];
+                    foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                        if ($this->frentePortuguesOculta($linha)) {
+                            continue;
+                        }
+                        $nome = (string) ($linha['nome'] ?? '');
+                        if ($nome === '' || !isset($abaixo[$nome])) {
+                            continue;
+                        }
+                        $linha['media_anual'] = $abaixo[$nome];
+                        $linhas[] = $linha;
+                    }
                     if ($linhas === []) {
                         continue;
                     }

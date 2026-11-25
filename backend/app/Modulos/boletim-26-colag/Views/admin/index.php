@@ -8,8 +8,9 @@ $serieFiltro = (int) ($painel['serie'] ?? 0);
 $bimestreFiltro = (int) ($painel['bimestre'] ?? 0);
 $notaMinima = is_numeric($painel['nota_minima'] ?? null) ? (float) $painel['nota_minima'] : null;
 $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ',', '');
-$notaCampo = (string) ($painel['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
-$notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : 'resultado final';
+$notaCampo = (string) ($painel['nota_campo'] ?? 'resultado');
+$notaCampo = ($notaCampo === 'media_bim' || $notaCampo === 'media_anual') ? $notaCampo : 'resultado';
+$notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : ($notaCampo === 'media_anual' ? 'média dos 4 bimestres' : 'resultado final');
 $abrir = !empty($painel['abrir']);
 $exibir = (string) ($_GET['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
 $homologacao = is_array($painel['homologacao'] ?? null) ? $painel['homologacao'] : [];
@@ -274,6 +275,7 @@ $rotuloSerie = static function (int $serie): string {
                 <select id="boletim_nota_campo" name="nota_campo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="media_bim" <?= $notaCampo === 'media_bim' ? 'selected' : '' ?>>Média bimestral</option>
                     <option value="resultado" <?= $notaCampo === 'resultado' ? 'selected' : '' ?>>Resultado final</option>
+                    <option value="media_anual" <?= $notaCampo === 'media_anual' ? 'selected' : '' ?>>Média dos 4 bimestres</option>
                 </select>
             </div>
             <div>

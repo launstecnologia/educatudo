@@ -186,7 +186,8 @@ class Boletim26ColagAdminController extends BaseController
             return;
         }
         $notaBruta = trim(str_replace(',', '.', (string) ($corpo['nota_minima'] ?? '')));
-        $notaCampo = (string) ($corpo['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado';
+        $notaCampo = (string) ($corpo['nota_campo'] ?? 'resultado');
+        $notaCampo = ($notaCampo === 'media_bim' || $notaCampo === 'media_anual') ? $notaCampo : 'resultado';
         $linhas = is_array($corpo['linhas'] ?? null) ? $corpo['linhas'] : [];
         $exibirSituacao = (string) ($corpo['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
         $bimestresSituacao = $this->bimestresDoFiltro($corpo, $exibirSituacao);
@@ -245,7 +246,7 @@ class Boletim26ColagAdminController extends BaseController
             'bimestre' => count($bimestres) === 1 ? $bimestres[0] : 0,
             'bimestres' => $bimestres,
             'exibir' => $exibir,
-            'nota_campo' => (string) ($fonte['nota_campo'] ?? 'resultado') === 'media_bim' ? 'media_bim' : 'resultado',
+            'nota_campo' => (($campo = (string) ($fonte['nota_campo'] ?? 'resultado')) === 'media_bim' || $campo === 'media_anual') ? $campo : 'resultado',
             'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
             'abrir' => (string) ($fonte['abrir'] ?? '') === '1',
         ];
