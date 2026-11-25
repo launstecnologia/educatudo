@@ -185,3 +185,5 @@
 - [x] Boletim: preservar a linha-mãe identificada do agrupamento (ex.: Língua Portuguesa) na geração sem notas das filhas. Corrige linha ausente na fonte gravada que deixava nota antiga na ficha mesmo após sincronizar; regressão cobre matriz e registro de persistência. — 2026-11-03
 
 - [x] Boletim: regravação acionada por Sincronizar eventos preserva a mesma matriz do Demonstrativo usada na geração, incluindo Português agrupado. Regressão reproduz gerar → regravar e impede a perda da linha-mãe. — 2026-11-03
+
+- [x] Lançamento de notas da coordenação — baixar em Excel o histórico completo de alterações do evento pelo painel Histórico. — 2026-11-25

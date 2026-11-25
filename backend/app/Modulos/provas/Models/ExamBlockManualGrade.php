@@ -587,26 +587,27 @@ class ExamBlockManualGrade
     /**
      * @return list<array<string,mixed>>
      */
-    public function fetchLogPorBloco(int $blocoId, int $limite = 100): array
+    public function fetchLogPorBloco(int $blocoId, ?int $limite = 100): array
     {
         if (!$this->logTableExists() || $blocoId <= 0) {
             return [];
         }
-        $limite = max(1, min(500, $limite));
+        $limiteSql = $limite === null ? '' : ' LIMIT ' . max(1, min(500, $limite));
         $rows = $this->db->fetchAll(
             "SELECT l.*,
+                    COALESCE(p.nome, IF(l.professor_id = 0, 'Coordenação', CONCAT('Professor #', l.professor_id))) AS professor_nome,
                     COALESCE(u.nome, 'Sistema') AS alterado_por_nome,
                     COALESCE(a.nome, CONCAT('Aluno #', l.aluno_id)) AS aluno_nome,
                     COALESCE(m.nome, CONCAT('Matéria #', l.materia_id)) AS materia_nome,
                     COALESCE(t.nome, CONCAT('Turma #', l.turma_id)) AS turma_nome
              FROM provas_blocos_notas_lancadas_log l
+             LEFT JOIN professores p ON p.id = l.professor_id
              LEFT JOIN usuarios u ON u.id = l.alterado_por
              LEFT JOIN alunos a ON a.id = l.aluno_id
              LEFT JOIN materias m ON m.id = l.materia_id
              LEFT JOIN turmas t ON t.id = l.turma_id
              WHERE l.bloco_id = :bloco
-             ORDER BY l.criado_em DESC, l.id DESC
-             LIMIT {$limite}",
+             ORDER BY l.criado_em DESC, l.id DESC{$limiteSql}",
             ['bloco' => $blocoId]
         ) ?: [];
 

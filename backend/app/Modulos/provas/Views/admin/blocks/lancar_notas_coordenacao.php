@@ -676,6 +676,10 @@ if ($tipoFlash === 'error') {
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Histórico de alterações</h3>
+        <a href="<?= htmlspecialchars($actionFiltro . '?exportar=historico_excel') ?>"
+           class="ml-auto mr-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:underline">
+            <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Baixar Excel
+        </a>
         <button type="button" data-csp-click="closeHistoricoDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>

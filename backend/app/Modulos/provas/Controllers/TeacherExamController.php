@@ -2555,6 +2555,29 @@ class TeacherExamController extends BaseController
         $this->redirect($urlVolta);
     }
 
+    private function baixarHistoricoNotasExcel(int $blocoId): void
+    {
+        $linhas = [];
+        foreach ((new ExamBlockManualGrade())->fetchLogPorBloco($blocoId, null) as $registro) {
+            $linhas[] = [
+                $registro['criado_em'], $registro['aluno_nome'], $registro['turma_nome'],
+                $registro['materia_nome'], $registro['professor_nome'], $registro['alterado_por_nome'],
+                $registro['nota_anterior'], $registro['nota_nova'],
+                $registro['observacao_anterior'], $registro['observacao_nova'],
+            ];
+        }
+        $arquivo = (new \App\Painel\Admin\Services\RelatorioCompletoArquivo())->excel(['abas' => [[
+            'nome' => 'Histórico',
+            'colunas' => ['Data e hora', 'Aluno', 'Turma', 'Matéria', 'Professor', 'Alterado por',
+                'Nota anterior', 'Nota nova', 'Observação anterior', 'Observação nova'],
+            'linhas' => $linhas,
+        ]]]);
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="historico-notas-evento-' . $blocoId . '.xlsx"');
+        header('Cache-Control: private, no-store');
+        echo $arquivo;
+    }
+
     /**
      * Coordenação: formulário para lançar notas diretamente no evento (matéria específica ou todas).
      */
@@ -2577,6 +2600,11 @@ class TeacherExamController extends BaseController
         if (($bloco['configuracao_nota'] ?? '') !== 'coordenacao_calcula') {
             $this->setFlashMessage('Este evento está configurado para lançamento pelo professor.', 'error');
             $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
+            return;
+        }
+
+        if (($_GET['exportar'] ?? '') === 'historico_excel') {
+            $this->baixarHistoricoNotasExcel($blocoId);
             return;
         }
 
