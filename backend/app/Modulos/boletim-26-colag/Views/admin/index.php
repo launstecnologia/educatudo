@@ -24,6 +24,12 @@ $fmtInt = static function ($valor): string {
     }
     return (string) (int) $valor;
 };
+$celNota = static function ($valor) use ($fmt): string {
+    $texto = $fmt($valor);
+    $classe = $texto === '—' ? '' : ' nota';
+
+    return '<td class="px-2 py-2' . $classe . '">' . $texto . '</td>';
+};
 $rotuloSerie = static function (int $serie): string {
     if ($serie === 1) {
         return '1ª Série EM';
@@ -37,6 +43,23 @@ $rotuloSerie = static function (int $serie): string {
     return 'Ensino Médio';
 };
 ?>
+<style>
+.boletim-colag { border-collapse: collapse; }
+.boletim-colag th,
+.boletim-colag td { border: 1px solid #dbe4ee; }
+.boletim-colag thead th {
+    background: #1e3a8a;
+    color: #fff;
+    border-color: rgba(255, 255, 255, .45);
+    font-size: 11px;
+    letter-spacing: .04em;
+    line-height: 1.2;
+}
+.boletim-colag thead tr:nth-child(2) th { font-size: 10px; padding-top: 4px; padding-bottom: 4px; }
+.boletim-colag tbody tr:nth-child(even) td { background: #f4f8fc; }
+.boletim-colag tbody tr:nth-child(odd) td { background: #fff; }
+.boletim-colag td.nota { color: #047857; font-weight: 600; }
+</style>
 <div class="mb-6">
     <h2 class="text-2xl font-bold text-gray-900 mb-1">Boletim - colag</h2>
     <p class="text-gray-600">Demonstrativo desta escola. A conta já está feita. A 1ª e a 2ª série separam Bloco A e Bloco B. A 3ª série fica numa lista só.</p>
@@ -132,8 +155,8 @@ foreach ($demonstrativos as $demoAba) {
     $terceira = !empty($demo['terceira']);
     ?>
     <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">
-        <?php $cabeca = 'px-2 py-2 bg-blue-900 text-white uppercase text-xs font-semibold tracking-wide whitespace-nowrap'; ?>
-        <table class="min-w-full text-sm text-center">
+        <?php $cabeca = 'px-2 py-2 uppercase font-semibold whitespace-nowrap'; ?>
+        <table class="boletim-colag min-w-full text-sm text-center">
             <thead>
                 <tr>
                     <th class="<?= $cabeca ?> px-3 text-left"<?= $semanas !== [] ? ' rowspan="2"' : '' ?>><?= htmlspecialchars((string) ($bloco['titulo'] ?? 'Matérias'), ENT_QUOTES, 'UTF-8') ?></th>
@@ -169,7 +192,7 @@ foreach ($demonstrativos as $demoAba) {
             <tbody>
                 <?php foreach ($linhas as $linha): ?>
                 <?php $filha = !empty($linha['filha']); ?>
-                <tr class="border-t border-gray-200 <?= $filha ? 'bg-gray-50' : 'bg-white' ?>">
+                <tr>
                     <td class="px-3 py-2 text-left <?= $filha ? 'pl-8 text-gray-700' : 'font-semibold text-gray-900' ?>">
                         <?php if ($filha): ?><span class="text-gray-400 mr-1">↳</span><?php endif; ?>
                         <?= htmlspecialchars((string) ($linha['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
@@ -182,17 +205,17 @@ foreach ($demonstrativos as $demoAba) {
                     <?php if ($semanas !== []): ?>
                     <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_n'] ?? null) ?></td>
                     <td class="px-2 py-2 font-semibold"><?= $fmtInt($linha['total_q'] ?? null) ?></td>
-                    <td class="px-2 py-2"><?= $fmt($linha['media_sem'] ?? null) ?></td>
+                    <?= $celNota($linha['media_sem'] ?? null) ?>
                     <?php endif; ?>
-                    <td class="px-2 py-2"><?= $fmt($linha['prova_bim'] ?? null) ?></td>
-                    <td class="px-2 py-2"><?= $fmt($linha['jornada'] ?? null) ?></td>
+                    <?= $celNota($linha['prova_bim'] ?? null) ?>
+                    <?= $celNota($linha['jornada'] ?? null) ?>
                     <?php if (!$terceira): ?>
-                    <td class="px-2 py-2"><?= $fmt($linha['media'] ?? null) ?></td>
+                    <?= $celNota($linha['media'] ?? null) ?>
                     <?php endif; ?>
-                    <td class="px-2 py-2"><?= $fmt($linha['enac'] ?? null) ?></td>
-                    <td class="px-2 py-2"><?= $fmt($linha['media_bim'] ?? null) ?></td>
-                    <td class="px-2 py-2"><?= $fmt($linha['rec'] ?? null) ?></td>
-                    <td class="px-2 py-2 font-semibold text-emerald-700"><?= $fmt($linha['resultado'] ?? null) ?></td>
+                    <?= $celNota($linha['enac'] ?? null) ?>
+                    <?= $celNota($linha['media_bim'] ?? null) ?>
+                    <?= $celNota($linha['rec'] ?? null) ?>
+                    <?= $celNota($linha['resultado'] ?? null) ?>
                     <td class="px-2 py-2"><?= $fmtInt($linha['faltas'] ?? null) ?></td>
                 </tr>
                 <?php endforeach; ?>

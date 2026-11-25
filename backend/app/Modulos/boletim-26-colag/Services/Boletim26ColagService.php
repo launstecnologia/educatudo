@@ -733,9 +733,7 @@ class Boletim26ColagService
             ];
         }
         $media = $this->mediaPresentes([$mediaSem, $prova, $notaJornada]);
-        $mediaBim = $enac !== null && $media !== null
-            ? $this->meio(($media + $enac) / 2)
-            : $media;
+        $mediaBim = $this->mediaBimComEnac($media, $enac);
         $resultado = $mediaBim;
         if ($rec !== null && ($resultado === null || $rec > $resultado)) {
             $resultado = $rec;
@@ -877,9 +875,10 @@ class Boletim26ColagService
             }
         }
         $pai['media'] = $this->mediaPresentes([$pai['media_sem'], $pai['prova_bim'], $pai['jornada']]);
-        $pai['media_bim'] = is_numeric($pai['enac']) && is_numeric($pai['media'])
-            ? $this->meio(((float) $pai['media'] + (float) $pai['enac']) / 2)
-            : $pai['media'];
+        $pai['media_bim'] = $this->mediaBimComEnac(
+            is_numeric($pai['media'] ?? null) ? (float) $pai['media'] : null,
+            is_numeric($pai['enac'] ?? null) ? (float) $pai['enac'] : null
+        );
         $pai['resultado'] = $pai['media_bim'];
         if (is_numeric($pai['rec']) && ($pai['resultado'] === null || (float) $pai['rec'] > (float) $pai['resultado'])) {
             $pai['resultado'] = $pai['rec'];
@@ -1059,6 +1058,22 @@ class Boletim26ColagService
         }
 
         return $semana;
+    }
+
+    /**
+     * Média bimestral fica com (MÉDIA + ENAC) / 2 só quando isso supera a MÉDIA.
+     */
+    private function mediaBimComEnac(?float $media, ?float $enac): ?float
+    {
+        if ($media === null) {
+            return null;
+        }
+        if ($enac === null) {
+            return $media;
+        }
+        $comEnac = $this->meio(($media + $enac) / 2);
+
+        return $comEnac > $media ? $comEnac : $media;
     }
 
     private function meio(float $valor): float

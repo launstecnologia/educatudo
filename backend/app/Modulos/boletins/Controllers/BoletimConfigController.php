@@ -8961,7 +8961,7 @@ class BoletimConfigController extends BaseController
             );
             $modoFormulaGrupo = (string) ($g['mode'] ?? 'media');
             if ($this->maeDePortuguesNoColag((string) ($g['label'] ?? ''))) {
-                $paiNotas = $this->mediaSemanalMaePorAcertos($paiNotas, $roundModeGrupo);
+                $paiNotas = $this->mediaSemanalMaePorAcertos($paiNotas, $roundModeGrupo, $arredGrupo);
                 $modoFormulaGrupo = 'media';
             }
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
@@ -9379,7 +9379,7 @@ class BoletimConfigController extends BaseController
         }
         $chave = $this->canonicalMateriaNomeKey($rotulo);
 
-        return str_contains($chave, 'lingua portuguesa') || $chave === 'portugues';
+        return str_contains($chave, 'linguaportuguesa') || $chave === 'portugues';
     }
 
     /**
@@ -9388,7 +9388,7 @@ class BoletimConfigController extends BaseController
      * @param array<string,mixed> $notas
      * @return array<string,mixed>
      */
-    private function mediaSemanalMaePorAcertos(array $notas, string $roundMode): array
+    private function mediaSemanalMaePorAcertos(array $notas, string $roundMode, string $arredondamento): array
     {
         $acertos = 0;
         $questoes = 0;
@@ -9412,14 +9412,10 @@ class BoletimConfigController extends BaseController
         if ($questoes <= 0) {
             return $notas;
         }
-        $modo = $roundMode === 'none' ? 'half' : $roundMode;
-        $media = $this->applyRoundMode(10 * $acertos / $questoes, $modo);
-        if ($media === null) {
-            return $notas;
-        }
+        $media = $this->aplicarArredondamentoMaeGrupo(10 * $acertos / $questoes, $roundMode, $arredondamento);
         $trocou = false;
-        foreach (array_keys($notas) as $codigo) {
-            if ($this->pecaGrupoDoCodigoColuna((string) $codigo) !== 'semanal') {
+        foreach (['media_sem', 'semanal'] as $codigo) {
+            if (!array_key_exists($codigo, $notas)) {
                 continue;
             }
             $notas[$codigo] = $media;
