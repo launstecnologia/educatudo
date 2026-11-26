@@ -169,7 +169,7 @@ class Boletim26ColagAdminController extends BaseController
     }
 
     /**
-     * CSV da turma no formato Prova Final: APRO ou nota (limiar padrão 6,5).
+     * Excel formatado da Prova Final: APRO verde ou nota amarela (limiar padrão 6,5).
      */
     public function exportarProvaFinal(): void
     {
@@ -189,55 +189,14 @@ class Boletim26ColagAdminController extends BaseController
             [1, 2, 3, 4]
         );
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
-        $blocos = $this->servico->planilhaProvaFinal($relatorios, (float) $limiar);
+        $xml = $this->servico->excelProvaFinal($relatorios, (float) $limiar);
         $ano = (int) ($painel['ano'] ?? date('Y'));
-        $nome = 'boletim-colag-prova-final-' . $ano . '.csv';
-        header('Content-Type: text/csv; charset=UTF-8');
+        $nome = 'boletim-colag-prova-final-' . $ano . '.xls';
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
         header('Content-Disposition: attachment; filename="' . $nome . '"');
         header('Pragma: no-cache');
         header('Expires: 0');
-        $saida = fopen('php://output', 'w');
-        if ($saida === false) {
-            return;
-        }
-        fprintf($saida, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        if ($blocos === []) {
-            fputcsv($saida, ['Sem dados para exportar com o filtro atual.'], ';');
-            fclose($saida);
-            exit;
-        }
-        $limiarTexto = number_format((float) $limiar, 1, ',', '');
-        foreach ($blocos as $indice => $bloco) {
-            if ($indice > 0) {
-                fputcsv($saida, [], ';');
-            }
-            $materias = is_array($bloco['materias'] ?? null) ? $bloco['materias'] : [];
-            $siglas = array_map(
-                static fn (array $materia): string => (string) ($materia['sigla'] ?? ''),
-                $materias
-            );
-            $qtd = count($siglas);
-            fputcsv($saida, array_merge(
-                [
-                    $this->csvTexto((string) ($bloco['turma'] ?? '')),
-                    'PROVA FINAL — APRO se ≥ ' . $limiarTexto . '; senão resultado',
-                ],
-                array_fill(0, max(0, $qtd - 1), '')
-            ), ';');
-            fputcsv($saida, array_merge(['NOME DO ALUNO'], $siglas), ';');
-            foreach (is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [] as $aluno) {
-                $prova = array_pad(
-                    array_slice(is_array($aluno['prova_final'] ?? null) ? $aluno['prova_final'] : [], 0, $qtd),
-                    $qtd,
-                    ''
-                );
-                fputcsv($saida, array_merge(
-                    [$this->csvTexto((string) ($aluno['nome'] ?? ''))],
-                    $prova
-                ), ';');
-            }
-        }
-        fclose($saida);
+        echo $xml;
         exit;
     }
 
@@ -399,15 +358,5 @@ class Boletim26ColagAdminController extends BaseController
         }
 
         return number_format((float) $valor, 1, ',', '');
-    }
-
-    /** Evita o Excel interpretar nome como fórmula. */
-    private function csvTexto(string $valor): string
-    {
-        if ($valor !== '' && preg_match('/^[=+\-@]/', $valor) === 1) {
-            return "'" . $valor;
-        }
-
-        return $valor;
     }
 }

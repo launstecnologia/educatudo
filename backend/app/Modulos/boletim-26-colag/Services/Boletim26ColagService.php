@@ -2479,6 +2479,132 @@ class Boletim26ColagService
     }
 
     /**
+     * Excel SpreadsheetML da Prova Final (cabeçalho, bordas, APRO verde, nota baixa amarela).
+     *
+     * @param list<array<string,mixed>> $relatorios
+     */
+    public function excelProvaFinal(array $relatorios, float $limiar = 6.5): string
+    {
+        $blocos = $this->planilhaProvaFinal($relatorios, $limiar);
+        $limiarTexto = number_format($limiar, 1, ',', '');
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
+        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+        $borda = '<Borders>'
+            . '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9CA3AF"/>'
+            . '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9CA3AF"/>'
+            . '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9CA3AF"/>'
+            . '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9CA3AF"/>'
+            . '</Borders>';
+        $xml .= '<Styles>';
+        $xml .= '<Style ss:ID="Default"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>';
+        $xml .= '<Style ss:ID="Titulo"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#D1D5DB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Subtitulo"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#374151"/><Interior ss:Color="#E5E7EB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="CabecaNome"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#9CA3AF" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Cabeca"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#9CA3AF" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        // Linha clara
+        $xml .= '<Style ss:ID="NomeClaro"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="AproClaro"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="NotaClaro"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#DC2626"/><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        // Linha cinza mais escura
+        $xml .= '<Style ss:ID="NomeEscuro"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#D1D5DB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="AproEscuro"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#111827"/><Interior ss:Color="#D1D5DB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="NotaEscuro"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#DC2626"/><Interior ss:Color="#D1D5DB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '</Styles>';
+
+        if ($blocos === []) {
+            $xml .= '<Worksheet ss:Name="Prova Final"><Table>';
+            $xml .= '<Row><Cell ss:StyleID="Subtitulo"><Data ss:Type="String">Sem dados para exportar com o filtro atual.</Data></Cell></Row>';
+            $xml .= '</Table></Worksheet></Workbook>';
+
+            return $xml;
+        }
+
+        $abasUsadas = [];
+        foreach ($blocos as $bloco) {
+            $turma = (string) ($bloco['turma'] ?? 'Turma');
+            $materias = is_array($bloco['materias'] ?? null) ? $bloco['materias'] : [];
+            $alunos = is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [];
+            $qtd = count($materias);
+            $merge = max(0, $qtd);
+            $aba = $this->nomeAbaExcel($turma, $abasUsadas);
+            $xml .= '<Worksheet ss:Name="' . $this->xmlAttr($aba) . '"><Table>';
+            $xml .= '<Column ss:Width="260"/>';
+            if ($qtd > 0) {
+                $xml .= '<Column ss:Width="52" ss:Span="' . max(0, $qtd - 1) . '"/>';
+            }
+            $xml .= '<Row ss:Height="26"><Cell ss:StyleID="Titulo"' . ($merge > 0 ? ' ss:MergeAcross="' . $merge . '"' : '') . '><Data ss:Type="String">'
+                . $this->xmlTexto($turma . ' — PROVA FINAL') . '</Data></Cell></Row>';
+            $xml .= '<Row ss:Height="18"><Cell ss:StyleID="Subtitulo"' . ($merge > 0 ? ' ss:MergeAcross="' . $merge . '"' : '') . '><Data ss:Type="String">'
+                . $this->xmlTexto('APRO se ≥ ' . $limiarTexto . '; senão resultado final') . '</Data></Cell></Row>';
+            $xml .= '<Row ss:Height="22"><Cell ss:StyleID="CabecaNome"><Data ss:Type="String">NOME DO ALUNO</Data></Cell>';
+            foreach ($materias as $materia) {
+                $xml .= '<Cell ss:StyleID="Cabeca"><Data ss:Type="String">' . $this->xmlTexto((string) ($materia['sigla'] ?? '')) . '</Data></Cell>';
+            }
+            $xml .= '</Row>';
+            foreach ($alunos as $indice => $aluno) {
+                $escuro = ($indice % 2) === 1;
+                $sufixo = $escuro ? 'Escuro' : 'Claro';
+                $xml .= '<Row ss:Height="18"><Cell ss:StyleID="Nome' . $sufixo . '"><Data ss:Type="String">'
+                    . $this->xmlTexto((string) ($aluno['nome'] ?? '')) . '</Data></Cell>';
+                $celulas = array_pad(
+                    array_slice(is_array($aluno['prova_final'] ?? null) ? $aluno['prova_final'] : [], 0, $qtd),
+                    $qtd,
+                    ''
+                );
+                foreach ($celulas as $celula) {
+                    $texto = (string) $celula;
+                    if ($texto === 'APRO' || $texto === '') {
+                        $estilo = 'Apro' . $sufixo;
+                    } else {
+                        $estilo = 'Nota' . $sufixo;
+                    }
+                    $xml .= '<Cell ss:StyleID="' . $estilo . '"><Data ss:Type="String">' . $this->xmlTexto($texto) . '</Data></Cell>';
+                }
+                $xml .= '</Row>';
+            }
+            $xml .= '</Table></Worksheet>';
+        }
+        $xml .= '</Workbook>';
+
+        return $xml;
+    }
+
+    /**
+     * @param array<string, true> $usadas
+     */
+    private function nomeAbaExcel(string $nome, array &$usadas): string
+    {
+        $base = preg_replace('/[\\\\\/\?\*\[\]:]/', ' ', $nome) ?? $nome;
+        $base = trim(preg_replace('/\s+/', ' ', $base) ?? $base);
+        if ($base === '') {
+            $base = 'Turma';
+        }
+        $base = function_exists('mb_substr') ? mb_substr($base, 0, 28, 'UTF-8') : substr($base, 0, 28);
+        $aba = $base;
+        $n = 2;
+        while (isset($usadas[$aba])) {
+            $sufixo = ' ' . $n;
+            $limite = 31 - strlen($sufixo);
+            $aba = (function_exists('mb_substr') ? mb_substr($base, 0, max(1, $limite), 'UTF-8') : substr($base, 0, max(1, $limite))) . $sufixo;
+            $n++;
+        }
+        $usadas[$aba] = true;
+
+        return $aba;
+    }
+
+    private function xmlTexto(string $valor): string
+    {
+        return htmlspecialchars($valor, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    }
+
+    private function xmlAttr(string $valor): string
+    {
+        return htmlspecialchars($valor, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
      * Planilha da turma: APRO se a média (resultado) >= limiar; senão a própria nota.
      *
      * @param list<array<string,mixed>> $relatorios
