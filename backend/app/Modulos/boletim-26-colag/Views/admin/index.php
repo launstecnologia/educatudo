@@ -149,6 +149,10 @@ $rotuloSerie = static function (int $serie): string {
             <i class="fa-solid fa-file-excel mr-2 text-gray-500"></i>
             Exportar Excel
         </button>
+        <button type="submit" form="boletim-filtros" formmethod="get" formaction="<?= URL ?>/admin/boletim-26-colag/exportar-prova-final" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" title="APRO se média ≥ nota mínima do filtro (padrão 6,5); senão mostra o resultado final">
+            <i class="fa-solid fa-table mr-2 text-gray-500"></i>
+            Exportar Prova Final
+        </button>
         <button type="submit" form="boletim-filtros" formmethod="post" formaction="<?= URL ?>/admin/boletim-26-colag/homologar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <i class="fa-solid fa-stamp mr-2 text-gray-500"></i>
             Homologar

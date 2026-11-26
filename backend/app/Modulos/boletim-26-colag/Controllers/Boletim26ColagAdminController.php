@@ -168,6 +168,85 @@ class Boletim26ColagAdminController extends BaseController
         exit;
     }
 
+    /**
+     * CSV da turma: Prova Final (APRO ou nota) + Média Final.
+     * Usa a média dos resultados dos bimestres filtrados; limiar padrão 6,5.
+     */
+    public function exportarProvaFinal(): void
+    {
+        $filtro = $this->filtroDaRequisicao();
+        $limiar = $filtro['nota_minima'] ?? 6.5;
+        // Planilha anual: sempre os 4 bimestres, independente do filtro de abas.
+        $painel = $this->servico->montarPainel(
+            $filtro['turma_id'],
+            $filtro['aluno_id'],
+            $filtro['ano'],
+            $filtro['serie'],
+            0,
+            null,
+            true,
+            $filtro['nota_campo'],
+            true,
+            [1, 2, 3, 4]
+        );
+        $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
+        $blocos = $this->servico->planilhaProvaFinal($relatorios, (float) $limiar);
+        $ano = (int) ($painel['ano'] ?? date('Y'));
+        $nome = 'boletim-colag-prova-final-' . $ano . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        $saida = fopen('php://output', 'w');
+        if ($saida === false) {
+            return;
+        }
+        fprintf($saida, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        if ($blocos === []) {
+            fputcsv($saida, ['Sem dados para exportar com o filtro atual.'], ';');
+            fclose($saida);
+            exit;
+        }
+        foreach ($blocos as $indice => $bloco) {
+            if ($indice > 0) {
+                fputcsv($saida, [], ';');
+            }
+            $materias = is_array($bloco['materias'] ?? null) ? $bloco['materias'] : [];
+            $siglas = array_map(
+                static fn (array $materia): string => (string) ($materia['sigla'] ?? ''),
+                $materias
+            );
+            $qtd = count($siglas);
+            $cabecaProva = array_merge(
+                [$this->csvTexto((string) ($bloco['turma'] ?? '')), 'PROVA FINAL — APRO se ≥ ' . number_format((float) $limiar, 1, ',', '') . '; senão resultado'],
+                array_fill(0, max(0, $qtd - 1), '')
+            );
+            $cabecaMedia = array_merge(
+                ['', 'MÉDIA FINAL'],
+                array_fill(0, max(0, $qtd - 1), '')
+            );
+            fputcsv($saida, array_merge($cabecaProva, $cabecaMedia), ';');
+            fputcsv($saida, array_merge(
+                ['NOME DO ALUNO'],
+                $siglas,
+                [''],
+                $siglas
+            ), ';');
+            foreach (is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [] as $aluno) {
+                $prova = array_pad(array_slice(is_array($aluno['prova_final'] ?? null) ? $aluno['prova_final'] : [], 0, $qtd), $qtd, '');
+                $media = array_pad(array_slice(is_array($aluno['media_final'] ?? null) ? $aluno['media_final'] : [], 0, $qtd), $qtd, '');
+                fputcsv($saida, array_merge(
+                    [$this->csvTexto((string) ($aluno['nome'] ?? ''))],
+                    $prova,
+                    [''],
+                    $media
+                ), ';');
+            }
+        }
+        fclose($saida);
+        exit;
+    }
+
     public function parcial(): void
     {
         $filtro = $this->filtroDaRequisicao();
@@ -326,5 +405,15 @@ class Boletim26ColagAdminController extends BaseController
         }
 
         return number_format((float) $valor, 1, ',', '');
+    }
+
+    /** Evita o Excel interpretar nome como fórmula. */
+    private function csvTexto(string $valor): string
+    {
+        if ($valor !== '' && preg_match('/^[=+\-@]/', $valor) === 1) {
+            return "'" . $valor;
+        }
+
+        return $valor;
     }
 }

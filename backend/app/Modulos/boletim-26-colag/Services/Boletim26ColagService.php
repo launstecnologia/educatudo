@@ -2478,6 +2478,201 @@ class Boletim26ColagService
         return (float) reset($vistos);
     }
 
+    /**
+     * Planilha da turma no formato Prova Final / Média Final.
+     * Prova Final: APRO se a média (resultado) >= limiar; senão a própria nota.
+     *
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array{
+     *   turma:string,
+     *   materias:list<array{nome:string,sigla:string}>,
+     *   alunos:list<array{nome:string,prova_final:list<string>,media_final:list<string>}>
+     * }>
+     */
+    public function planilhaProvaFinal(array $relatorios, float $limiar = 6.5): array
+    {
+        $porTurma = [];
+        $ordemMaterias = [];
+        foreach ($relatorios as $relatorio) {
+            $aluno = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : [];
+            $turma = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : [];
+            $nomeAluno = trim((string) ($aluno['nome'] ?? ''));
+            $nomeTurma = trim((string) ($turma['nome'] ?? ''));
+            $turmaId = (int) ($turma['id'] ?? 0);
+            $chaveTurma = $turmaId > 0 ? ('id:' . $turmaId) : ('nome:' . $nomeTurma);
+            if ($nomeAluno === '') {
+                continue;
+            }
+            $medias = $this->mediasAnuaisDoRelatorio($relatorio);
+            if ($medias === []) {
+                continue;
+            }
+            if (!isset($porTurma[$chaveTurma])) {
+                $porTurma[$chaveTurma] = ['turma' => $nomeTurma, 'alunos' => []];
+                $ordemMaterias[$chaveTurma] = [];
+            }
+            $linha = ['nome' => $nomeAluno, 'notas' => []];
+            foreach ($medias as $materia => $nota) {
+                if (!isset($ordemMaterias[$chaveTurma][$materia])) {
+                    $ordemMaterias[$chaveTurma][$materia] = count($ordemMaterias[$chaveTurma]);
+                }
+                $linha['notas'][$materia] = $nota;
+            }
+            $porTurma[$chaveTurma]['alunos'][] = $linha;
+        }
+
+        $saida = [];
+        foreach ($porTurma as $chaveTurma => $grupo) {
+            $alunos = is_array($grupo['alunos'] ?? null) ? $grupo['alunos'] : [];
+            usort($alunos, static fn (array $a, array $b): int => strcasecmp((string) $a['nome'], (string) $b['nome']));
+            $nomesMaterias = array_keys($ordemMaterias[$chaveTurma] ?? []);
+            $siglas = $this->siglasDasMaterias($nomesMaterias);
+            $materias = [];
+            foreach ($nomesMaterias as $indice => $nomeMateria) {
+                $materias[] = [
+                    'nome' => $nomeMateria,
+                    'sigla' => $siglas[$indice] ?? $this->siglaDaMateria($nomeMateria),
+                ];
+            }
+            $linhas = [];
+            foreach ($alunos as $aluno) {
+                $provaFinal = [];
+                $mediaFinal = [];
+                foreach ($nomesMaterias as $nomeMateria) {
+                    $nota = $aluno['notas'][$nomeMateria] ?? null;
+                    if (!is_numeric($nota)) {
+                        $provaFinal[] = '';
+                        $mediaFinal[] = '';
+                        continue;
+                    }
+                    $valor = (float) $nota;
+                    $texto = number_format($valor, 1, ',', '');
+                    $provaFinal[] = $valor >= $limiar ? 'APRO' : $texto;
+                    $mediaFinal[] = $texto;
+                }
+                $linhas[] = [
+                    'nome' => (string) $aluno['nome'],
+                    'prova_final' => $provaFinal,
+                    'media_final' => $mediaFinal,
+                ];
+            }
+            $saida[] = [
+                'turma' => (string) ($grupo['turma'] ?? ''),
+                'materias' => $materias,
+                'alunos' => $linhas,
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * Média dos resultados bimestrais por matéria-pai (sem frentes de português).
+     *
+     * @param array<string,mixed> $relatorio
+     * @return array<string, float>
+     */
+    private function mediasAnuaisDoRelatorio(array $relatorio): array
+    {
+        $somas = [];
+        $quantidades = [];
+        foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+            if (!empty($demo['titulo'])) {
+                continue;
+            }
+            foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                    if ($this->frentePortuguesOculta($linha) || !empty($linha['filha'])) {
+                        continue;
+                    }
+                    $nome = trim((string) ($linha['nome'] ?? ''));
+                    if ($nome === '' || !is_numeric($linha['resultado'] ?? null)) {
+                        continue;
+                    }
+                    $somas[$nome] = ($somas[$nome] ?? 0.0) + (float) $linha['resultado'];
+                    $quantidades[$nome] = ($quantidades[$nome] ?? 0) + 1;
+                }
+            }
+        }
+        $medias = [];
+        foreach ($somas as $nome => $soma) {
+            $quantidade = (int) ($quantidades[$nome] ?? 0);
+            if ($quantidade < 1) {
+                continue;
+            }
+            $medias[$nome] = round(($soma / $quantidade) * 2, 0, PHP_ROUND_HALF_UP) / 2;
+        }
+
+        return $medias;
+    }
+
+    /**
+     * @param list<string> $materias
+     * @return list<string>
+     */
+    private function siglasDasMaterias(array $materias): array
+    {
+        $usadas = [];
+        $siglas = [];
+        foreach ($materias as $materia) {
+            $base = $this->siglaDaMateria((string) $materia);
+            $sigla = $base;
+            $n = 2;
+            while (isset($usadas[$sigla])) {
+                $sigla = $base . $n;
+                $n++;
+            }
+            $usadas[$sigla] = true;
+            $siglas[] = $sigla;
+        }
+
+        return $siglas;
+    }
+
+    private function siglaDaMateria(string $nome): string
+    {
+        $mapa = [
+            'arte' => 'ART',
+            'artes' => 'ART',
+            'biologia' => 'BIO',
+            'ciencias' => 'CIE',
+            'educacao fisica' => 'ED.FIS',
+            'filosofia' => 'FIL',
+            'fisica' => 'FIS',
+            'geografia' => 'GEO',
+            'historia' => 'HIS',
+            'ingles' => 'ING',
+            'lingua inglesa' => 'ING',
+            'lingua portuguesa' => 'POR',
+            'matematica' => 'MAT',
+            'portugues' => 'POR',
+            'quimica' => 'QUI',
+            'sociologia' => 'SOC',
+        ];
+        $chave = $this->chaveOrdem($nome);
+        if (isset($mapa[$chave])) {
+            return $mapa[$chave];
+        }
+        $partes = preg_split('/\s+/', $chave) ?: [];
+        $ignorar = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o'];
+        $base = '';
+        foreach ($partes as $parte) {
+            if ($parte === '' || in_array($parte, $ignorar, true)) {
+                continue;
+            }
+            $base .= strtoupper(substr($parte, 0, 1));
+            if (strlen($base) >= 3) {
+                break;
+            }
+        }
+        if (strlen($base) < 3) {
+            $limpo = preg_replace('/[^a-z]/', '', $chave) ?: '';
+            $base = strtoupper(substr($limpo, 0, 3));
+        }
+
+        return $base !== '' ? $base : 'MAT';
+    }
+
     private function chaveOrdem(string $nome): string
     {
         $chave = $this->chave($nome);
