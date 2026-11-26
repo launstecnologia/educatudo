@@ -289,7 +289,7 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
             </tbody>
         </table>
     </div>
-    <?php if ($alunoPainelId > 0 && empty($somentePortal)): ?>
+    <?php if ($alunoPainelId > 0): ?>
     <?php
     $obsBoletim = '';
     try {
@@ -299,15 +299,22 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
     } catch (\Throwable $e) {
         $obsBoletim = '';
     }
+    $obsSomenteLeitura = !empty($somentePortal);
     ?>
-    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4" data-obs-aluno="<?= $alunoPainelId ?>">
+    <?php if (!$obsSomenteLeitura || $obsBoletim !== ''): ?>
+    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4"<?= $obsSomenteLeitura ? '' : ' data-obs-aluno="' . $alunoPainelId . '"' ?>>
         <h4 class="text-sm font-semibold text-gray-900 mb-2">Observação</h4>
+        <?php if ($obsSomenteLeitura): ?>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap break-words"><?= htmlspecialchars($obsBoletim, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php else: ?>
         <textarea rows="3" maxlength="5000" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Observação que fica no boletim deste aluno"><?= htmlspecialchars($obsBoletim, ENT_QUOTES, 'UTF-8') ?></textarea>
         <div class="mt-2 flex items-center gap-3">
             <button type="button" data-salvar-obs class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar observação</button>
             <span data-obs-status class="text-xs text-gray-500"></span>
         </div>
+        <?php endif; ?>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
 </section>
 <?php endif; ?>
