@@ -17,7 +17,8 @@ if (empty($boletim_somente_leitura)
     $resultadosColag = $servicoColag->resultadosPorBimestre(
         (int) ($aluno_id ?? ($aluno['id'] ?? 0)),
         (int) ($ficha['turma_id'] ?? 0),
-        $anoFicha
+        $anoFicha,
+        true
     );
 }
 $infoPeriodo = \App\Core\PeriodoLetivo::doAno($anoFicha);

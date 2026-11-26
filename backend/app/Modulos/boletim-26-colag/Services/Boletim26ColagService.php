@@ -43,6 +43,12 @@ class Boletim26ColagService
     /** Datetime Y-m-d H:i:s: conclusões de jornada depois disso não entram na nota. */
     private ?string $jornadaAte = null;
 
+    /**
+     * +1 no Resultado final do 4º bimestre (teto 10), só no admin/export.
+     * Portal de aluno e pais permanece sem o bônus.
+     */
+    private bool $bonusAdminQuartoBimestre = false;
+
     public function __construct()
     {
         $this->leitura = new Boletim26ColagLeitura();
@@ -50,6 +56,7 @@ class Boletim26ColagService
 
     public function portalDoAluno(array $aluno, string $perfil, int $ano): ?array
     {
+        $this->bonusAdminQuartoBimestre = false;
         $turma = $this->turmaPorId($this->turmasMedio(), (int) ($aluno['turma_id'] ?? 0));
         if ($turma === null) {
             return null;
@@ -96,6 +103,7 @@ class Boletim26ColagService
     public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = [], ?string $jornadaAte = null): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+        $this->bonusAdminQuartoBimestre = true;
         $this->jornadaAte = $this->normalizarJornadaAte($jornadaAte);
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
         $bimestreFiltro = ($bimestreFiltro >= 1 && $bimestreFiltro <= 4) ? $bimestreFiltro : 0;
@@ -533,54 +541,65 @@ class Boletim26ColagService
     }
 
     /**
-     * Resultado final do Colag por bimestre, para o boletim e as notas do detalhe do aluno.
-     * Pais e aluno não usam este mapa.
+     * Resultado final do Colag por bimestre, para o boletim e o detalhe admin do aluno.
+     * Portal de aluno/pais não deve pedir $comBonusAdmin = true.
      *
+     * @param bool $comBonusAdmin +1 no 4º bimestre (só admin/export; nunca portal)
      * @return array<int, array<string, float>>
      */
-    public function resultadosPorBimestre(int $alunoId, int $turmaId, int $ano): array
+    public function resultadosPorBimestre(int $alunoId, int $turmaId, int $ano, bool $comBonusAdmin = false): array
     {
         if (!self::ativo() || $alunoId <= 0 || $ano < 2000) {
             return [];
         }
+        $bonusAnterior = $this->bonusAdminQuartoBimestre;
+        $this->bonusAdminQuartoBimestre = $comBonusAdmin;
         if ($turmaId <= 0) {
             $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
         }
         if ($turmaId <= 0) {
+            $this->bonusAdminQuartoBimestre = $bonusAnterior;
+
             return [];
         }
-        $chave = $alunoId . ':' . $turmaId . ':' . $ano . ':' . ($this->jornadaAte ?? '');
-        if (isset($this->cacheResultadoOficial[$chave])) {
-            return $this->cacheResultadoOficial[$chave];
-        }
-        $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
-        if ($turma === null) {
-            return $this->cacheResultadoOficial[$chave] = [];
-        }
-        $mapa = [];
-        for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
-            $demo = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
-            $porChave = [];
-            foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
-                foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
-                    if (!is_numeric($linha['resultado'] ?? null)) {
-                        continue;
-                    }
-                    $valor = (float) $linha['resultado'];
-                    $mid = (int) ($linha['materia_id'] ?? 0);
-                    $nome = $this->chave((string) ($linha['nome'] ?? ''));
-                    if ($mid > 0) {
-                        $porChave['id:' . $mid] = $valor;
-                    }
-                    if ($nome !== '') {
-                        $porChave['nome:' . $nome] = $valor;
+        $chave = $alunoId . ':' . $turmaId . ':' . $ano
+            . ':' . ($this->jornadaAte ?? '')
+            . ':b' . ($comBonusAdmin ? '1' : '0');
+        try {
+            if (isset($this->cacheResultadoOficial[$chave])) {
+                return $this->cacheResultadoOficial[$chave];
+            }
+            $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
+            if ($turma === null) {
+                return $this->cacheResultadoOficial[$chave] = [];
+            }
+            $mapa = [];
+            for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
+                $demo = $this->montarBimestre($turma, $alunoId, $bimestre, $ano);
+                $porChave = [];
+                foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                    foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                        if (!is_numeric($linha['resultado'] ?? null)) {
+                            continue;
+                        }
+                        $valor = (float) $linha['resultado'];
+                        $mid = (int) ($linha['materia_id'] ?? 0);
+                        $nome = $this->chave((string) ($linha['nome'] ?? ''));
+                        if ($mid > 0) {
+                            $porChave['id:' . $mid] = $valor;
+                        }
+                        if ($nome !== '') {
+                            $porChave['nome:' . $nome] = $valor;
+                        }
                     }
                 }
+                $mapa[$bimestre] = $porChave;
             }
-            $mapa[$bimestre] = $porChave;
-        }
 
-        return $this->cacheResultadoOficial[$chave] = $mapa;
+            return $this->cacheResultadoOficial[$chave] = $mapa;
+        } finally {
+            $this->bonusAdminQuartoBimestre = $bonusAnterior;
+        }
     }
 
     /**
@@ -609,12 +628,12 @@ class Boletim26ColagService
      * @param array<string,mixed> $simulacao
      * @return array<string,mixed>
      */
-    public function aplicarResultadoNaSimulacao(array $simulacao, int $alunoId, int $turmaId, int $bimestre, int $ano): array
+    public function aplicarResultadoNaSimulacao(array $simulacao, int $alunoId, int $turmaId, int $bimestre, int $ano, bool $comBonusAdmin = false): array
     {
         if (!self::ativo() || $bimestre < 1 || $bimestre > 4) {
             return $simulacao;
         }
-        $mapa = $this->resultadosPorBimestre($alunoId, $turmaId, $ano)[$bimestre] ?? [];
+        $mapa = $this->resultadosPorBimestre($alunoId, $turmaId, $ano, $comBonusAdmin)[$bimestre] ?? [];
         if ($mapa === []) {
             return $simulacao;
         }
@@ -631,49 +650,55 @@ class Boletim26ColagService
     /**
      * Tabela de notas do boletim do Colag, para o demonstrativo oficial no detalhe do aluno.
      */
-    public function htmlNotasDoAluno(int $alunoId, int $bimestre, int $ano): string
+    public function htmlNotasDoAluno(int $alunoId, int $bimestre, int $ano, bool $comBonusAdmin = false): string
     {
         if (!self::ativo() || $alunoId <= 0 || $bimestre < 1 || $bimestre > 4) {
             return '';
         }
-        $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
-        $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
-        if ($turmaId <= 0) {
-            return '';
-        }
-        $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
-        if ($turma === null) {
-            return '';
-        }
-        $nome = '';
+        $bonusAnterior = $this->bonusAdminQuartoBimestre;
+        $this->bonusAdminQuartoBimestre = $comBonusAdmin;
         try {
-            foreach ((new AlunoTurmaResolver())->listarAlunosPorTurma($turmaId) as $row) {
-                if ((int) ($row['id'] ?? 0) === $alunoId) {
-                    $nome = trim((string) ($row['nome'] ?? ''));
-                    break;
-                }
+            $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+            $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
+            if ($turmaId <= 0) {
+                return '';
             }
-        } catch (\Throwable $e) {
+            $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
+            if ($turma === null) {
+                return '';
+            }
             $nome = '';
-        }
-        $relatorios = [[
-            'aluno' => ['id' => $alunoId, 'nome' => $nome, 'ra' => ''],
-            'turma' => $turma,
-            'demonstrativos' => [$this->montarBimestre($turma, $alunoId, $bimestre, $ano)],
-        ]];
-        $painel = [
-            'nota_minima' => null,
-            'nota_campo' => 'resultado',
-            'bimestre' => $bimestre,
-            'bimestres' => [$bimestre],
-        ];
-        $exibir = 'notas';
-        $somentePortal = 'notas';
-        ob_start();
-        include dirname(__DIR__) . '/Views/estilo_tabela.php';
-        include dirname(__DIR__) . '/Views/admin/_fragmento.php';
+            try {
+                foreach ((new AlunoTurmaResolver())->listarAlunosPorTurma($turmaId) as $row) {
+                    if ((int) ($row['id'] ?? 0) === $alunoId) {
+                        $nome = trim((string) ($row['nome'] ?? ''));
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $nome = '';
+            }
+            $relatorios = [[
+                'aluno' => ['id' => $alunoId, 'nome' => $nome, 'ra' => ''],
+                'turma' => $turma,
+                'demonstrativos' => [$this->montarBimestre($turma, $alunoId, $bimestre, $ano)],
+            ]];
+            $painel = [
+                'nota_minima' => null,
+                'nota_campo' => 'resultado',
+                'bimestre' => $bimestre,
+                'bimestres' => [$bimestre],
+            ];
+            $exibir = 'notas';
+            $somentePortal = 'notas';
+            ob_start();
+            include dirname(__DIR__) . '/Views/estilo_tabela.php';
+            include dirname(__DIR__) . '/Views/admin/_fragmento.php';
 
-        return (string) ob_get_clean();
+            return (string) ob_get_clean();
+        } finally {
+            $this->bonusAdminQuartoBimestre = $bonusAnterior;
+        }
     }
 
     /**
@@ -835,6 +860,7 @@ class Boletim26ColagService
         ));
         $linhas = $this->aplicarSomaDosProfessores($linhas, $alunoId, (int) ($turma['id'] ?? 0), $bimestre, $ano, $terceira);
         $linhas = $this->aplicarNotaChegadaMeioAno($linhas, $alunoId, $bimestre, $ano);
+        $linhas = $this->aplicarBonusAdminQuartoBimestre($linhas, $bimestre);
         $blocos = $this->partirBlocos($linhas, $terceira, $bimestre);
 
         return [
@@ -843,6 +869,28 @@ class Boletim26ColagService
             'terceira' => $terceira,
             'blocos' => $blocos,
         ];
+    }
+
+    /**
+     * Admin/export no 4º bimestre: Resultado final +1,0 (teto 10,0).
+     * Aluno e pais não passam por este bônus.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function aplicarBonusAdminQuartoBimestre(array $linhas, int $bimestre): array
+    {
+        if (!$this->bonusAdminQuartoBimestre || $bimestre !== 4) {
+            return $linhas;
+        }
+        foreach ($linhas as $i => $linha) {
+            if (!is_numeric($linha['resultado'] ?? null)) {
+                continue;
+            }
+            $linhas[$i]['resultado'] = $this->meio(min(10.0, (float) $linha['resultado'] + 1.0));
+        }
+
+        return $linhas;
     }
 
     /**

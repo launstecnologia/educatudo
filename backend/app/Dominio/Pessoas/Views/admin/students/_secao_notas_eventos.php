@@ -5,6 +5,8 @@ $boletins_gerados_notas_por_regra = is_array($boletins_gerados_notas_por_regra ?
 $paineis_notas_originais = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $paineis_notas = $paineis_notas_originais;
 $alunoIdNotas = (int) ($student['id'] ?? $aluno_id ?? 0);
+// Portal aluno/pais define $ocultar_ref_notas; aí o +1 do 4º bimestre Colag não entra.
+$comBonusAdminColag = empty($ocultar_ref_notas);
 
 $appDirNotas = \App\Core\ViewPaths::app();
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
@@ -203,7 +205,7 @@ $simularQuadroAluno = static function (
     int $regraId,
     string $dataInicio,
     string $dataFim
-) use (&$simulacaoQuadroCache, $obterMotorDemonstrativo, $obterCfgBoletim, $normalizarDataYmd): ?array {
+) use (&$simulacaoQuadroCache, $obterMotorDemonstrativo, $obterCfgBoletim, $normalizarDataYmd, $comBonusAdminColag): ?array {
     if ($alunoId <= 0 || $regraId <= 0) {
         return null;
     }
@@ -277,7 +279,8 @@ $simularQuadroAluno = static function (
                 $alunoId,
                 0,
                 (int) ($regra['bimestre'] ?? 0),
-                (int) ($regra['ano_letivo'] ?? 0)
+                (int) ($regra['ano_letivo'] ?? 0),
+                !empty($comBonusAdminColag)
             );
         }
         $simulacao['_regra_nome'] = (string) ($regra['nome'] ?? '');
@@ -523,7 +526,7 @@ foreach ($linhasPeriodo as &$linhaP) {
             && \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
         ) {
             $htmlQuadroPorChave[$chaveQuadro] = (new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService())
-                ->htmlNotasDoAluno($alunoIdNotas, $bimP, $anoP > 0 ? $anoP : (int) date('Y'));
+                ->htmlNotasDoAluno($alunoIdNotas, $bimP, $anoP > 0 ? $anoP : (int) date('Y'), !empty($comBonusAdminColag));
         }
         // 1) Demonstrativo ao vivo (Salvar demonstrativo já reflete no detalhe).
         if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP > 0 && $alunoIdNotas > 0) {
