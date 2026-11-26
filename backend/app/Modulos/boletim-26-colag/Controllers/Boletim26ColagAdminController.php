@@ -304,7 +304,9 @@ class Boletim26ColagAdminController extends BaseController
             'exibir' => $exibir,
             'nota_campo' => (($campo = (string) ($fonte['nota_campo'] ?? 'resultado')) === 'media_bim' || $campo === 'media_anual') ? $campo : 'resultado',
             'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
-            'jornada_ate' => $this->normalizarJornadaAteFiltro((string) ($fonte['jornada_ate'] ?? '')),
+            // Vazio → corte padrão do consolidado (26/11/2026 08:00). Data futura = ao vivo.
+            'jornada_ate' => $this->normalizarJornadaAteFiltro((string) ($fonte['jornada_ate'] ?? ''))
+                ?? '2026-11-26 08:00:00',
             'abrir' => (string) ($fonte['abrir'] ?? '') === '1',
         ];
     }

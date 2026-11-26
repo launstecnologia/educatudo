@@ -308,8 +308,8 @@ $rotuloSerie = static function (int $serie): string {
             </div>
             <div>
                 <label for="boletim_jornada_ate" class="block text-sm font-medium text-gray-700 mb-1.5">Contar jornada até</label>
-                <input type="datetime-local" id="boletim_jornada_ate" name="jornada_ate" value="<?= htmlspecialchars($jornadaAteInput, ENT_QUOTES, 'UTF-8') ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <span class="mt-1 block text-xs text-gray-500">Ex.: 26/11/2026 08:00 — conclusões depois disso não entram na nota da jornada. Vazio = tudo ao vivo.</span>
+                <input type="datetime-local" id="boletim_jornada_ate" name="jornada_ate" value="<?= htmlspecialchars($jornadaAteInput !== '' ? $jornadaAteInput : '2026-11-26T08:00', ENT_QUOTES, 'UTF-8') ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <span class="mt-1 block text-xs text-gray-500">Padrão do consolidado: 26/11/2026 08:00. Conclusões depois disso não sobem a jornada (ex.: Laila volta a 7,5). Para ver ao vivo, use uma data futura.</span>
             </div>
         </div>
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? '')), ENT_QUOTES, 'UTF-8') ?>" disabled>

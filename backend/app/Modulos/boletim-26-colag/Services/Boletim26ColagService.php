@@ -44,6 +44,12 @@ class Boletim26ColagService
     private ?string $jornadaAte = null;
 
     /**
+     * Corte padrão do consolidado admin (26/11/2026 08:00, Brasília).
+     * Sem filtro explícito, o painel usa este horário para não subir nota pós-corte.
+     */
+    private const JORNADA_ATE_PADRAO_ADMIN = '2026-11-26 08:00:00';
+
+    /**
      * +1 no Resultado final do 4º bimestre (teto 10), só no admin/export.
      * Portal de aluno e pais permanece sem o bônus.
      */
@@ -104,7 +110,7 @@ class Boletim26ColagService
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
         $this->bonusAdminQuartoBimestre = true;
-        $this->jornadaAte = $this->normalizarJornadaAte($jornadaAte);
+        $this->jornadaAte = $this->resolverJornadaAteAdmin($jornadaAte);
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
         $bimestreFiltro = ($bimestreFiltro >= 1 && $bimestreFiltro <= 4) ? $bimestreFiltro : 0;
         $listaBimestres = [];
@@ -553,12 +559,15 @@ class Boletim26ColagService
             return [];
         }
         $bonusAnterior = $this->bonusAdminQuartoBimestre;
+        $jornadaAnterior = $this->jornadaAte;
         $this->bonusAdminQuartoBimestre = $comBonusAdmin;
+        $this->aplicarCorteJornadaAdminSeAtivo();
         if ($turmaId <= 0) {
             $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
         }
         if ($turmaId <= 0) {
             $this->bonusAdminQuartoBimestre = $bonusAnterior;
+            $this->jornadaAte = $jornadaAnterior;
 
             return [];
         }
@@ -599,6 +608,7 @@ class Boletim26ColagService
             return $this->cacheResultadoOficial[$chave] = $mapa;
         } finally {
             $this->bonusAdminQuartoBimestre = $bonusAnterior;
+            $this->jornadaAte = $jornadaAnterior;
         }
     }
 
@@ -656,7 +666,9 @@ class Boletim26ColagService
             return '';
         }
         $bonusAnterior = $this->bonusAdminQuartoBimestre;
+        $jornadaAnterior = $this->jornadaAte;
         $this->bonusAdminQuartoBimestre = $comBonusAdmin;
+        $this->aplicarCorteJornadaAdminSeAtivo();
         try {
             $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
             $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
@@ -698,6 +710,7 @@ class Boletim26ColagService
             return (string) ob_get_clean();
         } finally {
             $this->bonusAdminQuartoBimestre = $bonusAnterior;
+            $this->jornadaAte = $jornadaAnterior;
         }
     }
 
@@ -1360,6 +1373,26 @@ class Boletim26ColagService
         $ts = strtotime($valor);
 
         return $ts === false ? null : date('Y-m-d H:i:s', $ts);
+    }
+
+    /**
+     * Admin/export: usa o filtro se vier preenchido; senão congela em 26/11/2026 08:00.
+     * Portal (aluno/pais) não chama este método — fica sem corte.
+     */
+    private function resolverJornadaAteAdmin(?string $valor): string
+    {
+        return $this->normalizarJornadaAte($valor) ?? self::JORNADA_ATE_PADRAO_ADMIN;
+    }
+
+    /** Garante o corte padrão sempre que o fluxo admin estiver ativo. */
+    private function aplicarCorteJornadaAdminSeAtivo(): void
+    {
+        if (!$this->bonusAdminQuartoBimestre) {
+            return;
+        }
+        if ($this->jornadaAte === null) {
+            $this->jornadaAte = self::JORNADA_ATE_PADRAO_ADMIN;
+        }
     }
 
     /**
