@@ -514,8 +514,19 @@ foreach ($linhasPeriodo as &$linhaP) {
     $chaveQuadro = $ridP . ':' . $anoP . ':' . $bimP;
     if (!array_key_exists($chaveQuadro, $htmlQuadroPorChave)) {
         $htmlQuadroPorChave[$chaveQuadro] = '';
+        $ehExtraQuadro = (($linhaP['selo'] ?? $linhaP['curso_tipo'] ?? '') === 'extra');
+        if (!$ehExtraQuadro
+            && $alunoIdNotas > 0
+            && $bimP >= 1
+            && $bimP <= 4
+            && class_exists(\App\Modulos\Boletim26Colag\Services\Boletim26ColagService::class)
+            && \App\Modulos\Boletim26Colag\Services\Boletim26ColagService::ativo()
+        ) {
+            $htmlQuadroPorChave[$chaveQuadro] = (new \App\Modulos\Boletim26Colag\Services\Boletim26ColagService())
+                ->htmlNotasDoAluno($alunoIdNotas, $bimP, $anoP > 0 ? $anoP : (int) date('Y'));
+        }
         // 1) Demonstrativo ao vivo (Salvar demonstrativo já reflete no detalhe).
-        if ($ridP > 0 && $alunoIdNotas > 0) {
+        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP > 0 && $alunoIdNotas > 0) {
             $htmlQuadroPorChave[$chaveQuadro] = $renderQuadroDemonstrativo(
                 $alunoIdNotas,
                 $ridP,

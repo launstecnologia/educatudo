@@ -624,6 +624,54 @@ class Boletim26ColagService
     }
 
     /**
+     * Tabela de notas do boletim do Colag, para o demonstrativo oficial no detalhe do aluno.
+     */
+    public function htmlNotasDoAluno(int $alunoId, int $bimestre, int $ano): string
+    {
+        if (!self::ativo() || $alunoId <= 0 || $bimestre < 1 || $bimestre > 4) {
+            return '';
+        }
+        $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+        $turmaId = (int) (new AlunoTurmaResolver())->getTurmaPrincipal($alunoId);
+        if ($turmaId <= 0) {
+            return '';
+        }
+        $turma = $this->turmaPorId($this->turmasMedio(), $turmaId);
+        if ($turma === null) {
+            return '';
+        }
+        $nome = '';
+        try {
+            foreach ((new AlunoTurmaResolver())->listarAlunosPorTurma($turmaId) as $row) {
+                if ((int) ($row['id'] ?? 0) === $alunoId) {
+                    $nome = trim((string) ($row['nome'] ?? ''));
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            $nome = '';
+        }
+        $relatorios = [[
+            'aluno' => ['id' => $alunoId, 'nome' => $nome, 'ra' => ''],
+            'turma' => $turma,
+            'demonstrativos' => [$this->montarBimestre($turma, $alunoId, $bimestre, $ano)],
+        ]];
+        $painel = [
+            'nota_minima' => null,
+            'nota_campo' => 'resultado',
+            'bimestre' => $bimestre,
+            'bimestres' => [$bimestre],
+        ];
+        $exibir = 'notas';
+        $somentePortal = 'notas';
+        ob_start();
+        include dirname(__DIR__) . '/Views/estilo_tabela.php';
+        include dirname(__DIR__) . '/Views/admin/_fragmento.php';
+
+        return (string) ob_get_clean();
+    }
+
+    /**
      * @param array<string,mixed> $matriz
      * @param array<string, float> $mapa
      * @return array<string,mixed>
