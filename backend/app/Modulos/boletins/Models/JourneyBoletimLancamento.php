@@ -484,7 +484,8 @@ class JourneyBoletimLancamento
         int $jornadaId,
         array $totaisModulos,
         array $concluidasExplicit,
-        array $modulosConcluidos
+        array $modulosConcluidos,
+        ?string $concluidasAte = null
     ): float {
         if ($alunoId <= 0 || $jornadaId <= 0) {
             return 0.0;
@@ -502,7 +503,7 @@ class JourneyBoletimLancamento
             return round(max(0.0, min(100.0, $pct)), 2);
         }
 
-        return $this->alunoTemQualquerConclusaoNaJornada($alunoId, $jornadaId) ? 100.0 : 0.0;
+        return $this->alunoTemQualquerConclusaoNaJornada($alunoId, $jornadaId, $concluidasAte) ? 100.0 : 0.0;
     }
 
     /**
@@ -517,7 +518,8 @@ class JourneyBoletimLancamento
         int $jornadaId,
         array $totaisModulos,
         array $concluidasExplicit,
-        array $modulosConcluidos
+        array $modulosConcluidos,
+        ?string $concluidasAte = null
     ): bool {
         if ($alunoId <= 0 || $jornadaId <= 0) {
             return false;
@@ -533,7 +535,7 @@ class JourneyBoletimLancamento
             return $mc >= $tm;
         }
 
-        return $this->alunoTemQualquerConclusaoNaJornada($alunoId, $jornadaId);
+        return $this->alunoTemQualquerConclusaoNaJornada($alunoId, $jornadaId, $concluidasAte);
     }
 
     /**
@@ -619,13 +621,15 @@ class JourneyBoletimLancamento
         array $faixasPercentuais = [],
         bool $notaUnicaPeloTotalConcluidasNoEscopo = false,
         ?array $notaUnicaExtras = null,
-        bool $escopoExplicito = false
+        bool $escopoExplicito = false,
+        ?string $concluidasAte = null
     ): array {
         $calcType = strtolower(trim($calcType));
         if (!in_array($calcType, ['media', 'soma', 'maior', 'ultima'], true)) {
             $calcType = 'media';
         }
         $usaTabelaFaixas = !$linearPorPercentualConclusao && !empty($faixasPercentuais);
+        $concluidasAte = $this->normalizarDatetimeCorte($concluidasAte);
 
         $turmaIds = [$turmaId];
         $jornadaIdsEscopo = array_values(array_unique(array_filter(array_map('intval', $jornadaIdsEscopo))));
@@ -736,8 +740,8 @@ class JourneyBoletimLancamento
         }
 
         $totaisModulos = $this->totaisModulosPorJornada($noEscopo);
-        $concluidasExplicit = $this->paresJornadaConcluidaExplicita($noEscopo, [$alunoId]);
-        $modulosConcluidos = $this->contagemModulosConcluidosPorAlunoJornada($noEscopo, [$alunoId]);
+        $concluidasExplicit = $this->paresJornadaConcluidaExplicita($noEscopo, [$alunoId], $concluidasAte);
+        $modulosConcluidos = $this->contagemModulosConcluidosPorAlunoJornada($noEscopo, [$alunoId], $concluidasAte);
 
         $byMid = [];
         $byMidTotais = [];
@@ -745,9 +749,9 @@ class JourneyBoletimLancamento
         $somaPct = 0.0;
         $conclAgregado = 0;
         foreach ($noEscopo as $jid) {
-            $pct = $this->percentualConclusaoAlunoJornada($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos);
+            $pct = $this->percentualConclusaoAlunoJornada($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos, $concluidasAte);
             $somaPct += $pct;
-            $concluiuBinario = $this->alunoJornadaConcluidaBinario($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos);
+            $concluiuBinario = $this->alunoJornadaConcluidaBinario($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos, $concluidasAte);
             if ($concluiuBinario) {
                 $conclAgregado++;
             }
@@ -816,7 +820,7 @@ class JourneyBoletimLancamento
                     $subTot = count($subIds);
                     $subConcl = 0;
                     foreach ($subIds as $jid) {
-                        if ($this->alunoJornadaConcluidaBinario($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos)) {
+                        if ($this->alunoJornadaConcluidaBinario($alunoId, $jid, $totaisModulos, $concluidasExplicit, $modulosConcluidos, $concluidasAte)) {
                             $subConcl++;
                         }
                     }
@@ -1329,20 +1333,24 @@ class JourneyBoletimLancamento
         return $out;
     }
 
-    private function alunoTemQualquerConclusaoNaJornada(int $alunoId, int $jornadaId): bool
+    private function alunoTemQualquerConclusaoNaJornada(int $alunoId, int $jornadaId, ?string $concluidasAte = null): bool
     {
         if ($alunoId <= 0 || $jornadaId <= 0) {
             return false;
         }
-        $r = $this->db->fetch(
-            "SELECT 1 AS ok
+        $sql = "SELECT 1 AS ok
              FROM jornadas_progresso_alunos
              WHERE aluno_id = :aluno_id
                AND jornada_id = :jornada_id
-               AND (status = 'concluido' OR status = 'concluído')
-             LIMIT 1",
-            ['aluno_id' => $alunoId, 'jornada_id' => $jornadaId]
-        );
+               AND (status = 'concluido' OR status = 'concluído')";
+        $params = ['aluno_id' => $alunoId, 'jornada_id' => $jornadaId];
+        $corte = $this->normalizarDatetimeCorte($concluidasAte);
+        if ($corte !== null) {
+            $sql .= ' AND COALESCE(data_conclusao, updated_at, created_at) <= :corte';
+            $params['corte'] = $corte;
+        }
+        $sql .= ' LIMIT 1';
+        $r = $this->db->fetch($sql, $params);
 
         return $r !== false && $r !== null;
     }
@@ -1374,7 +1382,7 @@ class JourneyBoletimLancamento
      * @param list<int> $alunoIds
      * @return array<string,bool> chave "alunoId:jornadaId"
      */
-    private function paresJornadaConcluidaExplicita(array $jornadaIds, array $alunoIds): array
+    private function paresJornadaConcluidaExplicita(array $jornadaIds, array $alunoIds, ?string $concluidasAte = null): array
     {
         $jornadaIds = array_values(array_filter(array_map('intval', $jornadaIds)));
         $alunoIds = array_values(array_filter(array_map('intval', $alunoIds)));
@@ -1384,15 +1392,18 @@ class JourneyBoletimLancamento
         $pj = implode(',', array_fill(0, count($jornadaIds), '?'));
         $pa = implode(',', array_fill(0, count($alunoIds), '?'));
         $params = array_merge($jornadaIds, $alunoIds);
-        $rows = $this->db->fetchAll(
-            "SELECT DISTINCT jpa.aluno_id, jpa.jornada_id
+        $sql = "SELECT DISTINCT jpa.aluno_id, jpa.jornada_id
              FROM jornadas_progresso_alunos jpa
              WHERE jpa.atividade_tipo = 'jornada_concluida'
                AND jpa.status = 'concluido'
                AND jpa.jornada_id IN ($pj)
-               AND jpa.aluno_id IN ($pa)",
-            $params
-        ) ?: [];
+               AND jpa.aluno_id IN ($pa)";
+        $corte = $this->normalizarDatetimeCorte($concluidasAte);
+        if ($corte !== null) {
+            $sql .= ' AND COALESCE(jpa.data_conclusao, jpa.updated_at, jpa.created_at) <= ?';
+            $params[] = $corte;
+        }
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
         $map = [];
         foreach ($rows as $r) {
             $map[(int) ($r['aluno_id'] ?? 0) . ':' . (int) ($r['jornada_id'] ?? 0)] = true;
@@ -1406,7 +1417,7 @@ class JourneyBoletimLancamento
      * @param list<int> $alunoIds
      * @return array<string,int> chave alunoId:jornadaId => módulos distintos concluídos
      */
-    private function contagemModulosConcluidosPorAlunoJornada(array $jornadaIds, array $alunoIds): array
+    private function contagemModulosConcluidosPorAlunoJornada(array $jornadaIds, array $alunoIds, ?string $concluidasAte = null): array
     {
         $jornadaIds = array_values(array_filter(array_map('intval', $jornadaIds)));
         $alunoIds = array_values(array_filter(array_map('intval', $alunoIds)));
@@ -1416,17 +1427,20 @@ class JourneyBoletimLancamento
         $pj = implode(',', array_fill(0, count($jornadaIds), '?'));
         $pa = implode(',', array_fill(0, count($alunoIds), '?'));
         $params = array_merge($jornadaIds, $alunoIds);
-        $rows = $this->db->fetchAll(
-            "SELECT jpa.aluno_id, jpa.jornada_id, COUNT(DISTINCT jpa.modulo_id) AS c
+        $sql = "SELECT jpa.aluno_id, jpa.jornada_id, COUNT(DISTINCT jpa.modulo_id) AS c
              FROM jornadas_progresso_alunos jpa
              WHERE jpa.atividade_tipo = 'modulo'
                AND jpa.status = 'concluido'
                AND jpa.modulo_id IS NOT NULL
                AND jpa.jornada_id IN ($pj)
-               AND jpa.aluno_id IN ($pa)
-             GROUP BY jpa.aluno_id, jpa.jornada_id",
-            $params
-        ) ?: [];
+               AND jpa.aluno_id IN ($pa)";
+        $corte = $this->normalizarDatetimeCorte($concluidasAte);
+        if ($corte !== null) {
+            $sql .= ' AND COALESCE(jpa.data_conclusao, jpa.updated_at, jpa.created_at) <= ?';
+            $params[] = $corte;
+        }
+        $sql .= ' GROUP BY jpa.aluno_id, jpa.jornada_id';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
         $map = [];
         foreach ($rows as $r) {
             $k = (int) ($r['aluno_id'] ?? 0) . ':' . (int) ($r['jornada_id'] ?? 0);
@@ -1434,6 +1448,25 @@ class JourneyBoletimLancamento
         }
 
         return $map;
+    }
+
+    /** Aceita Y-m-d H:i[:s] ou datetime-local Y-m-d\TH:i. */
+    private function normalizarDatetimeCorte(?string $valor): ?string
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return null;
+        }
+        $valor = str_replace('T', ' ', $valor);
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $valor) === 1) {
+            $valor .= ':00';
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $valor) !== 1) {
+            return null;
+        }
+        $ts = strtotime($valor);
+
+        return $ts === false ? null : date('Y-m-d H:i:s', $ts);
     }
 }
 

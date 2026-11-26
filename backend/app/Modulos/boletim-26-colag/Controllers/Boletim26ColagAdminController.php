@@ -51,7 +51,8 @@ class Boletim26ColagAdminController extends BaseController
             $filtro['abrir'],
             $filtro['nota_campo'],
             false,
-            $filtro['bimestres']
+            $filtro['bimestres'],
+            $filtro['jornada_ate']
         );
 
         $this->viewWithLayout('admin', 'admin/boletim-26-colag/index', [
@@ -99,7 +100,8 @@ class Boletim26ColagAdminController extends BaseController
             true,
             $filtro['nota_campo'],
             true,
-            $filtro['bimestres']
+            $filtro['bimestres'],
+            $filtro['jornada_ate']
         );
         $usuario = $this->auth->getUser();
         $this->servico->homologar(
@@ -132,7 +134,8 @@ class Boletim26ColagAdminController extends BaseController
             true,
             $filtro['nota_campo'],
             true,
-            $filtro['bimestres']
+            $filtro['bimestres'],
+            $filtro['jornada_ate']
         );
         $linhas = is_array($painel['linhas_planilha'] ?? null) ? $painel['linhas_planilha'] : [];
         $nome = 'boletim-colag-' . (int) ($painel['ano'] ?? date('Y')) . '.csv';
@@ -186,7 +189,8 @@ class Boletim26ColagAdminController extends BaseController
             true,
             $filtro['nota_campo'],
             true,
-            [1, 2, 3, 4]
+            [1, 2, 3, 4],
+            $filtro['jornada_ate']
         );
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $xml = $this->servico->excelProvaFinal($relatorios, (float) $limiar);
@@ -217,7 +221,8 @@ class Boletim26ColagAdminController extends BaseController
             true,
             $filtro['nota_campo'],
             true,
-            $filtro['bimestres']
+            $filtro['bimestres'],
+            $filtro['jornada_ate']
         );
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $this->responderJson([
@@ -280,7 +285,7 @@ class Boletim26ColagAdminController extends BaseController
     }
 
     /**
-     * @return array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,abrir:bool}
+     * @return array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,abrir:bool,bimestres:list<int>,exibir:string}
      */
     private function filtroDaRequisicao(): array
     {
@@ -299,16 +304,40 @@ class Boletim26ColagAdminController extends BaseController
             'exibir' => $exibir,
             'nota_campo' => (($campo = (string) ($fonte['nota_campo'] ?? 'resultado')) === 'media_bim' || $campo === 'media_anual') ? $campo : 'resultado',
             'nota_minima' => ($notaBruta !== '' && is_numeric($notaBruta)) ? (float) $notaBruta : null,
+            'jornada_ate' => $this->normalizarJornadaAteFiltro((string) ($fonte['jornada_ate'] ?? '')),
             'abrir' => (string) ($fonte['abrir'] ?? '') === '1',
         ];
     }
 
+    private function normalizarJornadaAteFiltro(string $bruto): ?string
+    {
+        $bruto = trim(str_replace('T', ' ', $bruto));
+        if ($bruto === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $bruto) === 1) {
+            $bruto .= ':00';
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $bruto) !== 1) {
+            return null;
+        }
+        $ts = strtotime($bruto);
+
+        return $ts === false ? null : date('Y-m-d H:i:s', $ts);
+    }
+
     /**
-     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,abrir:bool} $filtro
-     * @return array<string, scalar>
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,abrir:bool,bimestres:list<int>,exibir:string} $filtro
+     * @return array<string, scalar|list<int>>
      */
     private function queryDoFiltro(array $filtro, bool $abrir): array
     {
+        $jornadaAte = $filtro['jornada_ate'] ?? null;
+        $jornadaAteInput = '';
+        if (is_string($jornadaAte) && $jornadaAte !== '') {
+            $jornadaAteInput = str_replace(' ', 'T', substr($jornadaAte, 0, 16));
+        }
+
         return [
             'ano' => $filtro['ano'],
             'serie' => $filtro['serie'],
@@ -319,6 +348,7 @@ class Boletim26ColagAdminController extends BaseController
             'exibir' => $filtro['exibir'],
             'nota_campo' => $filtro['nota_campo'],
             'nota_minima' => $filtro['nota_minima'] === null ? '' : number_format($filtro['nota_minima'], 1, ',', ''),
+            'jornada_ate' => $jornadaAteInput,
             'abrir' => $abrir ? '1' : '0',
         ];
     }

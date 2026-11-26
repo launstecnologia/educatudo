@@ -11,6 +11,8 @@ $notaMinimaTexto = $notaMinima === null ? '' : number_format($notaMinima, 1, ','
 $notaCampo = (string) ($painel['nota_campo'] ?? 'resultado');
 $notaCampo = ($notaCampo === 'media_bim' || $notaCampo === 'media_anual') ? $notaCampo : 'resultado';
 $notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : ($notaCampo === 'media_anual' ? 'média dos 4 bimestres' : 'resultado final');
+$jornadaAte = trim((string) ($painel['jornada_ate'] ?? ''));
+$jornadaAteInput = $jornadaAte !== '' ? str_replace(' ', 'T', substr($jornadaAte, 0, 16)) : '';
 $abrir = !empty($painel['abrir']);
 $exibir = (string) ($_GET['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
 $homologacao = is_array($painel['homologacao'] ?? null) ? $painel['homologacao'] : [];
@@ -38,6 +40,9 @@ if ($exibir === 'boletim') {
     $filtrosAtivos++;
 }
 if ($notaMinima !== null) {
+    $filtrosAtivos++;
+}
+if ($jornadaAte !== '') {
     $filtrosAtivos++;
 }
 $reabrirFiltro = (string) ($_GET['filtro_aberto'] ?? '') === '1' && !$abrir;
@@ -300,6 +305,11 @@ $rotuloSerie = static function (int $serie): string {
                 <label for="boletim_nota_minima" class="block text-sm font-medium text-gray-700 mb-1.5">Nota mínima</label>
                 <input type="text" id="boletim_nota_minima" name="nota_minima" inputmode="decimal" value="<?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: 6,5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <span class="mt-1 block text-xs text-gray-500">Deixe vazio para ver todas. O cálculo da linha continua visível.</span>
+            </div>
+            <div>
+                <label for="boletim_jornada_ate" class="block text-sm font-medium text-gray-700 mb-1.5">Contar jornada até</label>
+                <input type="datetime-local" id="boletim_jornada_ate" name="jornada_ate" value="<?= htmlspecialchars($jornadaAteInput, ENT_QUOTES, 'UTF-8') ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <span class="mt-1 block text-xs text-gray-500">Ex.: 26/11/2026 08:00 — conclusões depois disso não entram na nota da jornada. Vazio = tudo ao vivo.</span>
             </div>
         </div>
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? '')), ENT_QUOTES, 'UTF-8') ?>" disabled>

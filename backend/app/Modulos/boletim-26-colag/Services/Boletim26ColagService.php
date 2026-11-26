@@ -40,6 +40,9 @@ class Boletim26ColagService
     /** @var array<int, list<array{materia_id:int,componente:string,periodo:int,nota:?float,faltas:?int,ano:int}>> */
     private array $cacheChegadaMeioAno = [];
 
+    /** Datetime Y-m-d H:i:s: conclusões de jornada depois disso não entram na nota. */
+    private ?string $jornadaAte = null;
+
     public function __construct()
     {
         $this->leitura = new Boletim26ColagLeitura();
@@ -90,9 +93,10 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = []): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = [], ?string $jornadaAte = null): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
+        $this->jornadaAte = $this->normalizarJornadaAte($jornadaAte);
         $serieFiltro = in_array($serieFiltro, [1, 2, 3], true) ? $serieFiltro : 0;
         $bimestreFiltro = ($bimestreFiltro >= 1 && $bimestreFiltro <= 4) ? $bimestreFiltro : 0;
         $listaBimestres = [];
@@ -177,6 +181,7 @@ class Boletim26ColagService
             'bimestres' => $bimestres,
             'nota_minima' => $notaMinima,
             'nota_campo' => $notaCampo,
+            'jornada_ate' => $this->jornadaAte,
             'abrir' => $abrir,
             'turma_id' => $turmaId,
             'aluno_id' => $aluno !== null ? (int) $aluno['id'] : 0,
@@ -544,7 +549,7 @@ class Boletim26ColagService
         if ($turmaId <= 0) {
             return [];
         }
-        $chave = $alunoId . ':' . $turmaId . ':' . $ano;
+        $chave = $alunoId . ':' . $turmaId . ':' . $ano . ':' . ($this->jornadaAte ?? '');
         if (isset($this->cacheResultadoOficial[$chave])) {
             return $this->cacheResultadoOficial[$chave];
         }
@@ -1291,6 +1296,24 @@ class Boletim26ColagService
         }
     }
 
+    private function normalizarJornadaAte(?string $valor): ?string
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return null;
+        }
+        $valor = str_replace('T', ' ', $valor);
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $valor) === 1) {
+            $valor .= ':00';
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $valor) !== 1) {
+            return null;
+        }
+        $ts = strtotime($valor);
+
+        return $ts === false ? null : date('Y-m-d H:i:s', $ts);
+    }
+
     /**
      * Uma nota só, pela conclusão das jornadas do bimestre.
      * Quem concluiu alguma jornada e ficou abaixo de 10% recebe 5,5.
@@ -1313,7 +1336,8 @@ class Boletim26ColagService
                 $this->faixasJornadaColag($bimestre),
                 true,
                 null,
-                true
+                true,
+                $this->jornadaAte
             );
         } catch (\Throwable $e) {
             return null;
