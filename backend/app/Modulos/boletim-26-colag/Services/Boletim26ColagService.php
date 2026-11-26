@@ -2479,14 +2479,13 @@ class Boletim26ColagService
     }
 
     /**
-     * Planilha da turma no formato Prova Final / Média Final.
-     * Prova Final: APRO se a média (resultado) >= limiar; senão a própria nota.
+     * Planilha da turma: APRO se a média (resultado) >= limiar; senão a própria nota.
      *
      * @param list<array<string,mixed>> $relatorios
      * @return list<array{
      *   turma:string,
      *   materias:list<array{nome:string,sigla:string}>,
-     *   alunos:list<array{nome:string,prova_final:list<string>,media_final:list<string>}>
+     *   alunos:list<array{nome:string,prova_final:list<string>}>
      * }>
      */
     public function planilhaProvaFinal(array $relatorios, float $limiar = 6.5): array
@@ -2537,23 +2536,18 @@ class Boletim26ColagService
             $linhas = [];
             foreach ($alunos as $aluno) {
                 $provaFinal = [];
-                $mediaFinal = [];
                 foreach ($nomesMaterias as $nomeMateria) {
                     $nota = $aluno['notas'][$nomeMateria] ?? null;
                     if (!is_numeric($nota)) {
                         $provaFinal[] = '';
-                        $mediaFinal[] = '';
                         continue;
                     }
                     $valor = (float) $nota;
-                    $texto = number_format($valor, 1, ',', '');
-                    $provaFinal[] = $valor >= $limiar ? 'APRO' : $texto;
-                    $mediaFinal[] = $texto;
+                    $provaFinal[] = $valor >= $limiar ? 'APRO' : number_format($valor, 1, ',', '');
                 }
                 $linhas[] = [
                     'nome' => (string) $aluno['nome'],
                     'prova_final' => $provaFinal,
-                    'media_final' => $mediaFinal,
                 ];
             }
             $saida[] = [

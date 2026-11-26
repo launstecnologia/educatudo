@@ -169,8 +169,7 @@ class Boletim26ColagAdminController extends BaseController
     }
 
     /**
-     * CSV da turma: Prova Final (APRO ou nota) + Média Final.
-     * Usa a média dos resultados dos bimestres filtrados; limiar padrão 6,5.
+     * CSV da turma no formato Prova Final: APRO ou nota (limiar padrão 6,5).
      */
     public function exportarProvaFinal(): void
     {
@@ -207,6 +206,7 @@ class Boletim26ColagAdminController extends BaseController
             fclose($saida);
             exit;
         }
+        $limiarTexto = number_format((float) $limiar, 1, ',', '');
         foreach ($blocos as $indice => $bloco) {
             if ($indice > 0) {
                 fputcsv($saida, [], ';');
@@ -217,29 +217,23 @@ class Boletim26ColagAdminController extends BaseController
                 $materias
             );
             $qtd = count($siglas);
-            $cabecaProva = array_merge(
-                [$this->csvTexto((string) ($bloco['turma'] ?? '')), 'PROVA FINAL — APRO se ≥ ' . number_format((float) $limiar, 1, ',', '') . '; senão resultado'],
-                array_fill(0, max(0, $qtd - 1), '')
-            );
-            $cabecaMedia = array_merge(
-                ['', 'MÉDIA FINAL'],
-                array_fill(0, max(0, $qtd - 1), '')
-            );
-            fputcsv($saida, array_merge($cabecaProva, $cabecaMedia), ';');
             fputcsv($saida, array_merge(
-                ['NOME DO ALUNO'],
-                $siglas,
-                [''],
-                $siglas
+                [
+                    $this->csvTexto((string) ($bloco['turma'] ?? '')),
+                    'PROVA FINAL — APRO se ≥ ' . $limiarTexto . '; senão resultado',
+                ],
+                array_fill(0, max(0, $qtd - 1), '')
             ), ';');
+            fputcsv($saida, array_merge(['NOME DO ALUNO'], $siglas), ';');
             foreach (is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [] as $aluno) {
-                $prova = array_pad(array_slice(is_array($aluno['prova_final'] ?? null) ? $aluno['prova_final'] : [], 0, $qtd), $qtd, '');
-                $media = array_pad(array_slice(is_array($aluno['media_final'] ?? null) ? $aluno['media_final'] : [], 0, $qtd), $qtd, '');
+                $prova = array_pad(
+                    array_slice(is_array($aluno['prova_final'] ?? null) ? $aluno['prova_final'] : [], 0, $qtd),
+                    $qtd,
+                    ''
+                );
                 fputcsv($saida, array_merge(
                     [$this->csvTexto((string) ($aluno['nome'] ?? ''))],
-                    $prova,
-                    [''],
-                    $media
+                    $prova
                 ), ';');
             }
         }
