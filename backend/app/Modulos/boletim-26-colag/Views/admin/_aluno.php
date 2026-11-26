@@ -218,6 +218,21 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
     // Mantém as 4 colunas; bimestres além do limite saem como —.
     $bimestresBoletim = [1, 2, 3, 4];
 }
+$chaveOrdemAlfa = static function (string $nome): string {
+    $nome = mb_strtolower(trim($nome));
+
+    return strtr($nome, [
+        'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+        'é' => 'e', 'ê' => 'e',
+        'í' => 'i',
+        'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+        'ú' => 'u',
+        'ç' => 'c',
+    ]);
+};
+usort($ordemBoletim, static function (string $a, string $b) use ($chaveOrdemAlfa): int {
+    return strcmp($chaveOrdemAlfa($a), $chaveOrdemAlfa($b));
+});
 ?>
 <?php if ($ordemBoletim !== [] && $bimestresBoletim !== []): ?>
 <section class="mb-8 vista-boletim <?= $exibir === 'notas' ? 'hidden' : '' ?>">
@@ -236,9 +251,7 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
                     <th class="<?= $cabecaBoletim ?>" colspan="2"><?= (int) $bimestreColuna ?>º</th>
                     <?php endforeach; ?>
-                    <?php if (empty($somentePortal)): ?>
                     <th class="<?= $cabecaBoletim ?>" rowspan="2" title="Média dos bimestres publicados">Média</th>
-                    <?php endif; ?>
                 </tr>
                 <tr>
                     <?php foreach ($bimestresBoletim as $bimestreColuna): ?>
@@ -262,7 +275,6 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
                     <td class="px-2 py-2 <?= $notaBaixa ? 'vermelho' : (is_numeric($notaGrade) ? 'nota' : '') ?>"><?= $fmt($notaGrade) ?></td>
                     <td class="px-2 py-2"><?= $fmtInt($faltaGrade) ?></td>
                     <?php endforeach; ?>
-                    <?php if (empty($somentePortal)): ?>
                     <?php
                     $somaMedia = 0.0;
                     $qtdMedia = 0;
@@ -283,7 +295,6 @@ if ($boletimAteBimestre !== null && $boletimAteBimestre >= 1 && $boletimAteBimes
                     $mediaBaixa = $notaCampo === 'media_anual' && $notaMinima !== null && $mediaAnual !== null && $mediaAnual < $notaMinima;
                     ?>
                     <td class="px-2 py-2 font-semibold <?= $mediaBaixa ? 'vermelho' : ($mediaAnual !== null ? 'nota' : '') ?>"><?= $fmt($mediaAnual) ?></td>
-                    <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

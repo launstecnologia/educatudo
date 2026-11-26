@@ -5,8 +5,8 @@ $boletins_gerados_notas_por_regra = is_array($boletins_gerados_notas_por_regra ?
 $paineis_notas_originais = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $paineis_notas = $paineis_notas_originais;
 $alunoIdNotas = (int) ($student['id'] ?? $aluno_id ?? 0);
-// Portal aluno/pais define $ocultar_ref_notas; aí o +1 do 4º bimestre Colag não entra.
-$comBonusAdminColag = empty($ocultar_ref_notas);
+// Mesma nota do Boletim Colag: +1 no Resultado do 4º bimestre também no portal.
+$comBonusAdminColag = true;
 
 $appDirNotas = \App\Core\ViewPaths::app();
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {

@@ -469,6 +469,7 @@ $rotuloAbaFicha = static function (array $f): array {
             $layoutCalc = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
             $layoutColunas = 0;
             $pecasPorPeriodo = [];
+            $temMediaFinalLayout = false;
             foreach ($layoutFaixas as $faixaLayout) {
                 $layoutColunas += count($faixaLayout['colunas'] ?? []);
                 foreach ($faixaLayout['colunas'] ?? [] as $colPeriodo) {
@@ -477,7 +478,16 @@ $rotuloAbaFicha = static function (array $f): array {
                     if ($periodoPeca > 0 && $nomePeca !== '') {
                         $pecasPorPeriodo[$periodoPeca][$nomePeca] = true;
                     }
+                    if ($periodoPeca === 0 && $nomePeca === 'media') {
+                        $temMediaFinalLayout = true;
+                    }
                 }
+            }
+            $mostrarMediaFinalColagLayout = !$temMediaFinalLayout
+                && isset($servicoColag)
+                && $resultadosColag !== [];
+            if ($mostrarMediaFinalColagLayout) {
+                $layoutColunas++;
             }
             $txtSituacao = static function ($nota, float $minima) use ($esc): string {
                 $aprovado = \App\Modulos\RegrasAcademicas\Services\EscalaNota::aprovado(
@@ -499,6 +509,9 @@ $rotuloAbaFicha = static function (array $f): array {
                         <?php foreach ($layoutFaixas as $faixaLayout): ?>
                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="<?= count($faixaLayout['colunas']) ?>"><?= $esc($faixaLayout['nome'] ?? '') ?></th>
                         <?php endforeach; ?>
+                        <?php if ($mostrarMediaFinalColagLayout): ?>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" rowspan="2" title="Média dos bimestres">Média</th>
+                        <?php endif; ?>
                     </tr>
                     <tr>
                         <?php foreach ($layoutFaixas as $faixaLayout): ?>
@@ -535,6 +548,20 @@ $rotuloAbaFicha = static function (array $f): array {
                             $faltasPeriodo[$numCel] = ($celLayout['faltas'] === null || $celLayout['faltas'] === '') ? null : (int) $celLayout['faltas'];
                         }
                         $finalMedia = $layoutCalc->calcularFormula($layoutFormula, $mediasPeriodo);
+                        if ($mostrarMediaFinalColagLayout) {
+                            $somaColag = 0.0;
+                            $qtdColag = 0;
+                            foreach ($mediasPeriodo as $periodoMedia => $notaMedia) {
+                                if ($notaMedia === null || isset($ocultarPeriodosPortal[(int) $periodoMedia])) {
+                                    continue;
+                                }
+                                $somaColag += (float) $notaMedia;
+                                $qtdColag++;
+                            }
+                            $finalMedia = $qtdColag > 0
+                                ? (round(($somaColag / $qtdColag) * 2, 0, PHP_ROUND_HALF_UP) / 2)
+                                : null;
+                        }
                         $faltasPreenchidas = array_filter($faltasPeriodo, static fn ($v) => $v !== null);
                         $finalFaltas = $faltasPreenchidas === [] ? null : array_sum($faltasPreenchidas);
                         $formsAbertos = [];
@@ -615,6 +642,11 @@ $rotuloAbaFicha = static function (array $f): array {
                             </td>
                             <?php endforeach; ?>
                         <?php endforeach; ?>
+                        <?php if ($mostrarMediaFinalColagLayout): ?>
+                            <td class="px-2 py-2 text-center font-semibold text-gray-900 tabular-nums">
+                                <?= $finalMedia === null ? '—' : $esc(number_format($finalMedia, 1, ',', '')) ?>
+                            </td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                     <?php if ($grid === []): ?>
@@ -624,17 +656,30 @@ $rotuloAbaFicha = static function (array $f): array {
             </table>
         </div>
         <?php else: ?>
+        <?php
+        $mostrarMediaFinalColag = isset($servicoColag) && $resultadosColag !== [];
+        $periodosMedia = [];
+        foreach ($periodosQuadro as $periodoMedia) {
+            $periodoMedia = (int) $periodoMedia;
+            if ($periodoMedia >= 1 && empty($ocultarPeriodosPortal[$periodoMedia])) {
+                $periodosMedia[] = $periodoMedia;
+            }
+        }
+        ?>
         <div class="overflow-x-auto border border-gray-200 rounded-lg">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase"<?= $mostrarMediaFinalColag ? ' rowspan="2"' : '' ?>>Componente</th>
                         <?php foreach ($periodosQuadro as $p): ?>
                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $esc($periodos[$p] ?? $p) ?></th>
                         <?php endforeach; ?>
+                        <?php if ($mostrarMediaFinalColag): ?>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" rowspan="2" title="Média dos bimestres">Média</th>
+                        <?php endif; ?>
                     </tr>
                     <tr>
-                        <th></th>
+                        <?php if (!$mostrarMediaFinalColag): ?><th></th><?php endif; ?>
                         <?php foreach ($periodosQuadro as $p): ?>
                             <th class="px-2 py-1 text-center text-[10px] text-gray-400">Nota</th>
                             <th class="px-2 py-1 text-center text-[10px] text-gray-400">Falta</th>
@@ -645,6 +690,7 @@ $rotuloAbaFicha = static function (array $f): array {
                     <?php foreach ($grid as $row):
                         $linha = $row['linha'];
                         $cels = $row['celulas'];
+                        $notasParaMedia = [];
                     ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap"><?= $esc($linha['componente_nome'] ?? '') ?></td>
@@ -664,6 +710,15 @@ $rotuloAbaFicha = static function (array $f): array {
                                         $c['nota'] = $notaColag;
                                     }
                                 }
+                            }
+                            if (
+                                $mostrarMediaFinalColag
+                                && in_array((int) $p, $periodosMedia, true)
+                                && is_array($c)
+                                && $c['nota'] !== null
+                                && $c['nota'] !== ''
+                            ) {
+                                $notasParaMedia[] = (float) $c['nota'];
                             }
                             $origem = (string) ($c['origem'] ?? 'vazia');
                             $aberta = $c && in_array($c['status'] ?? '', ['aberta', 'reaberta'], true) && $p !== 0;
@@ -697,10 +752,20 @@ $rotuloAbaFicha = static function (array $f): array {
                             <td class="px-2 py-2 text-center text-gray-600 tabular-nums"><?= $esc($faltasTxt) ?></td>
                             <?php endif; ?>
                         <?php endforeach; ?>
+                        <?php if ($mostrarMediaFinalColag): ?>
+                            <?php
+                            $mediaFinalLinha = $notasParaMedia === []
+                                ? null
+                                : (round((array_sum($notasParaMedia) / count($notasParaMedia)) * 2, 0, PHP_ROUND_HALF_UP) / 2);
+                            ?>
+                            <td class="px-2 py-2 text-center font-semibold text-gray-900 tabular-nums">
+                                <?= $mediaFinalLinha === null ? '—' : $esc(number_format($mediaFinalLinha, 1, ',', '')) ?>
+                            </td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                     <?php if ($grid === []): ?>
-                    <tr><td colspan="<?= 1 + (count($periodosQuadro) * 2) ?>" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
+                    <tr><td colspan="<?= 1 + (count($periodosQuadro) * 2) + ($mostrarMediaFinalColag ? 1 : 0) ?>" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>

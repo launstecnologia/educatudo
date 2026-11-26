@@ -50,8 +50,8 @@ class Boletim26ColagService
     private const JORNADA_ATE_PADRAO_ADMIN = '2026-11-26 08:00:00';
 
     /**
-     * +1 no Resultado final do 4º bimestre (teto 10), só no admin/export.
-     * Portal de aluno e pais permanece sem o bônus.
+     * +1 no Resultado final do 4º bimestre (teto 10).
+     * Vale no admin, no portal do aluno e no dos pais — mesma nota do Boletim Colag.
      */
     private bool $bonusAdminQuartoBimestre = false;
 
@@ -62,7 +62,9 @@ class Boletim26ColagService
 
     public function portalDoAluno(array $aluno, string $perfil, int $ano): ?array
     {
-        $this->bonusAdminQuartoBimestre = false;
+        // Mesma regra do painel Colag: +1 no 4º e corte de jornada padrão.
+        $this->bonusAdminQuartoBimestre = true;
+        $this->aplicarCorteJornadaAdminSeAtivo();
         $turma = $this->turmaPorId($this->turmasMedio(), (int) ($aluno['turma_id'] ?? 0));
         if ($turma === null) {
             return null;
@@ -547,10 +549,9 @@ class Boletim26ColagService
     }
 
     /**
-     * Resultado final do Colag por bimestre, para o boletim e o detalhe admin do aluno.
-     * Portal de aluno/pais não deve pedir $comBonusAdmin = true.
+     * Resultado final do Colag por bimestre (inclui +1 no 4º quando $comBonusAdmin).
      *
-     * @param bool $comBonusAdmin +1 no 4º bimestre (só admin/export; nunca portal)
+     * @param bool $comBonusAdmin +1 no Resultado final do 4º bimestre (teto 10)
      * @return array<int, array<string, float>>
      */
     public function resultadosPorBimestre(int $alunoId, int $turmaId, int $ano, bool $comBonusAdmin = false): array
@@ -885,8 +886,7 @@ class Boletim26ColagService
     }
 
     /**
-     * Admin/export no 4º bimestre: Resultado final +1,0 (teto 10,0).
-     * Aluno e pais não passam por este bônus.
+     * 4º bimestre: Resultado final +1,0 (teto 10,0) — admin, aluno e pais.
      *
      * @param list<array<string,mixed>> $linhas
      * @return list<array<string,mixed>>
@@ -1376,15 +1376,14 @@ class Boletim26ColagService
     }
 
     /**
-     * Admin/export: usa o filtro se vier preenchido; senão congela em 26/11/2026 08:00.
-     * Portal (aluno/pais) não chama este método — fica sem corte.
+     * Usa o filtro se vier preenchido; senão congela em 26/11/2026 08:00.
      */
     private function resolverJornadaAteAdmin(?string $valor): string
     {
         return $this->normalizarJornadaAte($valor) ?? self::JORNADA_ATE_PADRAO_ADMIN;
     }
 
-    /** Garante o corte padrão sempre que o fluxo admin estiver ativo. */
+    /** Garante o corte padrão de jornada (admin e portal). */
     private function aplicarCorteJornadaAdminSeAtivo(): void
     {
         if (!$this->bonusAdminQuartoBimestre) {
