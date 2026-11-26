@@ -1292,7 +1292,9 @@ class Boletim26ColagService
     }
 
     /**
-     * Uma nota só, pela conclusão das jornadas do bimestre na tabela de faixas.
+     * Uma nota só, pela conclusão das jornadas do bimestre.
+     * Quem concluiu alguma jornada e ficou abaixo de 10% recebe 5,5.
+     * Quem não concluiu nenhuma continua em 0.
      */
     private function jornadaDoBimestre(int $alunoId, int $turmaId, int $bimestre, int $ano): ?float
     {
@@ -1315,6 +1317,10 @@ class Boletim26ColagService
             );
         } catch (\Throwable $e) {
             return null;
+        }
+        $percentual = $notas['percentual_conclusao_escopo'] ?? null;
+        if (is_numeric($percentual) && (float) $percentual > 0 && (float) $percentual < 10) {
+            return 5.5;
         }
         $nota = $notas['nota_unica_valor_padrao'] ?? null;
 
