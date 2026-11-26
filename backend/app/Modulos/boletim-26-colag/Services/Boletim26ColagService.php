@@ -1348,15 +1348,13 @@ class Boletim26ColagService
     }
 
     /**
-     * Faixas por bimestre, iguais às regras antigas do EM:
-     * - 1º (regra 6 / ID 39): 10→5,5 … 40→7,0
-     * - 2º+ (regra 14 / ID 40, regra 15 / ID 43): 10%–40% → 7,0 (piso)
+     * A mesma tabela em todos os bimestres: 10% vale 5,5.
      *
      * @return list<array{percentual_min:int,nota:float}>
      */
     private function faixasJornadaColag(int $bimestre = 0): array
     {
-        $base = [
+        return [
             ['percentual_min' => 100, 'nota' => 10.0],
             ['percentual_min' => 90, 'nota' => 9.5],
             ['percentual_min' => 80, 'nota' => 9.0],
@@ -1364,20 +1362,10 @@ class Boletim26ColagService
             ['percentual_min' => 60, 'nota' => 8.0],
             ['percentual_min' => 50, 'nota' => 7.5],
             ['percentual_min' => 40, 'nota' => 7.0],
+            ['percentual_min' => 30, 'nota' => 6.5],
+            ['percentual_min' => 20, 'nota' => 6.0],
+            ['percentual_min' => 10, 'nota' => 5.5],
         ];
-        if ($bimestre <= 1) {
-            return array_merge($base, [
-                ['percentual_min' => 30, 'nota' => 6.5],
-                ['percentual_min' => 20, 'nota' => 6.0],
-                ['percentual_min' => 10, 'nota' => 5.5],
-            ]);
-        }
-
-        return array_merge($base, [
-            ['percentual_min' => 30, 'nota' => 7.0],
-            ['percentual_min' => 20, 'nota' => 7.0],
-            ['percentual_min' => 10, 'nota' => 7.0],
-        ]);
     }
 
     /**
