@@ -29,29 +29,130 @@ $urlMidia = static function (string $path): string {
     }
     return rtrim((string) URL, '/') . '/' . ltrim($path, '/');
 };
+
+$avatarHtml = static function (string $foto, string $iniciaisTxt, string $bg, string $fg, string $size = '40px') use ($urlMidia): string {
+    $foto = $urlMidia($foto);
+    $style = 'width:' . $size . ';height:' . $size . ';border-radius:9999px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:' . $bg . ';color:' . $fg . ';font-size:12px;font-weight:700;';
+    if ($foto !== '') {
+        return '<div style="' . $style . '"><img src="' . htmlspecialchars($foto) . '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent=\'' . htmlspecialchars($iniciaisTxt, ENT_QUOTES) . '\'"></div>';
+    }
+    return '<div style="' . $style . '">' . htmlspecialchars($iniciaisTxt) . '</div>';
+};
 ?>
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <div>
-        <h2 class="text-2xl font-bold text-gray-900">Fale com a Escola</h2>
-        <p class="text-gray-600 mt-1">Chat contínuo com cada família — texto, imagem, vídeo, PDF e curtidas.</p>
-    </div>
-    <a href="<?= URL ?>/admin/comunicacao-escolar" class="text-gray-600 hover:text-gray-900">← Comunicação escolar</a>
-</div>
+<style>
+.fale-shell { display:flex; flex-direction:column; gap:1rem; }
+.fale-card {
+  display:grid; grid-template-columns:1fr; width:100%;
+  height: calc(100vh - 11rem); min-height: 520px; max-height: 780px;
+  background:#fff; border:1px solid #e5e7eb; border-radius:1rem;
+  box-shadow:0 10px 15px -3px rgba(0,0,0,.08); overflow:hidden;
+}
+@media (min-width:1024px) {
+  .fale-card { grid-template-columns: 320px 1fr; }
+}
+.fale-lista { display:flex; flex-direction:column; background:#f8fafc; border-bottom:1px solid #e5e7eb; min-height:0; }
+@media (min-width:1024px) {
+  .fale-lista { border-bottom:0; border-right:1px solid #e5e7eb; }
+}
+.fale-lista-head { padding:.875rem 1rem; background:#fff; border-bottom:1px solid #e5e7eb; }
+.fale-lista-body { overflow:auto; flex:1; min-height:0; }
+.fale-conv {
+  display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem;
+  text-decoration:none; color:inherit; border-left:3px solid transparent; border-bottom:1px solid #f1f5f9;
+}
+.fale-conv:hover { background:#fff; }
+.fale-conv.is-ativa { background:#fff; border-left-color:#0d9488; }
+.fale-thread { display:flex; flex-direction:column; min-height:0; background:#fff; }
+.fale-thread-head {
+  display:flex; align-items:center; gap:.75rem; padding:.875rem 1rem;
+  background:#f8fafc; border-bottom:1px solid #e5e7eb; flex-shrink:0;
+}
+.fale-msgs {
+  flex:1; min-height:0; overflow:auto; padding:1rem;
+  background-color:#e5ddd5;
+  background-image: radial-gradient(rgba(0,0,0,.03) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.fale-row { display:flex; align-items:flex-end; gap:.5rem; margin-bottom:.75rem; }
+.fale-row.is-escola { justify-content:flex-end; }
+.fale-row.is-familia { justify-content:flex-start; }
+.fale-bolha {
+  max-width:min(78%, 28rem); padding:.55rem .8rem .4rem;
+  border-radius:12px; box-shadow:0 1px 1px rgba(0,0,0,.08); position:relative;
+}
+.fale-bolha.is-escola { background:#d9fdd3; border-bottom-right-radius:4px; }
+.fale-bolha.is-familia { background:#fff; border-bottom-left-radius:4px; }
+.fale-bolha-autor { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#64748b; margin-bottom:.15rem; }
+.fale-bolha-texto { font-size:14px; line-height:1.4; color:#111827; white-space:pre-wrap; word-break:break-word; }
+.fale-bolha-meta { display:flex; align-items:center; justify-content:flex-end; gap:.4rem; margin-top:.25rem; }
+.fale-bolha-hora { font-size:11px; color:#64748b; }
+.fale-curtir {
+  border:0; background:transparent; color:#64748b; cursor:pointer; padding:0;
+  font-size:12px; display:inline-flex; align-items:center; gap:.2rem;
+}
+.fale-curtir.is-on { color:#0d9488; }
+.fale-composer {
+  flex-shrink:0; background:#f0f2f5; border-top:1px solid #e5e7eb;
+  padding:.65rem .75rem; display:flex; flex-direction:column; gap:.5rem;
+}
+.fale-composer-row { display:flex; align-items:flex-end; gap:.5rem; }
+.fale-btn-icon {
+  width:42px; height:42px; border-radius:9999px; border:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.fale-btn-mais { background:#fff; color:#475569; border:1px solid #e2e8f0 !important; }
+.fale-btn-acao { background:#0d9488; color:#fff; }
+.fale-btn-acao:hover { background:#0f766e; }
+.fale-input {
+  flex:1; min-width:0; border:0; border-radius:1.5rem; background:#fff;
+  padding:.7rem 1rem; font-size:14px; resize:none; max-height:110px; line-height:1.35;
+  box-shadow: inset 0 0 0 1px #e2e8f0; outline:none;
+}
+.fale-input:focus { box-shadow: inset 0 0 0 2px #14b8a6; }
+.fale-menu {
+  display:none; position:absolute; bottom:52px; left:0; z-index:30;
+  width:180px; background:#fff; border:1px solid #e5e7eb; border-radius:.75rem;
+  box-shadow:0 10px 25px rgba(0,0,0,.12); overflow:hidden;
+}
+.fale-menu.is-open { display:block; }
+.fale-menu button {
+  width:100%; border:0; background:#fff; text-align:left; padding:.7rem .9rem;
+  font-size:14px; color:#334155; cursor:pointer; display:flex; align-items:center; gap:.5rem;
+}
+.fale-menu button:hover { background:#f8fafc; }
+.fale-chip {
+  display:none; align-items:center; justify-content:space-between; gap:.5rem;
+  background:#fff; border:1px solid #e5e7eb; border-radius:.75rem; padding:.5rem .75rem; font-size:13px;
+}
+.fale-chip.is-on { display:flex; }
+.fale-empty {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:2rem; color:#64748b; background:#f8fafc;
+}
+</style>
 
-<?php if (!empty($flash_message)): ?>
-    <div class="mb-4 rounded-lg px-4 py-3 text-sm <?= ($flash_type ?? '') === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200' ?>">
-        <?= htmlspecialchars((string) $flash_message) ?>
+<div class="fale-shell">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Fale com a Escola</h2>
+            <p class="text-gray-600 mt-1">Chat com as famílias — mensagens, anexos e áudio.</p>
+        </div>
+        <a href="<?= URL ?>/admin/comunicacao-escolar" class="text-gray-600 hover:text-gray-900">← Comunicação escolar</a>
     </div>
-<?php endif; ?>
 
-<div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden w-full" style="min-height: 36rem;">
-    <div class="grid grid-cols-1 lg:grid-cols-12 h-full" style="min-height: 36rem;">
-        <aside class="lg:col-span-4 border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col bg-gray-50/60 max-h-[40vh] lg:max-h-none">
-            <div class="px-4 py-3 border-b border-gray-200 bg-white">
+    <?php if (!empty($flash_message)): ?>
+        <div class="rounded-lg px-4 py-3 text-sm <?= ($flash_type ?? '') === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200' ?>">
+            <?= htmlspecialchars((string) $flash_message) ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="fale-card">
+        <aside class="fale-lista">
+            <div class="fale-lista-head">
                 <p class="text-sm font-semibold text-gray-900">Conversas</p>
                 <p class="text-xs text-gray-500"><?= count($items) ?> família(s)</p>
             </div>
-            <div class="overflow-y-auto flex-1">
+            <div class="fale-lista-body">
                 <?php if ($items === []): ?>
                     <p class="px-4 py-8 text-sm text-gray-500">Nenhuma família falou com a escola ainda.</p>
                 <?php else: ?>
@@ -60,27 +161,19 @@ $urlMidia = static function (string $path): string {
                         $id = (int) ($item['id'] ?? 0);
                         $ativa = $id === $conversaId;
                         $naoLidas = (int) ($item['nao_lidas'] ?? 0);
-                        $foto = $urlMidia((string) ($item['foto_url'] ?? ''));
                         $nomeAluno = (string) ($item['aluno_nome'] ?? 'Aluno');
                         ?>
-                        <a href="<?= $baseUrl ?>/<?= $id ?>"
-                           class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors <?= $ativa ? 'bg-white border-l-4 border-l-teal-600' : 'border-l-4 border-l-transparent' ?>">
-                            <div class="shrink-0 w-11 h-11 rounded-full overflow-hidden bg-teal-100 flex items-center justify-center text-teal-800 text-sm font-bold">
-                                <?php if ($foto !== ''): ?>
-                                    <img src="<?= htmlspecialchars($foto) ?>" alt="" class="w-full h-full object-cover" onerror="this.remove()">
-                                <?php else: ?>
-                                    <?= htmlspecialchars($iniciais($nomeAluno)) ?>
-                                <?php endif; ?>
-                            </div>
+                        <a href="<?= $baseUrl ?>/<?= $id ?>" class="fale-conv <?= $ativa ? 'is-ativa' : '' ?>">
+                            <?= $avatarHtml((string) ($item['foto_url'] ?? ''), $iniciais($nomeAluno), '#ccfbf1', '#115e59', '44px') ?>
                             <div class="min-w-0 flex-1">
-                                <div class="flex items-start justify-between gap-2">
-                                    <p class="font-semibold text-gray-900 truncate"><?= htmlspecialchars($nomeAluno) ?></p>
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="font-semibold text-gray-900 truncate text-sm"><?= htmlspecialchars($nomeAluno) ?></p>
                                     <?php if ($naoLidas > 0): ?>
-                                        <span class="shrink-0 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700"><?= $naoLidas ?></span>
+                                        <span class="shrink-0 inline-flex items-center rounded-full bg-red-500 text-white px-1.5 py-0.5 text-[10px] font-bold"><?= $naoLidas ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <p class="text-xs text-gray-500 truncate"><?= htmlspecialchars((string) ($item['responsavel_nome'] ?? 'Responsável')) ?></p>
-                                <p class="text-sm text-gray-600 truncate mt-0.5"><?= htmlspecialchars((string) (($item['ultima'] ?? '') !== '' ? $item['ultima'] : 'Anexo')) ?></p>
+                                <p class="text-xs text-gray-600 truncate mt-0.5"><?= htmlspecialchars((string) (($item['ultima'] ?? '') !== '' ? $item['ultima'] : 'Anexo')) ?></p>
                             </div>
                         </a>
                     <?php endforeach; ?>
@@ -88,200 +181,140 @@ $urlMidia = static function (string $path): string {
             </div>
         </aside>
 
-        <section class="lg:col-span-8 flex flex-col bg-white" style="min-height: 36rem;">
+        <section class="fale-thread">
             <?php if ($conversa === null): ?>
-                <div class="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div class="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mb-4">
+                <div class="fale-empty">
+                    <div class="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mb-3">
                         <i class="fa-regular fa-comments text-teal-600 text-xl"></i>
                     </div>
-                    <p class="text-lg font-semibold text-gray-900">Selecione uma conversa</p>
+                    <p class="text-base font-semibold text-gray-900">Selecione uma conversa</p>
                     <p class="text-sm text-gray-500 mt-1 max-w-sm">Escolha uma família à esquerda para ver o histórico e responder.</p>
                 </div>
             <?php else: ?>
                 <?php
-                $fotoConversa = $urlMidia((string) ($conversa['foto_url'] ?? ''));
+                $fotoConversa = (string) ($conversa['foto_url'] ?? '');
                 $nomeConversa = (string) ($conversa['aluno_nome'] ?? 'Aluno');
                 ?>
-                <div class="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full overflow-hidden bg-teal-100 flex items-center justify-center text-teal-800 font-bold shrink-0">
-                        <?php if ($fotoConversa !== ''): ?>
-                            <img src="<?= htmlspecialchars($fotoConversa) ?>" alt="" class="w-full h-full object-cover" onerror="this.remove()">
-                        <?php else: ?>
-                            <?= htmlspecialchars($iniciais($nomeConversa)) ?>
-                        <?php endif; ?>
-                    </div>
+                <div class="fale-thread-head">
+                    <?= $avatarHtml($fotoConversa, $iniciais($nomeConversa), '#ccfbf1', '#115e59', '44px') ?>
                     <div class="min-w-0">
                         <p class="font-semibold text-gray-900 truncate"><?= htmlspecialchars($nomeConversa) ?></p>
-                        <p class="text-sm text-gray-500 truncate">Responsável: <?= htmlspecialchars((string) ($conversa['responsavel_nome'] ?? '')) ?></p>
+                        <p class="text-xs text-gray-500 truncate">Responsável: <?= htmlspecialchars((string) ($conversa['responsavel_nome'] ?? '')) ?></p>
                     </div>
                 </div>
 
-                <div id="fale-chat-mensagens" class="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4 bg-[#efeae2]" style="max-height: 28rem;">
+                <div id="fale-chat-mensagens" class="fale-msgs">
                     <?php if ($mensagens === []): ?>
-                        <p class="text-sm text-gray-500 text-center py-8">Nenhuma mensagem nesta conversa.</p>
+                        <p class="text-sm text-gray-600 text-center py-10">Nenhuma mensagem nesta conversa.</p>
                     <?php endif; ?>
                     <?php foreach ($mensagens as $mensagem): ?>
                         <?php
                         $daEscola = ($mensagem['autor_tipo'] ?? '') === 'escola';
                         $msgId = (int) ($mensagem['id'] ?? 0);
                         $anexoTipo = (string) ($mensagem['anexo_tipo'] ?? (!empty($mensagem['imagem']) ? 'imagem' : ''));
+                        $anexoMime = (string) ($mensagem['anexo_mime'] ?? '');
+                        if ($anexoTipo === '' && str_starts_with($anexoMime, 'audio/')) {
+                            $anexoTipo = 'audio';
+                        }
                         $anexoUrl = $urlMidia((string) ($mensagem['imagem'] ?? ''));
                         $anexoNome = (string) ($mensagem['imagem_nome'] ?? 'arquivo');
                         $curtidas = (int) ($mensagem['curtidas'] ?? 0);
                         $euCurti = !empty($mensagem['eu_curti']);
-                        $fotoBolha = $daEscola ? $urlMidia($escolaAvatar) : $fotoConversa;
+                        $fotoBolha = $daEscola ? $escolaAvatar : $fotoConversa;
                         $iniciaisBolha = $daEscola ? 'ES' : $iniciais($nomeConversa);
                         ?>
-                        <div id="msg-<?= $msgId ?>" class="flex items-end gap-2 <?= $daEscola ? 'justify-end' : 'justify-start' ?>">
+                        <div id="msg-<?= $msgId ?>" class="fale-row <?= $daEscola ? 'is-escola' : 'is-familia' ?>">
                             <?php if (!$daEscola): ?>
-                                <div class="w-8 h-8 rounded-full overflow-hidden bg-white border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
-                                    <?php if ($fotoBolha !== ''): ?>
-                                        <img src="<?= htmlspecialchars($fotoBolha) ?>" alt="" class="w-full h-full object-cover" onerror="this.remove()">
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($iniciaisBolha) ?>
-                                    <?php endif; ?>
-                                </div>
+                                <?= $avatarHtml($fotoBolha, $iniciaisBolha, '#fff', '#475569', '32px') ?>
                             <?php endif; ?>
 
-                            <div class="max-w-[85%] sm:max-w-md">
-                                <div class="rounded-2xl px-3.5 py-2.5 shadow-sm <?= $daEscola ? 'bg-[#dcf8c6] text-gray-900 rounded-br-md' : 'bg-white text-gray-900 border border-gray-100 rounded-bl-md' ?>">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                                        <?= $daEscola ? 'Escola' : 'Família' ?>
-                                    </p>
-                                    <?php if (trim((string) ($mensagem['mensagem'] ?? '')) !== ''): ?>
-                                        <p class="mt-1 text-sm whitespace-pre-wrap"><?= nl2br(htmlspecialchars((string) $mensagem['mensagem'])) ?></p>
-                                    <?php endif; ?>
-
-                                    <?php if ($anexoUrl !== '' && $anexoTipo === 'imagem'): ?>
-                                        <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener" class="block mt-2">
-                                            <img src="<?= htmlspecialchars($anexoUrl) ?>" alt="Imagem" class="max-h-56 rounded-lg">
-                                        </a>
-                                    <?php elseif ($anexoUrl !== '' && $anexoTipo === 'video'): ?>
-                                        <video controls class="mt-2 max-h-56 w-full rounded-lg bg-black" preload="metadata">
-                                            <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars((string) ($mensagem['anexo_mime'] ?? 'video/mp4')) ?>">
-                                        </video>
-                                    <?php elseif ($anexoUrl !== '' && $anexoTipo === 'audio'): ?>
-                                        <audio controls class="mt-2 w-full max-w-xs" preload="metadata">
-                                            <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars((string) ($mensagem['anexo_mime'] ?? 'audio/webm')) ?>">
-                                        </audio>
-                                    <?php elseif ($anexoUrl !== '' && $anexoTipo === 'arquivo'): ?>
-                                        <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener"
-                                           class="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100">
-                                            <i class="fa-regular fa-file-pdf text-red-600"></i>
-                                            <?= htmlspecialchars($anexoNome) ?>
-                                        </a>
-                                    <?php elseif ($anexoUrl !== ''): ?>
-                                        <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener" class="block mt-2 text-sm underline">Abrir anexo</a>
-                                    <?php endif; ?>
-
-                                    <div class="mt-1 flex items-center justify-between gap-3">
-                                        <p class="text-[11px] text-gray-500">
-                                            <?= !empty($mensagem['created_at']) ? date('d/m/Y H:i', strtotime((string) $mensagem['created_at'])) : '' ?>
-                                        </p>
-                                        <?php if ($curtidas > 0): ?>
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-white/90 border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-700 shadow-sm">
-                                                👍 <?= $curtidas ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-
-                                <?php if ($reacoesProntas && $msgId > 0): ?>
-                                    <form method="post"
-                                          action="<?= $baseUrl ?>/<?= $conversaId ?>/mensagens/<?= $msgId ?>/curtir"
-                                          class="mt-1 <?= $daEscola ? 'text-right' : 'text-left' ?>">
-                                        <input type="hidden" name="_token" value="<?= $csrf ?>">
-                                        <button type="submit"
-                                                class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs <?= $euCurti ? 'bg-teal-100 text-teal-800' : 'bg-white/80 text-gray-600 hover:bg-white' ?> border border-gray-200 shadow-sm"
-                                                title="<?= $euCurti ? 'Remover curtida' : 'Curtir' ?>">
-                                            <i class="fa-<?= $euCurti ? 'solid' : 'regular' ?> fa-thumbs-up"></i>
-                                            <?= $euCurti ? 'Curtiu' : 'Curtir' ?>
-                                        </button>
-                                    </form>
+                            <div class="fale-bolha <?= $daEscola ? 'is-escola' : 'is-familia' ?>">
+                                <div class="fale-bolha-autor"><?= $daEscola ? 'Escola' : 'Família' ?></div>
+                                <?php if (trim((string) ($mensagem['mensagem'] ?? '')) !== ''): ?>
+                                    <div class="fale-bolha-texto"><?= nl2br(htmlspecialchars((string) $mensagem['mensagem'])) ?></div>
                                 <?php endif; ?>
+
+                                <?php if ($anexoUrl !== '' && $anexoTipo === 'imagem'): ?>
+                                    <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener" class="block mt-2">
+                                        <img src="<?= htmlspecialchars($anexoUrl) ?>" alt="Imagem" style="max-height:220px;border-radius:8px;display:block;">
+                                    </a>
+                                <?php elseif ($anexoUrl !== '' && $anexoTipo === 'video'): ?>
+                                    <video controls style="margin-top:8px;max-height:220px;width:100%;border-radius:8px;background:#000;" preload="metadata">
+                                        <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'video/mp4') ?>">
+                                    </video>
+                                <?php elseif ($anexoUrl !== '' && $anexoTipo === 'audio'): ?>
+                                    <audio controls style="margin-top:8px;width:100%;max-width:240px;" preload="metadata">
+                                        <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm') ?>">
+                                    </audio>
+                                <?php elseif ($anexoUrl !== ''): ?>
+                                    <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener"
+                                       style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#1e293b;text-decoration:none;">
+                                        <i class="fa-regular fa-file"></i>
+                                        <?= htmlspecialchars($anexoNome) ?>
+                                    </a>
+                                <?php endif; ?>
+
+                                <div class="fale-bolha-meta">
+                                    <?php if ($curtidas > 0): ?>
+                                        <span style="font-size:11px;">👍 <?= $curtidas ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($reacoesProntas && $msgId > 0): ?>
+                                        <form method="post" action="<?= $baseUrl ?>/<?= $conversaId ?>/mensagens/<?= $msgId ?>/curtir" style="display:inline;margin:0;">
+                                            <input type="hidden" name="_token" value="<?= $csrf ?>">
+                                            <button type="submit" class="fale-curtir <?= $euCurti ? 'is-on' : '' ?>" title="<?= $euCurti ? 'Remover curtida' : 'Curtir' ?>">
+                                                <i class="fa-<?= $euCurti ? 'solid' : 'regular' ?> fa-thumbs-up"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <span class="fale-bolha-hora"><?= !empty($mensagem['created_at']) ? date('d/m H:i', strtotime((string) $mensagem['created_at'])) : '' ?></span>
+                                </div>
                             </div>
 
                             <?php if ($daEscola): ?>
-                                <div class="w-8 h-8 rounded-full overflow-hidden bg-teal-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                                    <?php if ($fotoBolha !== ''): ?>
-                                        <img src="<?= htmlspecialchars($fotoBolha) ?>" alt="" class="w-full h-full object-cover" onerror="this.remove()">
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($iniciaisBolha) ?>
-                                    <?php endif; ?>
-                                </div>
+                                <?= $avatarHtml($fotoBolha, $iniciaisBolha, '#0d9488', '#fff', '32px') ?>
                             <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
                 </div>
 
-                <form id="fale-chat-form"
-                      method="post"
-                      enctype="multipart/form-data"
-                      action="<?= $baseUrl ?>/<?= $conversaId ?>/responder"
-                      class="border-t border-gray-200 px-3 py-2.5 bg-[#f0f2f5]">
+                <form id="fale-chat-form" method="post" enctype="multipart/form-data" action="<?= $baseUrl ?>/<?= $conversaId ?>/responder" class="fale-composer">
                     <input type="hidden" name="_token" value="<?= $csrf ?>">
                     <input type="file" id="fale-anexo-input" name="anexo" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf,audio/*" class="hidden">
 
-                    <div id="fale-anexo-preview" class="hidden mb-2 mx-1 rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm text-gray-700 flex items-center justify-between gap-2">
+                    <div id="fale-anexo-preview" class="fale-chip">
                         <span id="fale-anexo-nome" class="truncate"></span>
-                        <button type="button" id="fale-anexo-remover" class="text-gray-500 hover:text-red-600 shrink-0" title="Remover anexo" aria-label="Remover anexo">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
+                        <button type="button" id="fale-anexo-remover" class="text-gray-500 hover:text-red-600" title="Remover" aria-label="Remover anexo"><i class="fa-solid fa-xmark"></i></button>
                     </div>
 
-                    <div id="fale-gravando" class="hidden mb-2 mx-1 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 flex items-center justify-between gap-3">
-                        <span class="inline-flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                            Gravando <strong id="fale-gravando-timer">0:00</strong>
-                        </span>
-                        <span class="inline-flex items-center gap-2">
-                            <button type="button" id="fale-gravando-cancelar" class="text-red-700 hover:underline text-xs font-semibold">Cancelar</button>
-                            <button type="button" id="fale-gravando-parar" class="inline-flex items-center gap-1 rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold hover:bg-teal-700">
+                    <div id="fale-gravando" class="fale-chip" style="background:#fef2f2;border-color:#fecaca;color:#b91c1c;">
+                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:#ef4444;margin-right:6px;"></span>Gravando <strong id="fale-gravando-timer">0:00</strong></span>
+                        <span style="display:inline-flex;gap:8px;align-items:center;">
+                            <button type="button" id="fale-gravando-cancelar" style="border:0;background:transparent;color:#b91c1c;font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+                            <button type="button" id="fale-gravando-parar" class="fale-btn-acao" style="width:auto;height:auto;border-radius:9999px;padding:4px 10px;font-size:12px;">
                                 <i class="fa-solid fa-check"></i> Pronto
                             </button>
                         </span>
                     </div>
 
-                    <div class="flex items-end gap-2">
-                        <div class="relative shrink-0">
-                            <button type="button" id="fale-btn-mais"
-                                    class="w-10 h-10 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center shadow-sm"
-                                    title="Anexar" aria-label="Anexar arquivo">
-                                <i class="fa-solid fa-plus text-lg"></i>
+                    <div class="fale-composer-row">
+                        <div style="position:relative;flex-shrink:0;">
+                            <button type="button" id="fale-btn-mais" class="fale-btn-icon fale-btn-mais" title="Anexar" aria-label="Anexar">
+                                <i class="fa-solid fa-plus"></i>
                             </button>
-                            <div id="fale-menu-anexo" class="hidden absolute bottom-12 left-0 z-20 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 overflow-hidden">
-                                <button type="button" data-fale-attach="image/*" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                                    <i class="fa-regular fa-image text-teal-600 w-4"></i> Foto
-                                </button>
-                                <button type="button" data-fale-attach="video/mp4,video/webm" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                                    <i class="fa-solid fa-video text-purple-600 w-4"></i> Vídeo
-                                </button>
-                                <button type="button" data-fale-attach="application/pdf" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                                    <i class="fa-regular fa-file-pdf text-red-600 w-4"></i> Documento
-                                </button>
+                            <div id="fale-menu-anexo" class="fale-menu">
+                                <button type="button" data-fale-attach="image/*"><i class="fa-regular fa-image" style="color:#0d9488;width:16px;"></i> Foto</button>
+                                <button type="button" data-fale-attach="video/mp4,video/webm"><i class="fa-solid fa-video" style="color:#7c3aed;width:16px;"></i> Vídeo</button>
+                                <button type="button" data-fale-attach="application/pdf"><i class="fa-regular fa-file-pdf" style="color:#dc2626;width:16px;"></i> Documento</button>
                             </div>
                         </div>
 
-                        <div class="flex-1 min-w-0">
-                            <label class="block">
-                                <span class="sr-only">Mensagem</span>
-                                <textarea id="fale-mensagem"
-                                          name="mensagem"
-                                          rows="1"
-                                          class="w-full resize-none rounded-3xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent max-h-32"
-                                          placeholder="Mensagem"></textarea>
-                            </label>
-                        </div>
+                        <textarea id="fale-mensagem" name="mensagem" rows="1" class="fale-input" placeholder="Mensagem"></textarea>
 
-                        <button type="button" id="fale-btn-mic"
-                                class="w-10 h-10 rounded-full bg-teal-600 text-white hover:bg-teal-700 flex items-center justify-center shadow-sm shrink-0"
-                                title="Gravar áudio" aria-label="Gravar áudio">
+                        <button type="button" id="fale-btn-mic" class="fale-btn-icon fale-btn-acao" title="Gravar áudio" aria-label="Gravar áudio">
                             <i class="fa-solid fa-microphone"></i>
                         </button>
-                        <button type="submit" id="fale-btn-enviar"
-                                class="hidden w-10 h-10 rounded-full bg-teal-600 text-white hover:bg-teal-700 flex items-center justify-center shadow-sm shrink-0"
-                                title="Enviar" aria-label="Enviar">
-                            <i class="fa-solid fa-paper-plane text-sm"></i>
+                        <button type="submit" id="fale-btn-enviar" class="fale-btn-icon fale-btn-acao" title="Enviar" aria-label="Enviar" style="display:none;">
+                            <i class="fa-solid fa-paper-plane" style="font-size:13px;"></i>
                         </button>
                     </div>
                 </form>
@@ -332,38 +365,34 @@ $urlMidia = static function (string $path): string {
 
     function atualizarAcoes() {
         if (gravando) {
-            btnMic.classList.add('hidden');
-            btnEnviar.classList.add('hidden');
+            btnMic.style.display = 'none';
+            btnEnviar.style.display = 'none';
             return;
         }
         if (temConteudo()) {
-            btnMic.classList.add('hidden');
-            btnEnviar.classList.remove('hidden');
-            btnEnviar.classList.add('flex');
+            btnMic.style.display = 'none';
+            btnEnviar.style.display = 'inline-flex';
         } else {
-            btnEnviar.classList.add('hidden');
-            btnEnviar.classList.remove('flex');
-            btnMic.classList.remove('hidden');
+            btnEnviar.style.display = 'none';
+            btnMic.style.display = 'inline-flex';
         }
     }
 
     function mostrarPreview(nome) {
         previewNome.textContent = nome || 'Anexo selecionado';
-        preview.classList.remove('hidden');
-        preview.classList.add('flex');
+        preview.classList.add('is-on');
         atualizarAcoes();
     }
 
     function limparAnexo() {
         input.value = '';
-        preview.classList.add('hidden');
-        preview.classList.remove('flex');
+        preview.classList.remove('is-on');
         atualizarAcoes();
     }
 
     function autoResize() {
         mensagem.style.height = 'auto';
-        mensagem.style.height = Math.min(mensagem.scrollHeight, 128) + 'px';
+        mensagem.style.height = Math.min(mensagem.scrollHeight, 110) + 'px';
     }
 
     function formatarTempo(s) {
@@ -380,27 +409,24 @@ $urlMidia = static function (string $path): string {
 
     btnMais.addEventListener('click', function (e) {
         e.stopPropagation();
-        menuAnexo.classList.toggle('hidden');
+        menuAnexo.classList.toggle('is-open');
     });
     document.addEventListener('click', function () {
-        menuAnexo.classList.add('hidden');
+        menuAnexo.classList.remove('is-open');
     });
     menuAnexo.addEventListener('click', function (e) { e.stopPropagation(); });
 
     menuAnexo.querySelectorAll('[data-fale-attach]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             input.accept = btn.getAttribute('data-fale-attach') || 'image/*,video/*,application/pdf';
-            menuAnexo.classList.add('hidden');
+            menuAnexo.classList.remove('is-open');
             input.click();
         });
     });
 
     input.addEventListener('change', function () {
-        if (input.files && input.files[0]) {
-            mostrarPreview(input.files[0].name);
-        } else {
-            limparAnexo();
-        }
+        if (input.files && input.files[0]) mostrarPreview(input.files[0].name);
+        else limparAnexo();
     });
     btnRemover.addEventListener('click', limparAnexo);
     mensagem.addEventListener('input', function () {
@@ -435,11 +461,10 @@ $urlMidia = static function (string $path): string {
             mediaRecorder.onstop = function () {
                 stream.getTracks().forEach(function (t) { t.stop(); });
                 gravando = false;
-                gravandoBox.classList.add('hidden');
+                gravandoBox.classList.remove('is-on');
                 btnMais.disabled = false;
                 if (!cancelarProximo && chunks.length) {
-                    var blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-                    setArquivoAudio(blob);
+                    setArquivoAudio(new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' }));
                 } else {
                     limparAnexo();
                 }
@@ -448,9 +473,9 @@ $urlMidia = static function (string $path): string {
             };
             mediaRecorder.start();
             gravando = true;
-            gravandoBox.classList.remove('hidden');
+            gravandoBox.classList.add('is-on');
             btnMais.disabled = true;
-            menuAnexo.classList.add('hidden');
+            menuAnexo.classList.remove('is-open');
             segundos = 0;
             gravandoTimer.textContent = '0:00';
             timerId = setInterval(function () {
@@ -465,20 +490,14 @@ $urlMidia = static function (string $path): string {
 
     function pararGravacao(cancelar) {
         cancelarProximo = !!cancelar;
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     }
 
     btnMic.addEventListener('click', function () {
         if (!gravando) iniciarGravacao();
     });
-    btnCancelarGravacao.addEventListener('click', function () {
-        pararGravacao(true);
-    });
-    btnPararGravacao.addEventListener('click', function () {
-        pararGravacao(false);
-    });
+    btnCancelarGravacao.addEventListener('click', function () { pararGravacao(true); });
+    btnPararGravacao.addEventListener('click', function () { pararGravacao(false); });
 
     form.addEventListener('submit', function (e) {
         if (gravando) {
@@ -486,9 +505,7 @@ $urlMidia = static function (string $path): string {
             pararGravacao(false);
             return;
         }
-        if (!temConteudo()) {
-            e.preventDefault();
-        }
+        if (!temConteudo()) e.preventDefault();
     });
 
     atualizarAcoes();
