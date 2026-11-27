@@ -102,9 +102,20 @@ class MobileSchoolCommunicationController extends BaseController
             return;
         }
         $this->db->query("UPDATE familia_mensagens SET lido_familia_em=NOW() WHERE conversa_id=:id AND autor_tipo='escola' AND lido_familia_em IS NULL", ['id'=>(int)$conversa['id']]);
-        $rows=$this->db->fetchAll('SELECT id, autor_tipo, mensagem, imagem, created_at FROM familia_mensagens WHERE conversa_id=:id ORDER BY id', ['id'=>(int)$conversa['id']]);
+        $service=new \App\Modulos\Comunicacao\Services\SchoolCommunicationService($this->db);
+        $temAnexo=$this->colunaFamilia('anexo_tipo');
+        $temReacoes=$service->tabelaReacoesPronta();
+        $cols='id, autor_tipo, mensagem, imagem, imagem_nome, created_at';
+        if($temAnexo)$cols.=', anexo_tipo, anexo_mime';
+        if($temReacoes){
+            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = familia_mensagens.id AND r.reacao = 'curtir') AS curtidas";
+            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = familia_mensagens.id AND r.reacao = 'curtir' AND r.autor_tipo = 'responsavel' AND r.autor_id = :parent) AS eu_curti";
+        }
+        $params=['id'=>(int)$conversa['id']];
+        if($temReacoes)$params['parent']=$this->parentId();
+        $rows=$this->db->fetchAll("SELECT {$cols} FROM familia_mensagens WHERE conversa_id=:id ORDER BY id", $params);
         $data=array_map(fn($row)=>$this->mensagemFamilia(is_array($row)?$row:[]), is_array($rows)?$rows:[]);
-        $this->json(['data'=>$data,'meta'=>['count'=>count($data),'available'=>true]]);
+        $this->json(['data'=>$data,'meta'=>['count'=>count($data),'available'=>true,'reactions'=>$temReacoes]]);
     }
 
     public function sendMessage($studentId): void
@@ -114,22 +125,61 @@ class MobileSchoolCommunicationController extends BaseController
         if(!$service->canalFamiliaPronto())$this->fail('unavailable','O canal Fale com a Escola ainda não está disponível.',503);
         $input=$this->input();
         $message=trim((string)($input['message'] ?? $input['mensagem'] ?? ''));
-        $imagem=$service->guardarImagem($_FILES['imagem'] ?? [], 'fale-com-a-escola');
-        if(($message==='' && $imagem===null) || mb_strlen($message)>4000)$this->fail('invalid_message','Escreva uma mensagem de até 4.000 caracteres ou envie uma imagem.',422);
+        $file=$_FILES['anexo'] ?? ($_FILES['imagem'] ?? []);
+        $anexo=$service->guardarAnexo(is_array($file)?$file:[], 'fale-com-a-escola');
+        if(($message==='' && $anexo===null) || mb_strlen($message)>4000)$this->fail('invalid_message','Escreva uma mensagem ou envie imagem, vídeo ou PDF.',422);
         $conversa=$this->conversaDaFamilia((int)$student['id'], true);
-        $id=(int)$this->db->insert(
-            "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome) VALUES (:conversa, 'responsavel', :autor, :mensagem, :imagem, :nome)",
-            ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$imagem['path'] ?? null,'nome'=>$imagem['name'] ?? null]
-        );
+        $temAnexo=$this->colunaFamilia('anexo_tipo');
+        if($temAnexo){
+            $id=(int)$this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime) VALUES (:conversa, 'responsavel', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
+                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null,'tipo'=>$anexo['tipo'] ?? null,'mime'=>$anexo['mime'] ?? null]
+            );
+        } else {
+            $id=(int)$this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome) VALUES (:conversa, 'responsavel', :autor, :mensagem, :imagem, :nome)",
+                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null]
+            );
+        }
         $this->db->query('UPDATE familia_conversas SET updated_at=NOW() WHERE id=:id', ['id'=>(int)$conversa['id']]);
         $nome=trim((string)($student['nome'] ?? 'Aluno'));
-        $resumo=$message!=='' ? mb_substr($message, 0, 180) : 'Enviou uma imagem.';
+        $resumo=$message!=='' ? mb_substr($message, 0, 180) : ('Enviou um ' . ($anexo['tipo'] ?? 'anexo') . '.');
         $service->avisarAdmins(
             'Fale com a Escola',
             $nome . ': ' . $resumo,
             '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']
         );
-        $this->json(['data'=>$this->mensagemFamilia(['id'=>$id,'autor_tipo'=>'responsavel','mensagem'=>$message,'imagem'=>$imagem['path'] ?? '','created_at'=>date('Y-m-d H:i:s')])],201);
+        $this->json(['data'=>$this->mensagemFamilia([
+            'id'=>$id,
+            'autor_tipo'=>'responsavel',
+            'mensagem'=>$message,
+            'imagem'=>$anexo['path'] ?? '',
+            'imagem_nome'=>$anexo['name'] ?? '',
+            'anexo_tipo'=>$anexo['tipo'] ?? null,
+            'anexo_mime'=>$anexo['mime'] ?? null,
+            'created_at'=>date('Y-m-d H:i:s'),
+            'curtidas'=>0,
+            'eu_curti'=>0,
+        ])],201);
+    }
+
+    public function reactMessage($studentId, $mensagemId): void
+    {
+        $student=$this->student($studentId);
+        $service=new \App\Modulos\Comunicacao\Services\SchoolCommunicationService($this->db);
+        if(!$service->canalFamiliaPronto() || !$service->tabelaReacoesPronta()){
+            $this->fail('unavailable','Reações ainda não estão disponíveis.',503);
+        }
+        $conversa=$this->conversaDaFamilia((int)$student['id'], false);
+        if(!$conversa)$this->fail('conversation_not_found','Conversa não encontrada.',404);
+        $mensagemId=(int)$mensagemId;
+        $msg=$this->db->fetch(
+            'SELECT id FROM familia_mensagens WHERE id=:id AND conversa_id=:conversa LIMIT 1',
+            ['id'=>$mensagemId,'conversa'=>(int)$conversa['id']]
+        );
+        if(!$msg)$this->fail('message_not_found','Mensagem não encontrada.',404);
+        $liked=$service->alternarCurtida($mensagemId, 'responsavel', $this->parentId());
+        $this->json(['data'=>['message_id'=>$mensagemId,'liked'=>$liked]]);
     }
 
     public function calendar($studentId): void
@@ -278,13 +328,39 @@ class MobileSchoolCommunicationController extends BaseController
     private function mensagemFamilia(array $row): array
     {
         $imagem=trim((string)($row['imagem'] ?? ''));
+        $tipo=trim((string)($row['anexo_tipo'] ?? ''));
+        if($tipo==='' && $imagem!=='')$tipo='imagem';
+        $url=$imagem!=='' ? $this->absoluteUrl($imagem) : null;
         return [
             'id'=>(int)($row['id'] ?? 0),
             'sender_type'=>($row['autor_tipo'] ?? '')==='escola' ? 'escola' : 'responsavel',
             'message'=>(string)($row['mensagem'] ?? ''),
-            'image_url'=>$imagem!=='' ? $this->absoluteUrl($imagem) : null,
+            'image_url'=>$tipo==='imagem' ? $url : null,
+            'attachment_url'=>$url,
+            'attachment_type'=>$tipo!=='' ? $tipo : null,
+            'attachment_name'=>(string)($row['imagem_nome'] ?? ''),
+            'attachment_mime'=>$row['anexo_mime'] ?? null,
+            'likes_count'=>(int)($row['curtidas'] ?? 0),
+            'liked_by_me'=>((int)($row['eu_curti'] ?? 0)) > 0,
             'created_at'=>$this->iso($row['created_at'] ?? null),
         ];
+    }
+
+    private function colunaFamilia(string $coluna): bool
+    {
+        static $cache=[];
+        if(array_key_exists($coluna,$cache))return $cache[$coluna];
+        try {
+            $row=$this->db->fetch(
+                "SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'familia_mensagens' AND COLUMN_NAME = :col",
+                ['col'=>$coluna]
+            );
+            $cache[$coluna]=((int)($row['c'] ?? 0))>0;
+        } catch (\Throwable $e) {
+            $cache[$coluna]=false;
+        }
+        return $cache[$coluna];
     }
 
     private function student($raw): array { $id=filter_var($raw,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]); if($id===false||!$this->policy->canAccess($this->parentId(),(int)$id))$this->fail('student_not_found','Aluno não encontrado.',404); $row=$this->db->fetch('SELECT a.id,a.nome,a.turma_id,t.serie_id,COALESCE(t.curso_novo_id,t.curso_id) curso_id FROM alunos a LEFT JOIN turmas t ON t.id=a.turma_id WHERE a.id=:id',['id'=>(int)$id]); if(!$row)$this->fail('student_not_found','Aluno não encontrado.',404); return $row; }

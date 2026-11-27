@@ -111,8 +111,14 @@ class UserNotificationController extends BaseController
             return null;
         }
         $titulo = trim((string) ($notificacao['titulo'] ?? ''));
+        if ($titulo === 'Fale com a Escola') {
+            $conversaId = $this->resolverConversaFamiliaPorAviso($notificacao);
+            if ($conversaId > 0) {
+                return '/admin/comunicacao-escolar/fale-com-a-escola/' . $conversaId;
+            }
+            return '/admin/comunicacao-escolar/fale-com-a-escola';
+        }
         $mapa = [
-            'Fale com a Escola' => '/admin/comunicacao-escolar/fale-com-a-escola',
             'Fique sabendo' => '/admin/comunicacao-escolar',
             'Declaração aceita' => '/admin/documentos-familia',
             'Documentos da família' => '/admin/documentos-familia',
@@ -121,6 +127,63 @@ class UserNotificationController extends BaseController
             'Ficha de saúde' => '/admin/documentos-familia',
         ];
         return $mapa[$titulo] ?? null;
+    }
+
+    /**
+     * Abre a conversa certa a partir do texto do aviso (legado sem destino_url).
+     * @param array<string,mixed> $notificacao
+     */
+    private function resolverConversaFamiliaPorAviso(array $notificacao): int
+    {
+        try {
+            if (!$this->db->tableExists('familia_conversas') || !$this->db->tableExists('familia_mensagens')) {
+                return 0;
+            }
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        $conteudo = trim(strip_tags((string) ($notificacao['conteudo'] ?? '')));
+        $trecho = $conteudo;
+        if (str_contains($conteudo, ':')) {
+            $trecho = trim((string) substr($conteudo, (int) strpos($conteudo, ':') + 1));
+        }
+        $trecho = mb_substr($trecho, 0, 180);
+
+        if ($trecho !== '' && $trecho !== 'Enviou uma imagem.') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $trecho) . '%';
+            $porTexto = $this->db->fetch(
+                "SELECT c.id
+                 FROM familia_mensagens m
+                 INNER JOIN familia_conversas c ON c.id = m.conversa_id
+                 WHERE m.autor_tipo = 'responsavel' AND m.mensagem LIKE :trecho
+                 ORDER BY m.id DESC
+                 LIMIT 1",
+                ['trecho' => $like]
+            );
+            if (is_array($porTexto) && (int) ($porTexto['id'] ?? 0) > 0) {
+                return (int) $porTexto['id'];
+            }
+        }
+
+        $naoLida = $this->db->fetch(
+            "SELECT c.id
+             FROM familia_conversas c
+             WHERE EXISTS (
+                SELECT 1 FROM familia_mensagens m
+                WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL
+             )
+             ORDER BY c.updated_at DESC
+             LIMIT 1"
+        );
+        if (is_array($naoLida) && (int) ($naoLida['id'] ?? 0) > 0) {
+            return (int) $naoLida['id'];
+        }
+
+        $recente = $this->db->fetch(
+            'SELECT id FROM familia_conversas ORDER BY updated_at DESC LIMIT 1'
+        );
+        return (int) ($recente['id'] ?? 0);
     }
 
     private function destinoInterno(?string $url): ?string

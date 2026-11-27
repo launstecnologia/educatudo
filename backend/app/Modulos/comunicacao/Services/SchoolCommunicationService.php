@@ -125,21 +125,44 @@ class SchoolCommunicationService
 
     /**
      * @param array<string,mixed> $file
-     * @return array{path:string,name:string}|null
+     * @return array{path:string,name:string,tipo:string,mime:string}|null
      */
     public function guardarImagem(array $file, string $pasta): ?array
+    {
+        return $this->guardarAnexo($file, $pasta, ['imagem']);
+    }
+
+    /**
+     * Salva imagem, vídeo ou PDF do chat família↔escola.
+     *
+     * @param array<string,mixed> $file
+     * @param list<string> $tiposPermitidos imagem|video|arquivo
+     * @return array{path:string,name:string,tipo:string,mime:string}|null
+     */
+    public function guardarAnexo(array $file, string $pasta, array $tiposPermitidos = ['imagem', 'video', 'arquivo']): ?array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             return null;
         }
         $tmp = (string) ($file['tmp_name'] ?? '');
         $size = (int) ($file['size'] ?? 0);
-        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 8 * 1024 * 1024) {
+        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0) {
             return null;
         }
-        $mapa = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $mapa = [
+            'image/jpeg' => ['ext' => 'jpg', 'tipo' => 'imagem', 'max' => 8 * 1024 * 1024],
+            'image/png' => ['ext' => 'png', 'tipo' => 'imagem', 'max' => 8 * 1024 * 1024],
+            'image/webp' => ['ext' => 'webp', 'tipo' => 'imagem', 'max' => 8 * 1024 * 1024],
+            'video/mp4' => ['ext' => 'mp4', 'tipo' => 'video', 'max' => 40 * 1024 * 1024],
+            'video/webm' => ['ext' => 'webm', 'tipo' => 'video', 'max' => 40 * 1024 * 1024],
+            'application/pdf' => ['ext' => 'pdf', 'tipo' => 'arquivo', 'max' => 12 * 1024 * 1024],
+        ];
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
         if (!isset($mapa[$mime])) {
+            return null;
+        }
+        $meta = $mapa[$mime];
+        if (!in_array($meta['tipo'], $tiposPermitidos, true) || $size > $meta['max']) {
             return null;
         }
         $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'default';
@@ -149,13 +172,55 @@ class SchoolCommunicationService
         if (!is_dir($absolute) && !@mkdir($absolute, 0775, true) && !is_dir($absolute)) {
             return null;
         }
-        $filename = bin2hex(random_bytes(16)) . '.' . $mapa[$mime];
+        $filename = bin2hex(random_bytes(16)) . '.' . $meta['ext'];
         if (!move_uploaded_file($tmp, $absolute . '/' . $filename)) {
             return null;
         }
-        $nome = basename((string) ($file['name'] ?? 'imagem'));
+        $nome = basename((string) ($file['name'] ?? $meta['tipo']));
 
-        return ['path' => '/' . $relative . '/' . $filename, 'name' => $nome !== '' ? $nome : 'imagem'];
+        return [
+            'path' => '/' . $relative . '/' . $filename,
+            'name' => $nome !== '' ? $nome : $meta['tipo'],
+            'tipo' => $meta['tipo'],
+            'mime' => $mime,
+        ];
+    }
+
+    public function tabelaReacoesPronta(): bool
+    {
+        return $this->db->tableExists('familia_mensagem_reacoes');
+    }
+
+    /**
+     * Alterna curtida (toggle). Retorna se ficou curtida.
+     */
+    public function alternarCurtida(int $mensagemId, string $autorTipo, int $autorId): bool
+    {
+        if (!$this->tabelaReacoesPronta() || $mensagemId <= 0 || $autorId <= 0) {
+            return false;
+        }
+        if (!in_array($autorTipo, ['responsavel', 'escola'], true)) {
+            return false;
+        }
+        $existente = $this->db->fetch(
+            "SELECT id FROM familia_mensagem_reacoes
+             WHERE mensagem_id = :msg AND autor_tipo = :tipo AND autor_id = :autor AND reacao = 'curtir'
+             LIMIT 1",
+            ['msg' => $mensagemId, 'tipo' => $autorTipo, 'autor' => $autorId]
+        );
+        if (is_array($existente)) {
+            $this->db->query(
+                'DELETE FROM familia_mensagem_reacoes WHERE id = :id',
+                ['id' => (int) $existente['id']]
+            );
+            return false;
+        }
+        $this->db->insert(
+            "INSERT INTO familia_mensagem_reacoes (mensagem_id, autor_tipo, autor_id, reacao)
+             VALUES (:msg, :tipo, :autor, 'curtir')",
+            ['msg' => $mensagemId, 'tipo' => $autorTipo, 'autor' => $autorId]
+        );
+        return true;
     }
 
     /**

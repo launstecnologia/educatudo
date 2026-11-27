@@ -58,6 +58,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/students/{id}/finance/invoices/{source}/{invoiceId}/payment', 'Api/V1/MobileFinanceController@payment');
     $router->get('/api/v1/students/{id}/school-messages', 'Api/V1/MobileSchoolCommunicationController@messages');
     $router->post('/api/v1/students/{id}/school-messages', 'Api/V1/MobileSchoolCommunicationController@sendMessage');
+    $router->post('/api/v1/students/{id}/school-messages/{mensagemId}/like', 'Api/V1/MobileSchoolCommunicationController@reactMessage');
     $router->get('/api/v1/students/{id}/school-communications', 'Api/V1/MobileSchoolCommunicationController@index');
     $router->get('/api/v1/students/{id}/school-communications/{communicationId}', 'Api/V1/MobileSchoolCommunicationController@show');
     $router->post('/api/v1/students/{id}/school-communications/{communicationId}/read', 'Api/V1/MobileSchoolCommunicationController@read');
@@ -102,6 +103,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/alunos/{id}/financeiro/faturas/{origem}/{faturaId}/pagamento', 'Api/V1/MobileFinanceController@pagamento');
     $router->get('/api/alunos/{id}/fale-com-a-escola', 'Api/V1/MobileSchoolCommunicationController@messages');
     $router->post('/api/alunos/{id}/fale-com-a-escola', 'Api/V1/MobileSchoolCommunicationController@sendMessage');
+    $router->post('/api/alunos/{id}/fale-com-a-escola/{mensagemId}/curtir', 'Api/V1/MobileSchoolCommunicationController@reactMessage');
     $router->get('/api/alunos/{id}/comunicados', 'Api/V1/MobileSchoolCommunicationController@index');
     $router->get('/api/alunos/{id}/comunicados/{communicationId}', 'Api/V1/MobileSchoolCommunicationController@show');
     $router->post('/api/alunos/{id}/comunicados/{communicationId}/lido', 'Api/V1/MobileSchoolCommunicationController@read');

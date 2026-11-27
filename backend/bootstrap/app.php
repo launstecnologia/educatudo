@@ -846,6 +846,49 @@ if (strpos($caminhoStorage, 'storage/chat/') === 0) {
     exit;
 }
 
+// Anexos do Fale com a Escola / comunicação escolar (storage/uploads/…)
+if (
+    strpos($caminhoStorage, 'storage/uploads/fale-com-a-escola/') === 0
+    || strpos($caminhoStorage, 'storage/uploads/school-communications/') === 0
+) {
+    $logado = !empty($_SESSION['user_id']) || !empty($_SESSION['parent_id']) || !empty($_SESSION['aluno_id']);
+    if (!$logado) {
+        http_response_code(401);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    if (strpos($caminhoStorage, '..') !== false) {
+        http_response_code(403);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    $storageComFile = BASE_PATH . '/' . $caminhoStorage;
+    if (is_file($storageComFile)) {
+        $realPath = realpath($storageComFile);
+        $realDir = realpath(BASE_PATH . '/storage/uploads');
+        if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir . DIRECTORY_SEPARATOR) === 0) {
+            $ext = strtolower(pathinfo($storageComFile, PATHINFO_EXTENSION));
+            $mimes = [
+                'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                'gif' => 'image/gif', 'webp' => 'image/webp',
+                'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+            ];
+            if (!isset($mimes[$ext])) {
+                http_response_code(403);
+                header('X-Content-Type-Options: nosniff');
+                exit;
+            }
+            header('Content-Type: ' . $mimes[$ext]);
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, max-age=3600');
+            readfile($storageComFile);
+            exit;
+        }
+    }
+    http_response_code(404);
+    exit;
+}
+
 // Inicializar aplicação
 try {
     require_once BASE_PATH . '/app/Core/App.php';

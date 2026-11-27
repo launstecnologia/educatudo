@@ -18,6 +18,7 @@ $router->post('/professor/comunicacao-pais', 'Modulos/comunicacao/TeacherComunic
 $router->get('/admin/comunicacao-escolar/fale-com-a-escola', 'Modulos/comunicacao/SchoolCommunicationController@conversas');
 $router->get('/admin/comunicacao-escolar/fale-com-a-escola/{id}', 'Modulos/comunicacao/SchoolCommunicationController@conversa');
 $router->post('/admin/comunicacao-escolar/fale-com-a-escola/{id}/responder', 'Modulos/comunicacao/SchoolCommunicationController@responderConversa');
+$router->post('/admin/comunicacao-escolar/fale-com-a-escola/{id}/mensagens/{mensagemId}/curtir', 'Modulos/comunicacao/SchoolCommunicationController@curtirMensagem');
 $router->get('/admin/comunicacao-escolar/{id}', 'Modulos/comunicacao/SchoolCommunicationController@show');
 $router->post('/admin/comunicacao-escolar/{id}/responder', 'Modulos/comunicacao/SchoolCommunicationController@reply');
 

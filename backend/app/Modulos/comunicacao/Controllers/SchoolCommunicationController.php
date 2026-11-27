@@ -205,12 +205,9 @@ class SchoolCommunicationController extends BaseController
     {
         $items = $this->listarConversasFamilia();
         $mensagens = [];
+        $user = $this->auth->getUser();
         if ($conversa !== null) {
-            $mensagens = $this->db->fetchAll(
-                'SELECT id, autor_tipo, mensagem, imagem, created_at FROM familia_mensagens WHERE conversa_id = :id ORDER BY id',
-                ['id' => (int) $conversa['id']]
-            );
-            // Zera badge na lista da conversa aberta
+            $mensagens = $this->mensagensDaConversa((int) $conversa['id'], (int) ($user['id'] ?? 0));
             foreach ($items as &$item) {
                 if ((int) ($item['id'] ?? 0) === (int) $conversa['id']) {
                     $item['nao_lidas'] = 0;
@@ -222,31 +219,105 @@ class SchoolCommunicationController extends BaseController
         $this->viewWithLayout('admin', 'admin/school-communication/conversas', [
             'title' => 'Fale com a Escola',
             'page_title' => 'Fale com a Escola',
-            'user' => $this->auth->getUser(),
+            'user' => $user,
             'items' => $items,
             'conversa' => $conversa,
-            'mensagens' => is_array($mensagens) ? $mensagens : [],
+            'mensagens' => $mensagens,
+            'escola_avatar' => trim((string) ($user['avatar_url'] ?? '')),
             'current_page' => 'school-communication',
             'csrf_token' => $this->generateCsrfToken(),
             'flash_message' => $flash['message'] ?? null,
             'flash_type' => $flash['type'] ?? null,
+            'reacoes_prontas' => $this->service->tabelaReacoesPronta(),
         ]);
     }
 
     /** @return list<array<string,mixed>> */
     private function listarConversasFamilia(): array
     {
-        $items = $this->db->fetchAll(
-            "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
-                    (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
-                    (SELECT mensagem FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
-             FROM familia_conversas c
-             INNER JOIN alunos a ON a.id = c.aluno_id
-             INNER JOIN responsaveis r ON r.id = c.responsavel_id
-             ORDER BY c.updated_at DESC
-             LIMIT 200"
-        );
+        try {
+            $items = $this->db->fetchAll(
+                "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                        COALESCE(NULLIF(r.foto_url, ''), NULLIF(a.foto_url, ''), av.avatar_url) AS foto_url,
+                        (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
+                        (SELECT COALESCE(mensagem, CASE WHEN imagem IS NOT NULL THEN 'Anexo' ELSE '' END)
+                           FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
+                 FROM familia_conversas c
+                 INNER JOIN alunos a ON a.id = c.aluno_id
+                 INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 LEFT JOIN avatares_alunos av ON av.aluno_id = a.id
+                 ORDER BY c.updated_at DESC
+                 LIMIT 200"
+            );
+        } catch (\Throwable $e) {
+            $items = $this->db->fetchAll(
+                "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                        (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
+                        (SELECT mensagem FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
+                 FROM familia_conversas c
+                 INNER JOIN alunos a ON a.id = c.aluno_id
+                 INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 ORDER BY c.updated_at DESC
+                 LIMIT 200"
+            );
+        }
         return is_array($items) ? $items : [];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function mensagensDaConversa(int $conversaId, int $usuarioId): array
+    {
+        $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
+        $temReacoes = $this->service->tabelaReacoesPronta();
+        $cols = 'm.id, m.autor_tipo, m.mensagem, m.imagem, m.imagem_nome, m.created_at';
+        if ($temAnexo) {
+            $cols .= ', m.anexo_tipo, m.anexo_mime';
+        }
+        if ($temReacoes) {
+            $cols .= ", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir') AS curtidas";
+            $cols .= ", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir' AND r.autor_tipo = 'escola' AND r.autor_id = :uid) AS eu_curti";
+        }
+        $params = ['id' => $conversaId];
+        if ($temReacoes) {
+            $params['uid'] = $usuarioId;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT {$cols} FROM familia_mensagens m WHERE m.conversa_id = :id ORDER BY m.id",
+            $params
+        );
+        if (!is_array($rows)) {
+            return [];
+        }
+        foreach ($rows as &$row) {
+            if (empty($row['anexo_tipo']) && !empty($row['imagem'])) {
+                $row['anexo_tipo'] = 'imagem';
+            }
+            $row['curtidas'] = (int) ($row['curtidas'] ?? 0);
+            $row['eu_curti'] = (int) ($row['eu_curti'] ?? 0) > 0;
+        }
+        unset($row);
+        return $rows;
+    }
+
+    private function colunaMensagemExiste(string $coluna): bool
+    {
+        static $cache = [];
+        if (array_key_exists($coluna, $cache)) {
+            return $cache[$coluna];
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'familia_mensagens' AND COLUMN_NAME = :col",
+                ['col' => $coluna]
+            );
+            $cache[$coluna] = ((int) ($row['c'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            $cache[$coluna] = false;
+        }
+        return $cache[$coluna];
     }
 
     public function responderConversa($id): void
@@ -254,28 +325,47 @@ class SchoolCommunicationController extends BaseController
         $this->csrf();
         $conversa = $this->conversaDoAdmin((int) $id);
         $message = trim((string) ($_POST['mensagem'] ?? ''));
-        $imagem = $this->service->guardarImagem($_FILES['imagem'] ?? [], 'fale-com-a-escola');
-        if (($message === '' && $imagem === null) || mb_strlen($message) > 4000) {
-            $this->setFlashMessage('Escreva uma resposta ou envie uma imagem.', 'error');
+        $file = $_FILES['anexo'] ?? ($_FILES['imagem'] ?? []);
+        $anexo = $this->service->guardarAnexo(is_array($file) ? $file : [], 'fale-com-a-escola');
+        if (($message === '' && $anexo === null) || mb_strlen($message) > 4000) {
+            $this->setFlashMessage('Escreva uma mensagem ou envie imagem, vídeo ou PDF.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         $user = $this->auth->getUser();
-        $this->db->insert(
-            "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
-             VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
-            [
-                'conversa' => (int) $conversa['id'],
-                'autor' => (int) $user['id'],
-                'mensagem' => $message !== '' ? $message : null,
-                'imagem' => $imagem['path'] ?? null,
-                'nome' => $imagem['name'] ?? null,
-            ]
-        );
+        $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
+        if ($temAnexo) {
+            $this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
+                 VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
+                [
+                    'conversa' => (int) $conversa['id'],
+                    'autor' => (int) $user['id'],
+                    'mensagem' => $message !== '' ? $message : null,
+                    'imagem' => $anexo['path'] ?? null,
+                    'nome' => $anexo['name'] ?? null,
+                    'tipo' => $anexo['tipo'] ?? null,
+                    'mime' => $anexo['mime'] ?? null,
+                ]
+            );
+        } else {
+            $this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
+                 VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
+                [
+                    'conversa' => (int) $conversa['id'],
+                    'autor' => (int) $user['id'],
+                    'mensagem' => $message !== '' ? $message : null,
+                    'imagem' => $anexo['path'] ?? null,
+                    'nome' => $anexo['name'] ?? null,
+                ]
+            );
+        }
         $this->db->query('UPDATE familia_conversas SET updated_at = NOW() WHERE id = :id', ['id' => (int) $conversa['id']]);
+        $resumoPush = $message !== '' ? $message : ('A escola enviou um ' . ($anexo['tipo'] ?? 'anexo') . '.');
         $this->service->push(
             [(int) $conversa['responsavel_id']],
             'Fale com a Escola',
-            $message !== '' ? $message : 'A escola enviou uma imagem.',
+            $resumoPush,
             '/school-communications',
             ['type' => 'school_message', 'conversation_id' => (string) (int) $conversa['id']],
             (int) $user['id']
@@ -284,19 +374,51 @@ class SchoolCommunicationController extends BaseController
         $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
     }
 
+    public function curtirMensagem($conversaId, $mensagemId): void
+    {
+        $this->csrf();
+        $conversa = $this->conversaDoAdmin((int) $conversaId);
+        $mensagemId = (int) $mensagemId;
+        $msg = $this->db->fetch(
+            'SELECT id FROM familia_mensagens WHERE id = :id AND conversa_id = :conversa LIMIT 1',
+            ['id' => $mensagemId, 'conversa' => (int) $conversa['id']]
+        );
+        if (!$msg) {
+            $this->setFlashMessage('Mensagem não encontrada.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
+        }
+        $user = $this->auth->getUser();
+        $curtiu = $this->service->alternarCurtida($mensagemId, 'escola', (int) $user['id']);
+        $this->setFlashMessage($curtiu ? 'Mensagem curtida.' : 'Curtida removida.', 'success');
+        $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id'] . '#msg-' . $mensagemId);
+    }
+
     private function conversaDoAdmin(int $id): array
     {
         if (!$this->service->canalFamiliaPronto() || $id <= 0) {
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola');
         }
-        $conversa = $this->db->fetch(
-            'SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome
-             FROM familia_conversas c
-             INNER JOIN alunos a ON a.id = c.aluno_id
-             INNER JOIN responsaveis r ON r.id = c.responsavel_id
-             WHERE c.id = :id',
-            ['id' => $id]
-        );
+        try {
+            $conversa = $this->db->fetch(
+                "SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                        COALESCE(NULLIF(r.foto_url, ''), NULLIF(a.foto_url, ''), av.avatar_url) AS foto_url
+                 FROM familia_conversas c
+                 INNER JOIN alunos a ON a.id = c.aluno_id
+                 INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 LEFT JOIN avatares_alunos av ON av.aluno_id = a.id
+                 WHERE c.id = :id",
+                ['id' => $id]
+            );
+        } catch (\Throwable $e) {
+            $conversa = $this->db->fetch(
+                'SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome
+                 FROM familia_conversas c
+                 INNER JOIN alunos a ON a.id = c.aluno_id
+                 INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 WHERE c.id = :id',
+                ['id' => $id]
+            );
+        }
         if (!$conversa) {
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola');
         }
