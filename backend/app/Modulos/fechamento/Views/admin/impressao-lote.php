@@ -15,12 +15,21 @@ $jobs = is_array($jobs ?? null) ? $jobs : [];
 $linhas = is_array($linhas ?? null) ? $linhas : [];
 $documentos = is_array($documentos ?? null) ? $documentos : [];
 $pacote = is_array($pacote ?? null) ? $pacote : [];
+$pacoteColagAtivo = !empty($pacote_colag_ativo);
+$pacoteColagPode = $pacoteColagAtivo && $escopoOk && !empty($resumo['pode']);
 $painelQs = http_build_query([
     'ano_letivo' => $anoLetivo,
     'periodo_tipo' => $periodoTipo,
     'periodo_numero' => $periodoNumero,
 ]);
 $homologadas = (int) ($resumo['homologadas'] ?? 0);
+$pacoteColagQs = http_build_query(array_filter([
+    'ano_letivo' => $anoLetivo,
+    'periodo_tipo' => $periodoTipo,
+    'periodo_numero' => $periodoNumero,
+    'turma_id' => $turmaId > 0 ? $turmaId : null,
+    'serie' => $serieBruta !== '' ? $serieBruta : null,
+], static fn ($v) => $v !== null && $v !== ''));
 $page_header_title = 'Impressão em lote';
 $page_header_subtitle = 'Escolha a série ou a etapa inteira, emita os quatro documentos e baixe cada um no menu da turma.';
 ob_start();
@@ -284,6 +293,23 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                     <i class="fa-solid fa-print mr-2"></i> Gerar Documento em Lote
                 </button>
             </form>
+            <?php endif; ?>
+            <?php if ($pacoteColagAtivo): ?>
+            <div class="flex flex-col gap-1">
+                <?php if ($pacoteColagPode): ?>
+                <a href="<?= URL ?>/admin/fechamento/impressao-lote/pacote-colag?<?= htmlspecialchars($pacoteColagQs, ENT_QUOTES, 'UTF-8') ?>"
+                   class="inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium border border-emerald-600 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 w-full sm:w-auto">
+                    <i class="fa-solid fa-file-excel mr-2"></i> Baixar pacote Excel (Colag)
+                </a>
+                <?php else: ?>
+                <button type="button" disabled
+                        class="inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed w-full sm:w-auto"
+                        title="Homologue todas as turmas deste filtro">
+                    <i class="fa-solid fa-file-excel mr-2"></i> Baixar pacote Excel (Colag)
+                </button>
+                <?php endif; ?>
+                <p class="text-xs text-gray-500 max-w-xs">Planilha completa da série (médias, recuperação e atas) — só Colag.</p>
+            </div>
             <?php endif; ?>
         </div>
     </div>

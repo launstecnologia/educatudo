@@ -256,6 +256,51 @@ class BoletimConfig
         return $row ?: null;
     }
 
+    /**
+     * Alunos do escopo que têm observação atual preenchida no boletim.
+     *
+     * @param list<int> $alunoIds
+     * @return array<int, true> mapa aluno_id => true
+     */
+    public function mapaAlunosComObservacao(array $alunoIds): array
+    {
+        $ids = [];
+        foreach ($alunoIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $ids = array_values($ids);
+        $params = [];
+        $placeholders = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'id' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT aluno_id
+             FROM boletim_observacoes
+             WHERE aluno_id IN (' . implode(',', $placeholders) . ')
+               AND conteudo IS NOT NULL
+               AND TRIM(conteudo) <> \'\'',
+            $params
+        );
+        $mapa = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            if ($alunoId > 0) {
+                $mapa[$alunoId] = true;
+            }
+        }
+
+        return $mapa;
+    }
+
     public function saveObservacaoCoordenacao(int $alunoId, string $conteudo, ?int $userId = null, string $usuarioNome = ''): bool
     {
         if ($alunoId <= 0) {

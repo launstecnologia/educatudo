@@ -109,7 +109,7 @@ class Boletim26ColagService
     /**
      * @return array<string,mixed>
      */
-    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = [], ?string $jornadaAte = null): array
+    public function montarPainel(int $turmaId, int $alunoId, int $ano, int $serieFiltro = 0, int $bimestreFiltro = 0, ?float $notaMinima = null, bool $abrir = false, string $notaCampo = 'resultado', bool $montarRelatorios = true, array $bimestresLista = [], ?string $jornadaAte = null, bool $somenteComObs = false): array
     {
         $ano = ($ano >= 2000 && $ano <= 2100) ? $ano : (int) date('Y');
         $this->bonusAdminQuartoBimestre = true;
@@ -143,12 +143,26 @@ class Boletim26ColagService
             $turmaId = 0;
         }
         $alunos = $this->alunosDoEscopo($turma !== null ? [$turma] : ($serieFiltro > 0 ? $turmasSerie : []));
+        $mapaObs = [];
+        if ($somenteComObs) {
+            $mapaObs = $this->mapaObservacoesDosAlunos(array_map(
+                static fn (array $item): int => (int) ($item['id'] ?? 0),
+                $alunos
+            ));
+            $alunos = array_values(array_filter(
+                $alunos,
+                static fn (array $item): bool => isset($mapaObs[(int) ($item['id'] ?? 0)])
+            ));
+        }
         $aluno = null;
         foreach ($alunos as $item) {
             if ((int) $item['id'] === $alunoId) {
                 $aluno = $item;
                 break;
             }
+        }
+        if ($somenteComObs && $alunoId > 0 && $aluno === null) {
+            $alunos = [];
         }
         $notaCampo = $this->campoNotaMinima($notaCampo);
         $bimestres = $listaBimestres !== [] ? $listaBimestres : ($bimestreFiltro > 0 ? [$bimestreFiltro] : [1, 2, 3, 4]);
@@ -181,6 +195,12 @@ class Boletim26ColagService
         if ($abrir && $notaMinima !== null) {
             $relatorios = $this->filtrarRelatoriosAbaixo($relatorios, $notaMinima, $notaCampo);
         }
+        if ($somenteComObs && $relatorios !== []) {
+            $relatorios = array_values(array_filter(
+                $relatorios,
+                static fn (array $relatorio): bool => isset($mapaObs[(int) ($relatorio['aluno']['id'] ?? 0)])
+            ));
+        }
         $filtroHomologacao = [
             'ano' => $ano,
             'serie' => $serieFiltro,
@@ -199,6 +219,7 @@ class Boletim26ColagService
             'nota_minima' => $notaMinima,
             'nota_campo' => $notaCampo,
             'jornada_ate' => $this->jornadaAte,
+            'somente_com_obs' => $somenteComObs,
             'abrir' => $abrir,
             'turma_id' => $turmaId,
             'aluno_id' => $aluno !== null ? (int) $aluno['id'] : 0,
@@ -211,6 +232,21 @@ class Boletim26ColagService
                 : ($abrir ? $this->situacaoHomologacao($filtroHomologacao, $relatorios) : ['estado' => 'fechado']),
             'linhas_planilha' => ($abrir && $montarRelatorios) ? $this->linhasDaPlanilha($relatorios) : [],
         ];
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, true>
+     */
+    private function mapaObservacoesDosAlunos(array $alunoIds): array
+    {
+        try {
+            return (new \App\Modulos\Boletins\Models\BoletimConfig())->mapaAlunosComObservacao($alunoIds);
+        } catch (\Throwable $e) {
+            error_log('boletim-26-colag obs filtro: ' . $e->getMessage());
+
+            return [];
+        }
     }
 
     private function campoNotaMinima(string $campo): string

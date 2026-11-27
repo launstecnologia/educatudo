@@ -6,6 +6,8 @@ namespace App\Modulos\Fechamento\Controllers;
  */
 
 
+use App\Modulos\Boletim26Colag\Services\Boletim26ColagService;
+use App\Modulos\Boletim26Colag\Services\PacoteSerieColagService;
 use App\Modulos\Fechamento\Services\ApoioDigitacaoFechamentoService;
 use App\Modulos\Fechamento\Services\FechamentoMaquinaEstados;
 use App\Modulos\Fechamento\Services\FechamentoService;
@@ -453,11 +455,84 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             'impressao_lote' => $resumo,
             'documentos' => ImpressaoLoteFechamentoService::DOCUMENTOS,
             'pacote' => ImpressaoLoteFechamentoService::PACOTE,
+            'pacote_colag_ativo' => Boletim26ColagService::ativo(),
             'pode_preparar_historico' => $this->podeAlterarResultados(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
         ]);
+    }
+
+    /**
+     * Excel completo da série (modelo Colag) — só tenant colag, após homologação do filtro.
+     */
+    public function pacoteColag(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
+            return;
+        }
+        if (!Boletim26ColagService::ativo()) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Pacote Excel disponível apenas no Colag.';
+            exit;
+        }
+        $recorte = $this->recorteImpressao(false);
+        $svc = $recorte['svc'];
+        $lote = $recorte['lote'];
+        $anoLetivo = $recorte['ano'];
+        $periodoTipo = $recorte['tipo'];
+        $periodoNumero = $recorte['numero'];
+        $turmaId = $recorte['turma_id'];
+        $serie = $recorte['serie'];
+        $segmento = $recorte['segmento'];
+        $serieBruta = $recorte['serie_bruta'];
+        $voltar = $recorte['voltar'];
+        if (!$lote->escopoInformado($turmaId, $serie, $segmento)) {
+            $this->setFlashMessage('Escolha a série (ou turma) antes de baixar o pacote Excel Colag.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $paineis = $svc->painelImpressao($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $segmento);
+        $resumo = $lote->resumo($paineis);
+        if (empty($resumo['pode']) || (int) ($resumo['homologadas'] ?? 0) < 1) {
+            $this->setFlashMessage('Homologue todas as turmas deste filtro antes de baixar o pacote Excel Colag.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $turmaIds = [];
+        foreach ($paineis as $painel) {
+            if (($painel['status'] ?? '') !== FechamentoMaquinaEstados::HOMOLOGADO) {
+                continue;
+            }
+            $tid = (int) ($painel['turma']['id'] ?? 0);
+            if ($tid > 0) {
+                $turmaIds[] = $tid;
+            }
+        }
+        $limiarBruto = trim(str_replace(',', '.', (string) ($_GET['nota_minima'] ?? '6.5')));
+        $limiar = is_numeric($limiarBruto) ? (float) $limiarBruto : 6.5;
+        $limiar = max(0.0, min(10.0, $limiar));
+        $rotulo = $serie !== '' ? $serie : ($serieBruta !== '' ? $serieBruta : 'Serie');
+        try {
+            $pacote = (new PacoteSerieColagService())->gerar($turmaIds, $anoLetivo, $rotulo, $limiar);
+        } catch (\RuntimeException $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirect($voltar);
+            return;
+        } catch (\Throwable $e) {
+            error_log('pacote-colag: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível gerar o pacote Excel Colag. Tente novamente.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $nome = (string) ($pacote['nome_arquivo'] ?? ('pacote-colag-' . $anoLetivo . '.xls'));
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        echo (string) ($pacote['xml'] ?? '');
+        exit;
     }
 
     public function prepararHistoricos(): void

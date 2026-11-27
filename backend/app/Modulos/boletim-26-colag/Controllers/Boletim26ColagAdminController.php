@@ -41,19 +41,7 @@ class Boletim26ColagAdminController extends BaseController
     public function index(): void
     {
         $filtro = $this->filtroDaRequisicao();
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            $filtro['bimestre'],
-            $filtro['nota_minima'],
-            $filtro['abrir'],
-            $filtro['nota_campo'],
-            false,
-            $filtro['bimestres'],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, $filtro['abrir'], false);
 
         $this->viewWithLayout('admin', 'admin/boletim-26-colag/index', [
             'title' => 'Boletim - colag',
@@ -90,19 +78,7 @@ class Boletim26ColagAdminController extends BaseController
         }
         $filtro = $this->filtroDaRequisicao();
         $filtro['abrir'] = true;
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            $filtro['bimestre'],
-            $filtro['nota_minima'],
-            true,
-            $filtro['nota_campo'],
-            true,
-            $filtro['bimestres'],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true);
         $usuario = $this->auth->getUser();
         $this->servico->homologar(
             [
@@ -124,19 +100,7 @@ class Boletim26ColagAdminController extends BaseController
     public function exportar(): void
     {
         $filtro = $this->filtroDaRequisicao();
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            $filtro['bimestre'],
-            $filtro['nota_minima'],
-            true,
-            $filtro['nota_campo'],
-            true,
-            $filtro['bimestres'],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true);
         $linhas = is_array($painel['linhas_planilha'] ?? null) ? $painel['linhas_planilha'] : [];
         $nome = 'boletim-colag-' . (int) ($painel['ano'] ?? date('Y')) . '.csv';
         header('Content-Type: text/csv; charset=UTF-8');
@@ -179,19 +143,7 @@ class Boletim26ColagAdminController extends BaseController
         $filtro = $this->filtroDaRequisicao();
         $limiar = $filtro['nota_minima'] ?? 6.5;
         // Planilha anual: sempre os 4 bimestres, independente do filtro de abas.
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            0,
-            null,
-            true,
-            $filtro['nota_campo'],
-            true,
-            [1, 2, 3, 4],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true, true, [1, 2, 3, 4]);
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $xml = $this->servico->excelProvaFinal($relatorios, (float) $limiar);
         $ano = (int) ($painel['ano'] ?? date('Y'));
@@ -211,19 +163,7 @@ class Boletim26ColagAdminController extends BaseController
     {
         $filtro = $this->filtroDaRequisicao();
         $limiar = $filtro['nota_minima'] ?? 6.5;
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            0,
-            null,
-            true,
-            $filtro['nota_campo'],
-            true,
-            [1, 2, 3, 4],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true, true, [1, 2, 3, 4]);
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $xml = $this->servico->excelMediasBimestrais($relatorios, (float) $limiar);
         $ano = (int) ($painel['ano'] ?? date('Y'));
@@ -243,19 +183,7 @@ class Boletim26ColagAdminController extends BaseController
     {
         $filtro = $this->filtroDaRequisicao();
         $limiar = $filtro['nota_minima'] ?? 6.5;
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            0,
-            null,
-            true,
-            $filtro['nota_campo'],
-            true,
-            [1, 2, 3, 4],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true, true, [1, 2, 3, 4]);
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $ano = (int) ($painel['ano'] ?? date('Y'));
         try {
@@ -283,19 +211,7 @@ class Boletim26ColagAdminController extends BaseController
             $this->responderJson(['html' => '', 'linhas' => []]);
             return;
         }
-        $painel = $this->servico->montarPainel(
-            $filtro['turma_id'],
-            $filtro['aluno_id'],
-            $filtro['ano'],
-            $filtro['serie'],
-            $filtro['bimestre'],
-            $filtro['nota_minima'],
-            true,
-            $filtro['nota_campo'],
-            true,
-            $filtro['bimestres'],
-            $filtro['jornada_ate']
-        );
+        $painel = $this->painelDoFiltro($filtro, true, true);
         $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
         $this->responderJson([
             'html' => $this->htmlDosRelatorios($painel, $relatorios),
@@ -357,7 +273,7 @@ class Boletim26ColagAdminController extends BaseController
     }
 
     /**
-     * @return array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,abrir:bool,bimestres:list<int>,exibir:string}
+     * @return array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,somente_com_obs:bool,abrir:bool,bimestres:list<int>,exibir:string}
      */
     private function filtroDaRequisicao(): array
     {
@@ -379,6 +295,7 @@ class Boletim26ColagAdminController extends BaseController
             // Vazio → corte padrão do consolidado (26/11/2026 08:00). Data futura = ao vivo.
             'jornada_ate' => $this->normalizarJornadaAteFiltro((string) ($fonte['jornada_ate'] ?? ''))
                 ?? '2026-11-26 08:00:00',
+            'somente_com_obs' => in_array((string) ($fonte['somente_com_obs'] ?? ''), ['1', 'on', 'true'], true),
             'abrir' => (string) ($fonte['abrir'] ?? '') === '1',
         ];
     }
@@ -401,7 +318,7 @@ class Boletim26ColagAdminController extends BaseController
     }
 
     /**
-     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,abrir:bool,bimestres:list<int>,exibir:string} $filtro
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,somente_com_obs:bool,abrir:bool,bimestres:list<int>,exibir:string} $filtro
      * @return array<string, scalar|list<int>>
      */
     private function queryDoFiltro(array $filtro, bool $abrir): array
@@ -423,8 +340,39 @@ class Boletim26ColagAdminController extends BaseController
             'nota_campo' => $filtro['nota_campo'],
             'nota_minima' => $filtro['nota_minima'] === null ? '' : number_format($filtro['nota_minima'], 1, ',', ''),
             'jornada_ate' => $jornadaAteInput,
+            'somente_com_obs' => !empty($filtro['somente_com_obs']) ? '1' : '0',
             'abrir' => $abrir ? '1' : '0',
         ];
+    }
+
+    /**
+     * @param array{ano:int,serie:int,turma_id:int,aluno_id:int,bimestre:int,nota_campo:string,nota_minima:?float,jornada_ate:?string,somente_com_obs:bool,abrir:bool,bimestres:list<int>,exibir:string} $filtro
+     * @param list<int>|null $bimestres
+     * @return array<string,mixed>
+     */
+    private function painelDoFiltro(
+        array $filtro,
+        bool $abrir,
+        bool $montarRelatorios,
+        bool $ignorarNotaMinima = false,
+        ?array $bimestres = null
+    ): array {
+        $listaBimestres = $bimestres ?? $filtro['bimestres'];
+
+        return $this->servico->montarPainel(
+            $filtro['turma_id'],
+            $filtro['aluno_id'],
+            $filtro['ano'],
+            $filtro['serie'],
+            count($listaBimestres) === 1 ? $listaBimestres[0] : 0,
+            $ignorarNotaMinima ? null : $filtro['nota_minima'],
+            $abrir,
+            $filtro['nota_campo'],
+            $montarRelatorios,
+            $listaBimestres,
+            $filtro['jornada_ate'],
+            !empty($filtro['somente_com_obs'])
+        );
     }
 
     /**

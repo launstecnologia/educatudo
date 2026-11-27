@@ -13,6 +13,7 @@ $notaCampo = ($notaCampo === 'media_bim' || $notaCampo === 'media_anual') ? $not
 $notaCampoNome = $notaCampo === 'media_bim' ? 'média bimestral' : ($notaCampo === 'media_anual' ? 'média dos 4 bimestres' : 'resultado final');
 $jornadaAte = trim((string) ($painel['jornada_ate'] ?? ''));
 $jornadaAteInput = $jornadaAte !== '' ? str_replace(' ', 'T', substr($jornadaAte, 0, 16)) : '';
+$somenteComObs = !empty($painel['somente_com_obs']) || in_array((string) ($_GET['somente_com_obs'] ?? ''), ['1', 'on', 'true'], true);
 $abrir = !empty($painel['abrir']);
 $exibir = (string) ($_GET['exibir'] ?? 'notas') === 'boletim' ? 'boletim' : 'notas';
 $homologacao = is_array($painel['homologacao'] ?? null) ? $painel['homologacao'] : [];
@@ -43,6 +44,9 @@ if ($notaMinima !== null) {
     $filtrosAtivos++;
 }
 if ($jornadaAte !== '') {
+    $filtrosAtivos++;
+}
+if ($somenteComObs) {
     $filtrosAtivos++;
 }
 $reabrirFiltro = (string) ($_GET['filtro_aberto'] ?? '') === '1' && !$abrir;
@@ -315,6 +319,15 @@ $rotuloSerie = static function (int $serie): string {
                 <span class="mt-1 block text-xs text-gray-500">Deixe vazio para ver todas. O cálculo da linha continua visível.</span>
             </div>
             <div>
+                <label class="flex items-start gap-2 text-sm text-gray-700">
+                    <input type="checkbox" name="somente_com_obs" value="1" class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500" <?= $somenteComObs ? 'checked' : '' ?>>
+                    <span>
+                        <span class="font-medium">Só alunos com observação</span>
+                        <span class="block text-xs text-gray-500 mt-0.5">Puxa quem tem texto salvo na observação do boletim.</span>
+                    </span>
+                </label>
+            </div>
+            <div>
                 <label for="boletim_jornada_ate" class="block text-sm font-medium text-gray-700 mb-1.5">Contar jornada até</label>
                 <input type="datetime-local" id="boletim_jornada_ate" name="jornada_ate" value="<?= htmlspecialchars($jornadaAteInput !== '' ? $jornadaAteInput : '2026-11-26T08:00', ENT_QUOTES, 'UTF-8') ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <span class="mt-1 block text-xs text-gray-500">Padrão do consolidado: 26/11/2026 08:00. Conclusões depois disso não sobem a jornada (ex.: Laila volta a 7,5). Para ver ao vivo, use uma data futura.</span>
@@ -378,6 +391,9 @@ $bimestresAbas = (($carregarFundo || !$modeloVazio) && count($bimestresPainel) >
     <?php if ($notaMinima !== null): ?>
     Só as matérias com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.
     <?php endif; ?>
+    <?php if ($somenteComObs): ?>
+    Só alunos com observação no boletim.
+    <?php endif; ?>
 </p>
 <?php endif; ?>
 <?php
@@ -385,7 +401,9 @@ if ($abrir && $notaMinima !== null) {
     $relatorios = array_values(array_filter($relatorios, $relatorioTemAbaixo));
 }
 ?>
-<?php if ($abrir && !$carregarFundo && $notaMinima !== null && $relatorios === []): ?>
+<?php if ($abrir && !$carregarFundo && $somenteComObs && $alunos === [] && $relatorios === []): ?>
+<p class="text-sm text-gray-600 mb-6">Nenhum aluno com observação neste filtro.</p>
+<?php elseif ($abrir && !$carregarFundo && $notaMinima !== null && $relatorios === []): ?>
 <p class="text-sm text-gray-600 mb-6">Nenhum aluno com <?= htmlspecialchars($notaCampoNome, ENT_QUOTES, 'UTF-8') ?> abaixo de <?= htmlspecialchars($notaMinimaTexto, ENT_QUOTES, 'UTF-8') ?>.</p>
 <?php endif; ?>
 <?php if ($abrir || $carregarFundo): ?>
