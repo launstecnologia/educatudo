@@ -80,7 +80,11 @@ class MobileSchoolCommunicationController extends BaseController
         $replyId=(int)$this->db->insert("INSERT INTO school_communication_replies (communication_id,responsavel_id,aluno_id,sender_type,sender_id,mensagem,imagem,imagem_nome) VALUES (:communication,:parent,:student,'responsavel',:sender,:message,:imagem,:nome)",['communication'=>$item['id'],'parent'=>$this->parentId(),'student'=>$student['id'],'sender'=>$this->parentId(),'message'=>$message,'imagem'=>$imagem['path'] ?? null,'nome'=>$imagem['name'] ?? null]);
         $nome=trim((string)($student['nome'] ?? 'Aluno'));
         $resumo=$message!=='' ? mb_substr($message, 0, 180) : 'Enviou uma imagem.';
-        $service->avisarAdmins('Fique sabendo', $nome . ' respondeu: ' . $resumo);
+        $service->avisarAdmins(
+            'Fique sabendo',
+            $nome . ' respondeu: ' . $resumo,
+            '/admin/comunicacao-escolar/' . (int) $item['id']
+        );
         $this->json(['data'=>['id'=>$replyId,'sender_type'=>'responsavel','message'=>$message,'image_url'=>$imagem ? $this->absoluteUrl($imagem['path']) : null,'created_at'=>date(DATE_ATOM)]],201);
     }
 
@@ -120,7 +124,11 @@ class MobileSchoolCommunicationController extends BaseController
         $this->db->query('UPDATE familia_conversas SET updated_at=NOW() WHERE id=:id', ['id'=>(int)$conversa['id']]);
         $nome=trim((string)($student['nome'] ?? 'Aluno'));
         $resumo=$message!=='' ? mb_substr($message, 0, 180) : 'Enviou uma imagem.';
-        $service->avisarAdmins('Fale com a Escola', $nome . ': ' . $resumo);
+        $service->avisarAdmins(
+            'Fale com a Escola',
+            $nome . ': ' . $resumo,
+            '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']
+        );
         $this->json(['data'=>$this->mensagemFamilia(['id'=>$id,'autor_tipo'=>'responsavel','mensagem'=>$message,'imagem'=>$imagem['path'] ?? '','created_at'=>date('Y-m-d H:i:s')])],201);
     }
 

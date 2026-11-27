@@ -48,43 +48,119 @@ class UserNotificationController extends BaseController
     }
     
     /**
-     * Visualizar notificação específica
+     * Visualizar notificação específica.
+     * Se tiver destino_url (ou fallback conhecido), marca como lida e redireciona.
      */
     public function show($id)
     {
         $usuario = $this->getCurrentUser();
         $tipoUsuario = $this->getTipoUsuario();
-        
-        // Marcar como visualizada
-        $this->notificacaoModel->marcarComoVisualizada($id, $usuario['id'], $tipoUsuario);
-        
-        // Buscar notificação
-        $notificacoes = $this->notificacaoModel->getHistorico($usuario['id'], $tipoUsuario, 1);
-        $notificacao = null;
-        
-        foreach ($notificacoes as $notif) {
-            if ($notif['id'] == $id) {
-                $notificacao = $notif;
-                break;
-            }
+        $id = (int) $id;
+
+        // Ownership ANTES de marcar — evitar IDOR via INSERT em marcarComo*
+        if (!$this->usuarioPodeVerNotificacao($id, (int) $usuario['id'], $tipoUsuario)) {
+            $this->setFlashMessage('Notificação não encontrada', 'error');
+            $this->redirect('/notifications');
         }
-        
+
+        $notificacao = $this->notificacaoModel->getById($id);
         if (!$notificacao) {
             $this->setFlashMessage('Notificação não encontrada', 'error');
             $this->redirect('/notifications');
         }
-        
-        // Determinar layout baseado no tipo de usuário
-        $layout = $tipoUsuario === 'aluno' ? 'student' : 
-                 ($tipoUsuario === 'professor' ? 'professor' : 
+
+        $this->notificacaoModel->marcarComoVisualizada($id, $usuario['id'], $tipoUsuario);
+        $this->notificacaoModel->marcarComoLida($id, $usuario['id'], $tipoUsuario);
+
+        $destino = $this->resolverDestinoNotificacao($notificacao, $tipoUsuario);
+        if ($destino !== null) {
+            $this->redirect($destino);
+        }
+
+        $layout = $tipoUsuario === 'aluno' ? 'student' :
+                 ($tipoUsuario === 'professor' ? 'professor' :
                  ($tipoUsuario === 'admin' ? 'admin' : 'parent'));
-        
+
         $this->viewWithLayout($layout, 'notifications/show', [
             'notificacao' => $notificacao,
             'title' => 'Notificação',
             'page_title' => 'Notificação',
             'user' => $usuario
         ]);
+    }
+
+    /**
+     * Destino interno seguro para deep link do sino.
+     * @param array<string,mixed> $notificacao
+     */
+    private function resolverDestinoNotificacao(array $notificacao, string $tipoUsuario): ?string
+    {
+        $ehAdmin = in_array($tipoUsuario, ['admin', 'admin_escola'], true);
+        $destino = $this->destinoInterno($notificacao['destino_url'] ?? null);
+
+        if ($destino !== null) {
+            // Destinos /admin/* só para admin
+            if (str_starts_with($destino, '/admin') && !$ehAdmin) {
+                return null;
+            }
+            return $destino;
+        }
+
+        // Fallbacks para avisos antigos (sem destino_url) — só no admin
+        if (!$ehAdmin) {
+            return null;
+        }
+        $titulo = trim((string) ($notificacao['titulo'] ?? ''));
+        $mapa = [
+            'Fale com a Escola' => '/admin/comunicacao-escolar/fale-com-a-escola',
+            'Fique sabendo' => '/admin/comunicacao-escolar',
+            'Declaração aceita' => '/admin/documentos-familia',
+            'Documentos da família' => '/admin/documentos-familia',
+            'Documento do aluno' => '/admin/documentos-familia',
+            'Ficha do aluno' => '/admin/documentos-familia',
+            'Ficha de saúde' => '/admin/documentos-familia',
+        ];
+        return $mapa[$titulo] ?? null;
+    }
+
+    private function destinoInterno(?string $url): ?string
+    {
+        $url = preg_replace('/[\r\n\0]/', '', trim((string) $url)) ?? '';
+        if ($url === '' || !str_starts_with($url, '/') || str_starts_with($url, '//')) {
+            return null;
+        }
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $url)) {
+            return null;
+        }
+        return mb_substr($url, 0, 500);
+    }
+
+    private function usuarioPodeVerNotificacao(int $notificacaoId, int $usuarioId, string $tipoUsuario): bool
+    {
+        $tipoDestinatario = $this->notificacaoModel->mapearTipoUsuario($tipoUsuario);
+        $row = $this->db->fetch(
+            "SELECT nd.id
+             FROM notificacoes_destinatarios nd
+             WHERE nd.notificacao_id = :id
+               AND (
+                    nd.tipo_destinatario = 'todos'
+                    OR (nd.tipo_destinatario = :tipo AND nd.destinatario_id = :uid)
+                    OR (nd.tipo_destinatario = 'usuarios' AND nd.destinatario_id = :uid2)
+                    OR (
+                        nd.tipo_destinatario = 'turma'
+                        AND nd.turma_id IN (SELECT turma_id FROM alunos WHERE id = :aluno)
+                    )
+               )
+             LIMIT 1",
+            [
+                'id' => $notificacaoId,
+                'tipo' => $tipoDestinatario,
+                'uid' => $usuarioId,
+                'uid2' => $usuarioId,
+                'aluno' => $usuarioId,
+            ]
+        );
+        return is_array($row);
     }
     
     /**

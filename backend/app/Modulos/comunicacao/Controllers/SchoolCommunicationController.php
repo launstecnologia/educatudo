@@ -184,6 +184,58 @@ class SchoolCommunicationController extends BaseController
             $this->setFlashMessage('Rode a migração do canal Fale com a Escola antes de abrir as conversas.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar');
         }
+        $this->renderCaixaEntrada(null);
+    }
+
+    public function conversa($id): void
+    {
+        $conversa = $this->conversaDoAdmin((int) $id);
+        $this->db->query(
+            "UPDATE familia_mensagens SET lido_escola_em = NOW() WHERE conversa_id = :id AND autor_tipo = 'responsavel' AND lido_escola_em IS NULL",
+            ['id' => (int) $conversa['id']]
+        );
+        $this->renderCaixaEntrada($conversa);
+    }
+
+    /**
+     * Inbox estilo chat: lista à esquerda + thread à direita.
+     * @param array<string,mixed>|null $conversa
+     */
+    private function renderCaixaEntrada(?array $conversa): void
+    {
+        $items = $this->listarConversasFamilia();
+        $mensagens = [];
+        if ($conversa !== null) {
+            $mensagens = $this->db->fetchAll(
+                'SELECT id, autor_tipo, mensagem, imagem, created_at FROM familia_mensagens WHERE conversa_id = :id ORDER BY id',
+                ['id' => (int) $conversa['id']]
+            );
+            // Zera badge na lista da conversa aberta
+            foreach ($items as &$item) {
+                if ((int) ($item['id'] ?? 0) === (int) $conversa['id']) {
+                    $item['nao_lidas'] = 0;
+                }
+            }
+            unset($item);
+        }
+        $flash = $this->getFlashMessage();
+        $this->viewWithLayout('admin', 'admin/school-communication/conversas', [
+            'title' => 'Fale com a Escola',
+            'page_title' => 'Fale com a Escola',
+            'user' => $this->auth->getUser(),
+            'items' => $items,
+            'conversa' => $conversa,
+            'mensagens' => is_array($mensagens) ? $mensagens : [],
+            'current_page' => 'school-communication',
+            'csrf_token' => $this->generateCsrfToken(),
+            'flash_message' => $flash['message'] ?? null,
+            'flash_type' => $flash['type'] ?? null,
+        ]);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function listarConversasFamilia(): array
+    {
         $items = $this->db->fetchAll(
             "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
                     (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
@@ -194,35 +246,7 @@ class SchoolCommunicationController extends BaseController
              ORDER BY c.updated_at DESC
              LIMIT 200"
         );
-        $this->viewWithLayout('admin', 'admin/school-communication/conversas', [
-            'title' => 'Fale com a Escola',
-            'page_title' => 'Fale com a Escola',
-            'user' => $this->auth->getUser(),
-            'items' => is_array($items) ? $items : [],
-            'current_page' => 'school-communication',
-        ]);
-    }
-
-    public function conversa($id): void
-    {
-        $conversa = $this->conversaDoAdmin((int) $id);
-        $this->db->query(
-            "UPDATE familia_mensagens SET lido_escola_em = NOW() WHERE conversa_id = :id AND autor_tipo = 'responsavel' AND lido_escola_em IS NULL",
-            ['id' => (int) $conversa['id']]
-        );
-        $mensagens = $this->db->fetchAll(
-            'SELECT id, autor_tipo, mensagem, imagem, created_at FROM familia_mensagens WHERE conversa_id = :id ORDER BY id',
-            ['id' => (int) $conversa['id']]
-        );
-        $this->viewWithLayout('admin', 'admin/school-communication/conversa', [
-            'title' => 'Fale com a Escola',
-            'page_title' => 'Fale com a Escola',
-            'user' => $this->auth->getUser(),
-            'conversa' => $conversa,
-            'mensagens' => is_array($mensagens) ? $mensagens : [],
-            'current_page' => 'school-communication',
-            'csrf_token' => $this->generateCsrfToken(),
-        ]);
+        return is_array($items) ? $items : [];
     }
 
     public function responderConversa($id): void

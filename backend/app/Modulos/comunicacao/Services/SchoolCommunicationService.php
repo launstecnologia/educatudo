@@ -158,7 +158,11 @@ class SchoolCommunicationService
         return ['path' => '/' . $relative . '/' . $filename, 'name' => $nome !== '' ? $nome : 'imagem'];
     }
 
-    public function avisarAdmins(string $titulo, string $conteudo): void
+    /**
+     * Avisa admins no sino. $destinoUrl é caminho relativo interno
+     * (ex.: /admin/comunicacao-escolar/fale-com-a-escola/12).
+     */
+    public function avisarAdmins(string $titulo, string $conteudo, ?string $destinoUrl = null): void
     {
         try {
             $admins = $this->db->fetchAll(
@@ -176,11 +180,21 @@ class SchoolCommunicationService
         if ($primeiro <= 0) {
             return;
         }
-        $notificacaoId = (int) $this->db->insert(
-            "INSERT INTO notificacoes (tipo_conteudo, titulo, conteudo, enviado_por, tipo_enviador, prioridade, data_envio, ativo)
-             VALUES ('mensagem', :titulo, :conteudo, :enviado, 'admin', 'alta', NOW(), 1)",
-            ['titulo' => $titulo, 'conteudo' => $conteudo, 'enviado' => $primeiro]
-        );
+        $destinoUrl = $this->destinoInterno($destinoUrl);
+        $temDestino = $destinoUrl !== null && $this->colunaDestinoUrlExiste();
+        if ($temDestino) {
+            $notificacaoId = (int) $this->db->insert(
+                "INSERT INTO notificacoes (tipo_conteudo, titulo, conteudo, enviado_por, tipo_enviador, prioridade, data_envio, ativo, destino_url)
+                 VALUES ('mensagem', :titulo, :conteudo, :enviado, 'admin', 'alta', NOW(), 1, :destino)",
+                ['titulo' => $titulo, 'conteudo' => $conteudo, 'enviado' => $primeiro, 'destino' => $destinoUrl]
+            );
+        } else {
+            $notificacaoId = (int) $this->db->insert(
+                "INSERT INTO notificacoes (tipo_conteudo, titulo, conteudo, enviado_por, tipo_enviador, prioridade, data_envio, ativo)
+                 VALUES ('mensagem', :titulo, :conteudo, :enviado, 'admin', 'alta', NOW(), 1)",
+                ['titulo' => $titulo, 'conteudo' => $conteudo, 'enviado' => $primeiro]
+            );
+        }
         foreach ($admins as $admin) {
             $destino = (int) ($admin['id'] ?? 0);
             if ($destino <= 0) {
@@ -192,6 +206,36 @@ class SchoolCommunicationService
                 ['id' => $notificacaoId, 'destinatario' => $destino]
             );
         }
+    }
+
+    private function destinoInterno(?string $url): ?string
+    {
+        $url = preg_replace('/[\r\n\0]/', '', trim((string) $url)) ?? '';
+        if ($url === '' || !str_starts_with($url, '/') || str_starts_with($url, '//')) {
+            return null;
+        }
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $url)) {
+            return null;
+        }
+        return mb_substr($url, 0, 500);
+    }
+
+    private function colunaDestinoUrlExiste(): bool
+    {
+        static $existe = null;
+        if ($existe !== null) {
+            return $existe;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notificacoes' AND COLUMN_NAME = 'destino_url'"
+            );
+            $existe = ((int) ($row['c'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            $existe = false;
+        }
+        return $existe;
     }
 
     public function canalFamiliaPronto(): bool
