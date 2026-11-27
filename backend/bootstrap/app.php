@@ -851,7 +851,7 @@ if (
     strpos($caminhoStorage, 'storage/uploads/fale-com-a-escola/') === 0
     || strpos($caminhoStorage, 'storage/uploads/school-communications/') === 0
 ) {
-    $logado = !empty($_SESSION['user_id']) || !empty($_SESSION['parent_id']) || !empty($_SESSION['aluno_id']);
+    $logado = !empty($_SESSION['user_id']) || !empty($_SESSION['parent_id']) || !empty($_SESSION['aluno_id']) || !empty($_SESSION['master_user_id']);
     if (!$logado) {
         http_response_code(401);
         header('X-Content-Type-Options: nosniff');
@@ -861,6 +861,54 @@ if (
         http_response_code(403);
         header('X-Content-Type-Options: nosniff');
         exit;
+    }
+    if (empty($_SESSION['master_user_id']) && class_exists(\App\Core\AuthManager::class) && !\App\Core\AuthManager::sessaoConfereComEscolaAtual()) {
+        http_response_code(403);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    // Isolamento: só serve arquivos do tenant da request atual
+    $tenantSlug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+    if ($tenantSlug === '') {
+        $tenantSlug = 'default';
+    }
+    if (!preg_match('#^storage/uploads/(?:fale-com-a-escola|school-communications)/' . preg_quote($tenantSlug, '#') . '(?:/|$)#', $caminhoStorage)) {
+        http_response_code(403);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    // Legado fale-com-a-escola: admin da escola OU responsável dono da conversa
+    $tipoSessao = (string) ($_SESSION['user_type'] ?? '');
+    $ehAdmin = !empty($_SESSION['master_user_id']) || in_array($tipoSessao, ['admin', 'admin_escola'], true);
+    if (!$ehAdmin && strpos($caminhoStorage, 'storage/uploads/fale-com-a-escola/') === 0) {
+        $responsavelId = (int) ($_SESSION['parent_id'] ?? 0);
+        if ($responsavelId <= 0 && in_array($tipoSessao, ['pai', 'responsavel'], true)) {
+            $responsavelId = (int) ($_SESSION['user_id'] ?? 0);
+        }
+        $arquivo = basename($caminhoStorage);
+        $okDono = false;
+        if ($responsavelId > 0 && $arquivo !== '' && $arquivo !== '.' && $arquivo !== '..') {
+            try {
+                $db = \App\Core\Database::getInstance();
+                $row = $db->fetch(
+                    "SELECT m.id
+                     FROM familia_mensagens m
+                     INNER JOIN familia_conversas c ON c.id = m.conversa_id
+                     WHERE c.responsavel_id = :responsavel
+                       AND LOCATE(:arquivo, COALESCE(m.imagem, '')) > 0
+                     LIMIT 1",
+                    ['responsavel' => $responsavelId, 'arquivo' => $arquivo]
+                );
+                $okDono = is_array($row) && !empty($row);
+            } catch (\Throwable $e) {
+                $okDono = false;
+            }
+        }
+        if (!$okDono) {
+            http_response_code(403);
+            header('X-Content-Type-Options: nosniff');
+            exit;
+        }
     }
     $storageComFile = BASE_PATH . '/' . $caminhoStorage;
     if (is_file($storageComFile)) {

@@ -178,6 +178,7 @@ return [
         'tenant_prefix' => env('MEDIA_TENANT_PREFIX', '') === 'true',
         'local_paths' => [
             'layout' => 'public/uploads/layout',
+            'fale_com_escola' => 'storage/uploads/fale-com-a-escola',
             'provas_questoes' => 'storage/provas/questoes',
             'chat' => 'storage/chat',
             'jornadas_exercicios' => 'public/uploads/jornadas/exercicios',

@@ -6,18 +6,23 @@ require_once __DIR__ . '/../../../Policies/ParentStudentAccessPolicy.php';
 
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Infra\Services\MediaStorageService;
 use App\Middleware\MobileApiAuthMiddleware;
 
 class MobileSchoolCommunicationController extends BaseController
 {
     private $db;
     private \ParentStudentAccessPolicy $policy;
+    private array $config;
 
     public function __construct()
     {
         parent::__construct();
         $this->db = Database::getInstance();
         $this->policy = new \ParentStudentAccessPolicy();
+        $this->config = isset($GLOBALS['config']) && is_array($GLOBALS['config'])
+            ? $GLOBALS['config']
+            : (require dirname(__DIR__, 4) . '/config/app.php');
     }
 
     public function index($studentId): void
@@ -331,7 +336,10 @@ class MobileSchoolCommunicationController extends BaseController
         $imagem=trim((string)($row['imagem'] ?? ''));
         $tipo=trim((string)($row['anexo_tipo'] ?? ''));
         if($tipo==='' && $imagem!=='')$tipo='imagem';
-        $url=$imagem!=='' ? $this->absoluteUrl($imagem) : null;
+        $url = null;
+        if ($imagem !== '') {
+            $url = $this->resolverUrlAnexoMensagem($imagem, (string) ($row['imagem_nome'] ?? 'arquivo'));
+        }
         return [
             'id'=>(int)($row['id'] ?? 0),
             'sender_type'=>($row['autor_tipo'] ?? '')==='escola' ? 'escola' : 'responsavel',
@@ -345,6 +353,43 @@ class MobileSchoolCommunicationController extends BaseController
             'liked_by_me'=>((int)($row['eu_curti'] ?? 0)) > 0,
             'created_at'=>$this->iso($row['created_at'] ?? null),
         ];
+    }
+
+    private function resolverUrlAnexoMensagem(string $path, string $nomeArquivo): ?string
+    {
+        $path = trim($path);
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $path) === 1) {
+            return $path;
+        }
+
+        if (!str_starts_with($path, '/media/serve?')) {
+            return $this->absoluteUrl($path);
+        }
+
+        $parts = parse_url($path);
+        if (!is_array($parts) || !isset($parts['query'])) {
+            return $this->absoluteUrl($path);
+        }
+        parse_str((string) $parts['query'], $query);
+        $type = trim((string) ($query['type'] ?? ''));
+        $key = trim((string) ($query['key'] ?? ''));
+        if ($type !== 'fale_com_escola' || $key === '') {
+            return $this->absoluteUrl($path);
+        }
+
+        $config = is_array($this->config) ? $this->config : [];
+        $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
+        $media = new MediaStorageService($config);
+        if (!$media->isS3()) {
+            return $this->absoluteUrl($path);
+        }
+
+        $urlAssinada = $media->getViewUrl($type, $key, basename($nomeArquivo !== '' ? $nomeArquivo : $key), 3600);
+        return $urlAssinada ?: $this->absoluteUrl($path);
     }
 
     private function colunaFamilia(string $coluna): bool

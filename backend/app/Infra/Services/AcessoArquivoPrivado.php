@@ -25,10 +25,20 @@ class AcessoArquivoPrivado
 
     public static function podeLer(string $type, string $key): bool
     {
+        if (empty($_SESSION['master_user_id']) && class_exists(\App\Core\AuthManager::class) && !\App\Core\AuthManager::sessaoConfereComEscolaAtual()) {
+            return false;
+        }
         $tipo = (string) ($_SESSION['user_type'] ?? '');
         $userId = (int) ($_SESSION['user_id'] ?? 0);
+        if ($tipo === '' && !empty($_SESSION['parent_id'])) {
+            $tipo = 'pai';
+            $userId = (int) $_SESSION['parent_id'];
+        }
         if (!empty($_SESSION['master_user_id']) || in_array($tipo, ['admin', 'admin_escola'], true)) {
             return true;
+        }
+        if ($type === 'fale_com_escola') {
+            return self::podeLerFaleComEscola($tipo, $userId, $key);
         }
 
         if (!in_array($type, self::TIPOS_DO_ALUNO, true)) {
@@ -823,6 +833,42 @@ class AcessoArquivoPrivado
         }
 
         return null;
+    }
+
+    private static function podeLerFaleComEscola(string $tipo, int $userId, string $key): bool
+    {
+        if (!in_array($tipo, ['pai', 'responsavel'], true) || $userId <= 0) {
+            return false;
+        }
+
+        $key = ltrim(trim($key), '/');
+        if ($key === '' || str_contains($key, '..') || !str_starts_with($key, 'familia/')) {
+            return false;
+        }
+        // Aceita só a chave exata no querystring do path gravado
+        $needle = 'key=' . rawurlencode($key);
+        $needleAlt = 'key=' . $key;
+
+        $row = Database::getInstance()->fetch(
+            "SELECT m.id
+             FROM familia_mensagens m
+             INNER JOIN familia_conversas c ON c.id = m.conversa_id
+             WHERE c.responsavel_id = :responsavel
+               AND (
+                    COALESCE(m.imagem, '') LIKE :like
+                    OR LOCATE(:needle, COALESCE(m.imagem, '')) > 0
+                    OR LOCATE(:needle_alt, COALESCE(m.imagem, '')) > 0
+               )
+             LIMIT 1",
+            [
+                'responsavel' => $userId,
+                'like' => '%/' . $key,
+                'needle' => $needle,
+                'needle_alt' => $needleAlt,
+            ]
+        );
+
+        return is_array($row) && !empty($row);
     }
 
     /**

@@ -268,7 +268,7 @@ class SchoolCommunicationController extends BaseController
     /**
      * @return list<array<string,mixed>>
      */
-    private function mensagensDaConversa(int $conversaId, int $usuarioId): array
+    private function mensagensDaConversa(int $conversaId, int $usuarioId, int $depoisDe = 0): array
     {
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
         $temReacoes = $this->service->tabelaReacoesPronta();
@@ -285,11 +285,16 @@ class SchoolCommunicationController extends BaseController
             $cols .= ", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir' AND r.autor_tipo = 'escola' AND r.autor_id = :uid) AS eu_curti";
         }
         $params = ['id' => $conversaId];
+        $where = 'm.conversa_id = :id';
         if ($temReacoes) {
             $params['uid'] = $usuarioId;
         }
+        if ($depoisDe > 0) {
+            $where .= ' AND m.id > :depois_de';
+            $params['depois_de'] = $depoisDe;
+        }
         $rows = $this->db->fetchAll(
-            "SELECT {$cols} FROM familia_mensagens m WHERE m.conversa_id = :id ORDER BY m.id",
+            "SELECT {$cols} FROM familia_mensagens m WHERE {$where} ORDER BY m.id",
             $params
         );
         if (!is_array($rows)) {
@@ -328,6 +333,7 @@ class SchoolCommunicationController extends BaseController
     public function responderConversa($id): void
     {
         $this->csrf();
+        $ajax = $this->querJson();
         $conversa = $this->conversaDoAdmin((int) $id);
         $message = trim((string) ($_POST['mensagem'] ?? ''));
         $file = $_FILES['anexo'] ?? ($_FILES['imagem'] ?? []);
@@ -336,23 +342,33 @@ class SchoolCommunicationController extends BaseController
         if ($uploadErro === UPLOAD_ERR_OK) {
             $anexo = $this->service->guardarAnexo($file, 'fale-com-a-escola');
             if ($anexo === null) {
+                if ($ajax) {
+                    $this->responderJson(['ok' => false, 'erro' => 'Não foi possível enviar o anexo. Use foto, vídeo, PDF ou áudio compatível.'], 422);
+                }
                 $this->setFlashMessage('Não foi possível enviar o anexo. Use foto, vídeo, PDF ou áudio compatível.', 'error');
                 $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
             }
         } elseif ($uploadErro !== UPLOAD_ERR_NO_FILE) {
+            if ($ajax) {
+                $this->responderJson(['ok' => false, 'erro' => 'Falha no upload do anexo (código ' . $uploadErro . ').'], 422);
+            }
             $this->setFlashMessage('Falha no upload do anexo (código ' . $uploadErro . ').', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         if (($message === '' && $anexo === null) || mb_strlen($message) > 4000) {
+            if ($ajax) {
+                $this->responderJson(['ok' => false, 'erro' => 'Escreva uma mensagem ou envie foto, vídeo, PDF ou áudio.'], 422);
+            }
             $this->setFlashMessage('Escreva uma mensagem ou envie foto, vídeo, PDF ou áudio.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         $user = $this->auth->getUser();
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
         $tipoAnexo = $this->service->normalizarTipoAnexo($anexo['tipo'] ?? null);
+        $mensagemId = 0;
         try {
             if ($temAnexo) {
-                $this->db->insert(
+                $mensagemId = (int) $this->db->insert(
                     "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
                      VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
                     [
@@ -366,7 +382,7 @@ class SchoolCommunicationController extends BaseController
                     ]
                 );
             } else {
-                $this->db->insert(
+                $mensagemId = (int) $this->db->insert(
                     "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
                      VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
                     [
@@ -381,6 +397,9 @@ class SchoolCommunicationController extends BaseController
             $this->db->query('UPDATE familia_conversas SET updated_at = NOW() WHERE id = :id', ['id' => (int) $conversa['id']]);
         } catch (\Throwable $e) {
             error_log('FaleComEscola responderConversa: ' . $e->getMessage());
+            if ($ajax) {
+                $this->responderJson(['ok' => false, 'erro' => 'Não foi possível salvar a mensagem. Verifique se as migrations do chat foram aplicadas.'], 500);
+            }
             $this->setFlashMessage('Não foi possível salvar a mensagem. Verifique se as migrations do chat foram aplicadas.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
@@ -397,6 +416,25 @@ class SchoolCommunicationController extends BaseController
         } catch (\Throwable $e) {
             error_log('FaleComEscola push: ' . $e->getMessage());
         }
+        if ($ajax) {
+            $mensagem = $this->mensagemPorId((int) $conversa['id'], $mensagemId, (int) ($user['id'] ?? 0));
+            if ($mensagem === null) {
+                $mensagem = [
+                    'id' => $mensagemId,
+                    'autor_tipo' => 'escola',
+                    'mensagem' => $message !== '' ? $message : null,
+                    'imagem' => $anexo['path'] ?? null,
+                    'imagem_nome' => $anexo['name'] ?? null,
+                    'anexo_tipo' => $tipoAnexo,
+                    'anexo_mime' => $anexo['mime'] ?? null,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'curtidas' => 0,
+                    'eu_curti' => false,
+                    'lido_familia_em' => null,
+                ];
+            }
+            $this->responderJson(['ok' => true, 'mensagem' => $this->montarPayloadMensagemJson($mensagem)]);
+        }
         $this->setFlashMessage('Resposta enviada para a família.', 'success');
         $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
     }
@@ -404,6 +442,7 @@ class SchoolCommunicationController extends BaseController
     public function curtirMensagem($conversaId, $mensagemId): void
     {
         $this->csrf();
+        $ajax = $this->querJson();
         $conversa = $this->conversaDoAdmin((int) $conversaId);
         $mensagemId = (int) $mensagemId;
         $msg = $this->db->fetch(
@@ -411,13 +450,52 @@ class SchoolCommunicationController extends BaseController
             ['id' => $mensagemId, 'conversa' => (int) $conversa['id']]
         );
         if (!$msg) {
+            if ($ajax) {
+                $this->responderJson(['ok' => false, 'erro' => 'Mensagem não encontrada.'], 404);
+            }
             $this->setFlashMessage('Mensagem não encontrada.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         $user = $this->auth->getUser();
         $curtiu = $this->service->alternarCurtida($mensagemId, 'escola', (int) $user['id']);
+        $curtidas = 0;
+        if ($this->service->tabelaReacoesPronta()) {
+            $totais = $this->db->fetch(
+                "SELECT COUNT(*) AS total
+                 FROM familia_mensagem_reacoes
+                 WHERE mensagem_id = :id AND reacao = 'curtir'",
+                ['id' => $mensagemId]
+            );
+            $curtidas = (int) ($totais['total'] ?? 0);
+        }
+        if ($ajax) {
+            $this->responderJson(['ok' => true, 'liked' => $curtiu, 'curtidas' => $curtidas]);
+        }
         $this->setFlashMessage($curtiu ? 'Mensagem curtida.' : 'Curtida removida.', 'success');
         $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id'] . '#msg-' . $mensagemId);
+    }
+
+    public function mensagensJson($id): void
+    {
+        $conversa = $this->conversaDoAdmin((int) $id);
+        $depoisDe = (int) ($_GET['depois_de'] ?? 0);
+        if ($depoisDe < 0) {
+            $depoisDe = 0;
+        }
+        $this->db->query(
+            "UPDATE familia_mensagens
+             SET lido_escola_em = NOW()
+             WHERE conversa_id = :id AND autor_tipo = 'responsavel' AND lido_escola_em IS NULL",
+            ['id' => (int) $conversa['id']]
+        );
+        $user = $this->auth->getUser();
+        $mensagens = $this->mensagensDaConversa((int) $conversa['id'], (int) ($user['id'] ?? 0), $depoisDe);
+        $payload = array_map(fn (array $mensagem): array => $this->montarPayloadMensagemJson($mensagem), $mensagens);
+        $this->responderJson([
+            'ok' => true,
+            'mensagens' => $payload,
+            'conversa_id' => (int) $conversa['id'],
+        ]);
     }
 
     private function conversaDoAdmin(int $id): array
@@ -657,6 +735,116 @@ class SchoolCommunicationController extends BaseController
         }
         $time = strtotime($value);
         return $time === false ? '' : date('Y-m-d\TH:i', $time);
+    }
+    private function querJson(): bool
+    {
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+        if (str_contains($accept, 'application/json')) {
+            return true;
+        }
+        if ($requestedWith === 'xmlhttprequest') {
+            return true;
+        }
+        return (string) ($_POST['ajax'] ?? '') === '1' || (string) ($_GET['ajax'] ?? '') === '1';
+    }
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function responderJson(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    private function mensagemPorId(int $conversaId, int $mensagemId, int $usuarioId): ?array
+    {
+        if ($mensagemId <= 0) {
+            return null;
+        }
+        $rows = $this->mensagensDaConversa($conversaId, $usuarioId, $mensagemId - 1);
+        foreach ($rows as $row) {
+            if ((int) ($row['id'] ?? 0) === $mensagemId) {
+                return $row;
+            }
+        }
+        return null;
+    }
+    /**
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function montarPayloadMensagemJson(array $row): array
+    {
+        $tipo = $this->tipoAnexoParaUi($row);
+        $imagem = isset($row['imagem']) ? trim((string) $row['imagem']) : '';
+        $urlAbsoluta = $this->urlAbsolutaArquivo($imagem);
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'autor_tipo' => (string) ($row['autor_tipo'] ?? ''),
+            'mensagem' => $row['mensagem'] ?? null,
+            'imagem' => $imagem !== '' ? $imagem : null,
+            'url' => $urlAbsoluta,
+            'imagem_nome' => $row['imagem_nome'] ?? null,
+            'anexo_tipo' => $tipo,
+            'anexo_mime' => $row['anexo_mime'] ?? null,
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'curtidas' => (int) ($row['curtidas'] ?? 0),
+            'eu_curti' => (bool) ($row['eu_curti'] ?? false),
+            'lido_familia_em' => $row['lido_familia_em'] ?? null,
+        ];
+    }
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function tipoAnexoParaUi(array $row): ?string
+    {
+        $tipo = trim((string) ($row['anexo_tipo'] ?? ''));
+        $mime = strtolower(trim((string) ($row['anexo_mime'] ?? '')));
+        $imagem = strtolower(trim((string) ($row['imagem'] ?? '')));
+        if ($tipo === '') {
+            if ($imagem !== '') {
+                $tipo = 'imagem';
+            } else {
+                return null;
+            }
+        }
+        if ($tipo === 'audio' || str_starts_with($mime, 'audio/')) {
+            return 'audio';
+        }
+        if ($tipo === 'arquivo') {
+            foreach (['.mp3', '.m4a', '.aac', '.wav', '.ogg', '.weba', '.webm'] as $ext) {
+                if (str_ends_with($imagem, $ext)) {
+                    return 'audio';
+                }
+            }
+        }
+        return $tipo;
+    }
+    private function urlAbsolutaArquivo(?string $path): ?string
+    {
+        $path = trim((string) $path);
+        if ($path === '') {
+            return null;
+        }
+        if (preg_match('#^https?://#i', $path) === 1) {
+            return $path;
+        }
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        if (str_starts_with($path, '/media/serve?')) {
+            return rtrim((string) URL, '/') . $path;
+        }
+
+        if (str_starts_with($path, '/storage/uploads/fale-com-a-escola/')
+            || str_starts_with($path, '/storage/uploads/school-communications/')) {
+            return rtrim((string) URL, '/') . $path;
+        }
+
+        return rtrim((string) URL, '/') . $path;
     }
     private function csrf(?string $fallback = null): void { if(!$this->verifyCsrfToken($_POST['_token']??'')){ $this->setFlashMessage('Sessão expirada. Tente novamente.','error'); $this->redirect($fallback ?? (URL.'/admin/comunicacao-escolar')); } }
     private function back(string $message): void { $this->setFlashMessage($message,'error'); $this->redirect($_SERVER['HTTP_REFERER']??(URL.'/admin/comunicacao-escolar')); }

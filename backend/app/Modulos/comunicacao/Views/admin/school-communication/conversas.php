@@ -7,6 +7,7 @@ $conversaId = (int) ($conversa['id'] ?? 0);
 $baseUrl = URL . '/admin/comunicacao-escolar/fale-com-a-escola';
 $escolaAvatar = trim((string) ($escola_avatar ?? ''));
 $reacoesProntas = !empty($reacoes_prontas);
+$ultimoMsgId = 0;
 
 $iniciais = static function (string $nome): string {
     $nome = trim($nome);
@@ -319,6 +320,11 @@ $fmtDiaDivisor = static function (string $dt): string {
 .fc-bubble.is-escola .fc-audio-scrub { background:#166534; }
 .fc-audio-time { font-size:11px; color:#64748b; font-variant-numeric:tabular-nums; }
 .fc-audio audio { display:none; }
+@keyframes fc-flash-familia {
+  0% { box-shadow:0 0 0 2px rgba(37,99,235,.35); }
+  100% { box-shadow:0 1px 2px rgba(15,23,42,.06); }
+}
+.fc-row.fc-new-in .fc-bubble.is-familia { animation:fc-flash-familia 1.4s ease; }
 </style>
 
 <div class="fc-shell">
@@ -433,7 +439,7 @@ $fmtDiaDivisor = static function (string $dt): string {
                     $diaAtual = '';
                     if ($mensagens === []):
                     ?>
-                        <p class="text-sm text-slate-500 text-center py-10">Nenhuma mensagem nesta conversa.</p>
+                        <p id="fale-chat-vazio" class="text-sm text-slate-500 text-center py-10">Nenhuma mensagem nesta conversa.</p>
                     <?php endif; ?>
                     <?php foreach ($mensagens as $mensagem): ?>
                         <?php
@@ -471,7 +477,7 @@ $fmtDiaDivisor = static function (string $dt): string {
                         ?>
                         <?php if ($dia !== '' && $dia !== $diaAtual): ?>
                             <?php $diaAtual = $dia; ?>
-                            <div class="fc-day"><span><?= htmlspecialchars($fmtDiaDivisor($created)) ?></span></div>
+                            <div class="fc-day" data-fc-dia="<?= htmlspecialchars($dia, ENT_QUOTES, 'UTF-8') ?>"><span><?= htmlspecialchars($fmtDiaDivisor($created)) ?></span></div>
                         <?php endif; ?>
 
                         <div id="msg-<?= $msgId ?>" class="fc-row <?= $daEscola ? 'is-escola' : 'is-familia' ?>">
@@ -519,9 +525,9 @@ $fmtDiaDivisor = static function (string $dt): string {
 
                                 <?php if ($curtidas > 0 || ($reacoesProntas && $msgId > 0)): ?>
                                     <div class="fc-react">
-                                        <?php if ($curtidas > 0): ?><span>👍 <?= $curtidas ?></span><?php endif; ?>
+                                        <?php if ($curtidas > 0): ?><span class="fc-like-count">👍 <?= $curtidas ?></span><?php endif; ?>
                                         <?php if ($reacoesProntas && $msgId > 0): ?>
-                                            <form method="post" action="<?= $baseUrl ?>/<?= $conversaId ?>/mensagens/<?= $msgId ?>/curtir" style="display:inline;margin:0;">
+                                            <form method="post" class="fc-like-form" action="<?= $baseUrl ?>/<?= $conversaId ?>/mensagens/<?= $msgId ?>/curtir" style="display:inline;margin:0;">
                                                 <input type="hidden" name="_token" value="<?= $csrf ?>">
                                                 <button type="submit" class="fc-like <?= $euCurti ? 'is-on' : '' ?>" title="<?= $euCurti ? 'Remover curtida' : 'Curtir' ?>">
                                                     <i class="fa-<?= $euCurti ? 'solid' : 'regular' ?> fa-thumbs-up"></i>
@@ -586,6 +592,12 @@ $fmtDiaDivisor = static function (string $dt): string {
                         <button type="submit" id="fale-btn-enviar" class="fc-send" title="Enviar" aria-label="Enviar" style="display:none;"><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
                 </form>
+            <?php
+            $ultimoMsgId = 0;
+            foreach ($mensagens as $m) {
+                $ultimoMsgId = max($ultimoMsgId, (int) ($m['id'] ?? 0));
+            }
+            ?>
             <?php endif; ?>
         </section>
     </div>
@@ -593,11 +605,95 @@ $fmtDiaDivisor = static function (string $dt): string {
 
 <script>
 (function () {
-    var box = document.getElementById('fale-chat-mensagens');
-    if (box) {
-        var hash = window.location.hash;
-        if (hash && document.querySelector(hash)) document.querySelector(hash).scrollIntoView({ block: 'center' });
-        else box.scrollTop = box.scrollHeight;
+    var FC = {
+        conversaId: <?= (int) $conversaId ?>,
+        baseUrl: <?= json_encode($baseUrl, JSON_UNESCAPED_UNICODE) ?>,
+        csrf: <?= json_encode((string) ($csrf_token ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+        reacoesProntas: <?= $reacoesProntas ? 'true' : 'false' ?>,
+        urlBase: <?= json_encode(rtrim((string) URL, '/'), JSON_UNESCAPED_UNICODE) ?>,
+        ultimoMsgId: <?= (int) ($ultimoMsgId ?? 0) ?>,
+        ultimoDia: <?= json_encode($diaAtual ?? '', JSON_UNESCAPED_UNICODE) ?>
+    };
+
+    var AUDIO_BARS = [8,14,10,18,12,16,9,15,11,17,13,10,16,12,14,9,18,11,15,10,13,17,12,16,9,14,11,15];
+    var EXT_AUDIO = ['webm','weba','ogg','mp3','m4a','aac','wav'];
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+    function textoHtml(s) {
+        return escHtml(s).replace(/\n/g, '<br>');
+    }
+    function urlAnexoJs(path) {
+        path = (path || '').trim();
+        if (path === '') return '';
+        if (/^https?:\/\//i.test(path)) return path;
+        return FC.urlBase + '/' + path.replace(/^\//, '');
+    }
+    function parseDataIso(created) {
+        if (!created) return { dia: '', hora: '', ts: NaN };
+        var ts = Date.parse(String(created).replace(' ', 'T'));
+        if (isNaN(ts)) return { dia: '', hora: '', ts: NaN };
+        var d = new Date(ts);
+        var dia = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        var hora = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        return { dia: dia, hora: hora, ts: ts, date: d };
+    }
+    function fmtDiaDivisorJs(created) {
+        var p = parseDataIso(created);
+        if (!p.date) return '';
+        var meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+        var hoje = new Date();
+        var ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+        var d = p.date;
+        var diaChave = p.dia;
+        var hojeChave = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+        var ontemChave = ontem.getFullYear() + '-' + String(ontem.getMonth() + 1).padStart(2, '0') + '-' + String(ontem.getDate()).padStart(2, '0');
+        var j = d.getDate();
+        var mes = meses[d.getMonth()];
+        if (diaChave === hojeChave) return 'Hoje, ' + j + ' de ' + mes;
+        if (diaChave === ontemChave) return 'Ontem, ' + j + ' de ' + mes;
+        return j + ' de ' + mes + ' de ' + d.getFullYear();
+    }
+    function fmtHoraListaJs(created) {
+        var p = parseDataIso(created);
+        if (!p.date) return '';
+        var hoje = new Date();
+        var hojeChave = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+        if (p.dia === hojeChave) return p.hora;
+        var ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+        var ontemChave = ontem.getFullYear() + '-' + String(ontem.getMonth() + 1).padStart(2, '0') + '-' + String(ontem.getDate()).padStart(2, '0');
+        if (p.dia === ontemChave) return 'Ontem';
+        return String(p.date.getDate()).padStart(2, '0') + '/' + String(p.date.getMonth() + 1).padStart(2, '0');
+    }
+    function resolverAnexo(m) {
+        var anexoTipo = (m.anexo_tipo || '').toString();
+        var anexoMime = (m.anexo_mime || '').toString();
+        var path = (m.imagem || m.url || '').toString();
+        var anexoNome = (m.imagem_nome || 'arquivo').toString();
+        if (anexoTipo === '' && path !== '') {
+            anexoTipo = 'imagem';
+        }
+        var ext = '';
+        var base = path || anexoNome;
+        var dot = base.lastIndexOf('.');
+        if (dot !== -1) ext = base.slice(dot + 1).toLowerCase();
+        var extAudio = EXT_AUDIO.indexOf(ext) !== -1;
+        if (anexoTipo === '' && (path !== '' || anexoMime.indexOf('image/') === 0)) {
+            if (path && !anexoTipo) anexoTipo = m.imagem ? (anexoMime.indexOf('image/') === 0 ? 'imagem' : '') : '';
+        }
+        if (anexoTipo === '' && (anexoMime.indexOf('audio/') === 0 || extAudio)) anexoTipo = 'audio';
+        if (anexoTipo === 'arquivo' && (anexoMime.indexOf('audio/') === 0 || extAudio)) anexoTipo = 'audio';
+        if (anexoTipo === 'audio' && anexoMime === '') {
+            var mimeMap = { m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac', weba: 'audio/webm', webm: 'audio/webm' };
+            anexoMime = mimeMap[ext] || 'audio/webm';
+        }
+        var anexoUrl = urlAnexoJs(path);
+        if (!anexoTipo && anexoUrl && anexoMime.indexOf('image/') === 0) anexoTipo = 'imagem';
+        if (!anexoTipo && anexoUrl && anexoMime.indexOf('video/') === 0) anexoTipo = 'video';
+        return { anexoTipo: anexoTipo, anexoMime: anexoMime, anexoUrl: anexoUrl, anexoNome: anexoNome };
     }
 
     function fmtAudio(s) {
@@ -605,7 +701,7 @@ $fmtDiaDivisor = static function (string $dt): string {
         return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     }
     var audioAtual = null;
-    function pararAudio(exceto) {
+    function pararAudioTodos(exceto) {
         document.querySelectorAll('[data-fc-audio]').forEach(function (wrap) {
             if (exceto && wrap === exceto) return;
             var a = wrap.querySelector('audio');
@@ -614,7 +710,7 @@ $fmtDiaDivisor = static function (string $dt): string {
             if (btn) btn.innerHTML = '<i class="fa-solid fa-play"></i>';
         });
     }
-    function atualizarPlayer(wrap) {
+    function atualizarPlayerAudio(wrap) {
         var audio = wrap.querySelector('audio');
         var timeEl = wrap.querySelector('.fc-audio-time');
         var scrub = wrap.querySelector('.fc-audio-scrub');
@@ -629,49 +725,61 @@ $fmtDiaDivisor = static function (string $dt): string {
             if (i < done) bar.classList.add('is-done');
             else bar.classList.remove('is-done');
         });
+        if (timeEl.getAttribute('data-fc-indisp') === '1') return;
         if (dur > 0 && !audio.paused) timeEl.textContent = fmtAudio(cur);
         else if (dur > 0) timeEl.textContent = fmtAudio(dur);
         else timeEl.textContent = fmtAudio(cur);
     }
-    document.querySelectorAll('[data-fc-audio]').forEach(function (wrap) {
+    function garantirSrcAudio(wrap, audio) {
+        var src = wrap.getAttribute('data-src') || '';
+        if (src && (!audio.src || audio.src.indexOf(src) === -1)) {
+            audio.src = src;
+        }
+    }
+    function initAudioPlayer(wrap) {
+        if (!wrap || wrap.getAttribute('data-fc-audio-init') === '1') return;
+        wrap.setAttribute('data-fc-audio-init', '1');
         var audio = wrap.querySelector('audio');
         var btn = wrap.querySelector('.fc-audio-play');
         var track = wrap.querySelector('[data-fc-seek]');
         if (!audio || !btn) return;
+        garantirSrcAudio(wrap, audio);
 
-        // Fallback: alguns browsers travam no type errado — tenta src direto
-        if (!audio.getAttribute('src')) {
-            var src = wrap.getAttribute('data-src') || '';
-            if (src) audio.src = src;
-        }
-
-        audio.addEventListener('loadedmetadata', function () { atualizarPlayer(wrap); });
-        audio.addEventListener('durationchange', function () { atualizarPlayer(wrap); });
-        audio.addEventListener('timeupdate', function () { atualizarPlayer(wrap); });
+        audio.addEventListener('loadedmetadata', function () { atualizarPlayerAudio(wrap); });
+        audio.addEventListener('durationchange', function () { atualizarPlayerAudio(wrap); });
+        audio.addEventListener('timeupdate', function () { atualizarPlayerAudio(wrap); });
         audio.addEventListener('ended', function () {
             btn.innerHTML = '<i class="fa-solid fa-play"></i>';
             audio.currentTime = 0;
-            atualizarPlayer(wrap);
+            atualizarPlayerAudio(wrap);
             if (audioAtual === audio) audioAtual = null;
         });
         audio.addEventListener('error', function () {
-            btn.disabled = true;
-            btn.title = 'Não foi possível reproduzir este áudio';
             var timeEl = wrap.querySelector('.fc-audio-time');
-            if (timeEl) timeEl.textContent = 'erro';
+            if (timeEl) {
+                timeEl.textContent = 'indisponível';
+                timeEl.setAttribute('data-fc-indisp', '1');
+            }
         });
 
         btn.addEventListener('click', function () {
+            garantirSrcAudio(wrap, audio);
+            var timeEl = wrap.querySelector('.fc-audio-time');
+            if (timeEl) timeEl.removeAttribute('data-fc-indisp');
             if (audio.paused) {
-                pararAudio(wrap);
+                pararAudioTodos(wrap);
                 var playPromise = audio.play();
                 if (playPromise && typeof playPromise.then === 'function') {
                     playPromise.then(function () {
                         audioAtual = audio;
                         btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                        atualizarPlayerAudio(wrap);
                     }).catch(function () {
                         btn.innerHTML = '<i class="fa-solid fa-play"></i>';
-                        alert('Não foi possível tocar o áudio. Tente de novo ou use outro navegador.');
+                        if (timeEl) {
+                            timeEl.textContent = 'indisponível';
+                            timeEl.setAttribute('data-fc-indisp', '1');
+                        }
                     });
                 } else {
                     audioAtual = audio;
@@ -680,21 +788,292 @@ $fmtDiaDivisor = static function (string $dt): string {
             } else {
                 audio.pause();
                 btn.innerHTML = '<i class="fa-solid fa-play"></i>';
-                atualizarPlayer(wrap);
+                atualizarPlayerAudio(wrap);
             }
         });
 
         if (track) {
             track.addEventListener('click', function (e) {
+                garantirSrcAudio(wrap, audio);
                 if (!isFinite(audio.duration) || audio.duration <= 0) return;
                 var rect = track.getBoundingClientRect();
                 var ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0;
                 ratio = Math.max(0, Math.min(1, ratio));
                 audio.currentTime = audio.duration * ratio;
-                atualizarPlayer(wrap);
+                atualizarPlayerAudio(wrap);
             });
         }
+    }
+
+    function htmlAudioPlayer(anexoUrl, anexoMime) {
+        var bars = AUDIO_BARS.map(function (h) {
+            return '<span style="height:' + h + 'px"></span>';
+        }).join('');
+        var mime = anexoMime || 'audio/webm';
+        return '<div class="fc-audio" data-fc-audio data-src="' + escHtml(anexoUrl) + '" data-mime="' + escHtml(mime) + '">' +
+            '<button type="button" class="fc-audio-play" aria-label="Reproduzir áudio"><i class="fa-solid fa-play"></i></button>' +
+            '<div class="fc-audio-body">' +
+            '<div class="fc-audio-track" data-fc-seek>' +
+            '<div class="fc-audio-bars">' + bars + '</div>' +
+            '<div class="fc-audio-scrub" style="left:0%"></div></div>' +
+            '<span class="fc-audio-time">0:00</span></div>' +
+            '<audio preload="metadata" playsinline src="' + escHtml(anexoUrl) + '"></audio></div>';
+    }
+
+    function renderMensagem(m) {
+        var daEscola = (m.autor_tipo || '') === 'escola';
+        var msgId = parseInt(m.id, 10) || 0;
+        var created = (m.created_at || '').toString();
+        var hora = parseDataIso(created).hora;
+        var an = resolverAnexo(m);
+        var curtidas = parseInt(m.curtidas, 10) || 0;
+        var euCurti = !!m.eu_curti;
+        var lidaFamilia = !!(m.lido_familia_em);
+
+        var html = '<div id="msg-' + msgId + '" class="fc-row ' + (daEscola ? 'is-escola' : 'is-familia') + '">' +
+            '<div class="fc-bubble ' + (daEscola ? 'is-escola' : 'is-familia') + '">' +
+            '<span class="fc-tag ' + (daEscola ? 'is-escola' : 'is-familia') + '">' + (daEscola ? 'Escola' : 'Família') + '</span>';
+
+        if ((m.mensagem || '').toString().trim() !== '') {
+            html += '<div class="fc-text">' + textoHtml(m.mensagem) + '</div>';
+        }
+        if (an.anexoUrl && an.anexoTipo === 'imagem') {
+            html += '<a href="' + escHtml(an.anexoUrl) + '" target="_blank" rel="noopener" class="block mt-2">' +
+                '<img src="' + escHtml(an.anexoUrl) + '" alt="Imagem" style="max-height:220px;border-radius:10px;display:block;"></a>';
+        } else if (an.anexoUrl && an.anexoTipo === 'video') {
+            var vMime = an.anexoMime || 'video/mp4';
+            html += '<video controls style="margin-top:8px;max-height:220px;width:100%;border-radius:10px;background:#000;" preload="metadata">' +
+                '<source src="' + escHtml(an.anexoUrl) + '" type="' + escHtml(vMime) + '"></video>';
+        } else if (an.anexoUrl && an.anexoTipo === 'audio') {
+            html += htmlAudioPlayer(an.anexoUrl, an.anexoMime);
+        } else if (an.anexoUrl) {
+            html += '<a href="' + escHtml(an.anexoUrl) + '" target="_blank" rel="noopener" ' +
+                'style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#1e293b;text-decoration:none;">' +
+                '<i class="fa-regular fa-file"></i> ' + escHtml(an.anexoNome) + '</a>';
+        }
+
+        if (curtidas > 0 || (FC.reacoesProntas && msgId > 0)) {
+            html += '<div class="fc-react">';
+            if (curtidas > 0) html += '<span class="fc-like-count">👍 ' + curtidas + '</span>';
+            if (FC.reacoesProntas && msgId > 0) {
+                html += '<form method="post" action="' + escHtml(FC.baseUrl + '/' + FC.conversaId + '/mensagens/' + msgId + '/curtir') + '" class="fc-like-form" style="display:inline;margin:0;">' +
+                    '<input type="hidden" name="_token" value="' + escHtml(FC.csrf) + '">' +
+                    '<button type="submit" class="fc-like ' + (euCurti ? 'is-on' : '') + '" title="' + (euCurti ? 'Remover curtida' : 'Curtir') + '">' +
+                    '<i class="fa-' + (euCurti ? 'solid' : 'regular') + ' fa-thumbs-up"></i></button></form>';
+            }
+            html += '</div>';
+        }
+
+        html += '<div class="fc-meta"><span class="fc-time">' + escHtml(hora) + '</span>';
+        if (daEscola) {
+            html += '<span class="fc-checks" title="' + (lidaFamilia ? 'Lida pela família' : 'Enviada') + '">' +
+                '<i class="fa-solid fa-check' + (lidaFamilia ? '-double' : '') + '"></i></span>';
+        }
+        html += '</div></div></div>';
+        return html;
+    }
+
+    var box = document.getElementById('fale-chat-mensagens');
+    var renderedIds = new Set();
+    var ultimoDia = FC.ultimoDia || '';
+    var lastMsgId = FC.ultimoMsgId || 0;
+    var enviando = false;
+    var pendingSendAposGravacao = false;
+    var autoEnviarGravacao = false;
+    var pollTimer = null;
+
+    if (box) {
+        box.querySelectorAll('.fc-row[id^="msg-"]').forEach(function (row) {
+            var id = parseInt(row.id.replace('msg-', ''), 10);
+            if (id > 0) renderedIds.add(id);
+        });
+        var ultimoDiaEl = box.querySelector('.fc-day:last-of-type');
+        if (ultimoDiaEl && ultimoDiaEl.getAttribute('data-fc-dia')) {
+            ultimoDia = ultimoDiaEl.getAttribute('data-fc-dia');
+        }
+        box.querySelectorAll('[data-fc-audio]').forEach(function (w) { initAudioPlayer(w); });
+        var hash = window.location.hash;
+        if (hash && document.querySelector(hash)) document.querySelector(hash).scrollIntoView({ block: 'center' });
+        else box.scrollTop = box.scrollHeight;
+    }
+
+    function removerVazio() {
+        var v = document.getElementById('fale-chat-vazio');
+        if (v) v.remove();
+    }
+    function scrollBottom() {
+        if (!box) return;
+        requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+    }
+    function inserirDiaSePreciso(created) {
+        var dia = parseDataIso(created).dia;
+        if (!dia || dia === ultimoDia) return;
+        ultimoDia = dia;
+        var div = document.createElement('div');
+        div.className = 'fc-day';
+        div.setAttribute('data-fc-dia', dia);
+        div.innerHTML = '<span>' + escHtml(fmtDiaDivisorJs(created)) + '</span>';
+        box.appendChild(div);
+    }
+    function previewListaUltima(m) {
+        var item = document.querySelector('.fc-item.is-on');
+        if (!item) return;
+        var last = item.querySelector('.fc-item-last');
+        var time = item.querySelector('.fc-item-time');
+        if (last) {
+            var txt = (m.mensagem || '').toString().trim();
+            if (!txt) txt = 'Anexo';
+            last.textContent = txt.length > 80 ? txt.slice(0, 80) + '…' : txt;
+        }
+        if (time && m.created_at) time.textContent = fmtHoraListaJs(m.created_at);
+    }
+    function appendMensagem(m, opts) {
+        opts = opts || {};
+        var msgId = parseInt(m.id, 10) || 0;
+        if (msgId <= 0 || renderedIds.has(msgId)) return false;
+        renderedIds.add(msgId);
+        if (msgId > lastMsgId) lastMsgId = msgId;
+        removerVazio();
+        inserirDiaSePreciso(m.created_at);
+        var tmp = document.createElement('div');
+        tmp.innerHTML = renderMensagem(m);
+        var row = tmp.firstElementChild;
+        if (!row) return false;
+        if (opts.highlightFamilia && (m.autor_tipo || '') === 'responsavel') {
+            row.classList.add('fc-new-in');
+            setTimeout(function () { row.classList.remove('fc-new-in'); }, 1600);
+        }
+        box.appendChild(row);
+        var audioWrap = row.querySelector('[data-fc-audio]');
+        if (audioWrap) initAudioPlayer(audioWrap);
+        return true;
+    }
+
+    function atualizarChecks(msgId, lido) {
+        var row = document.getElementById('msg-' + msgId);
+        if (!row) return;
+        var checks = row.querySelector('.fc-checks i');
+        if (!checks) return;
+        checks.className = 'fa-solid fa-check' + (lido ? '-double' : '');
+        row.querySelector('.fc-checks').title = lido ? 'Lida pela família' : 'Enviada';
+    }
+
+    function enviarMensagemAjax() {
+        var form = document.getElementById('fale-chat-form');
+        if (!form || enviando) return Promise.resolve();
+        if (!temConteudo()) return Promise.resolve();
+        enviando = true;
+        if (btnEnviar) btnEnviar.disabled = true;
+
+        var fd = new FormData(form);
+        fd.append('ajax', '1');
+        return fetch(form.action, {
+            method: 'POST',
+            body: fd,
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        }).then(function (r) { return r.json(); })
+            .then(function (data) {
+                enviando = false;
+                if (btnEnviar) btnEnviar.disabled = false;
+                if (!data || !data.ok) {
+                    alert((data && data.erro) ? data.erro : 'Não foi possível enviar a mensagem.');
+                    return;
+                }
+                if (data.mensagem) {
+                    appendMensagem(data.mensagem, { highlightFamilia: false });
+                    previewListaUltima(data.mensagem);
+                }
+                mensagem.value = '';
+                autoResize();
+                limparAnexo();
+                scrollBottom();
+            })
+            .catch(function () {
+                enviando = false;
+                if (btnEnviar) btnEnviar.disabled = false;
+                alert('Falha de rede ao enviar. Tente novamente.');
+            });
+    }
+
+    function pollMensagens() {
+        if (!box || !FC.conversaId || document.hidden) return;
+        var url = FC.baseUrl + '/' + FC.conversaId + '/mensagens?depois_de=' + encodeURIComponent(String(lastMsgId));
+        fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        }).then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data || !data.ok || !Array.isArray(data.mensagens)) return;
+                var added = false;
+                var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+                data.mensagens.forEach(function (m) {
+                    if (appendMensagem(m, { highlightFamilia: true })) added = true;
+                    if ((m.autor_tipo || '') === 'escola' && m.lido_familia_em) {
+                        atualizarChecks(parseInt(m.id, 10), true);
+                    }
+                });
+                if (added && nearBottom) scrollBottom();
+            })
+            .catch(function () { /* silencioso */ });
+    }
+
+    function iniciarPolling() {
+        if (!FC.conversaId || !box) return;
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(pollMensagens, 3000);
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) pollMensagens();
     });
+
+    if (box && FC.conversaId) {
+        box.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (!form || !form.classList || !form.classList.contains('fc-like-form')) return;
+            e.preventDefault();
+            var react = form.closest('.fc-react');
+            var fd = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: fd,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data || !data.ok) return;
+                    var btn = form.querySelector('.fc-like');
+                    var liked = !!data.liked;
+                    var count = parseInt(data.curtidas, 10) || 0;
+                    if (btn) {
+                        btn.classList.toggle('is-on', liked);
+                        btn.title = liked ? 'Remover curtida' : 'Curtir';
+                        var icon = btn.querySelector('i');
+                        if (icon) icon.className = 'fa-' + (liked ? 'solid' : 'regular') + ' fa-thumbs-up';
+                    }
+                    if (!react) return;
+                    var span = react.querySelector('.fc-like-count');
+                    if (count > 0) {
+                        if (!span) {
+                            span = document.createElement('span');
+                            span.className = 'fc-like-count';
+                            react.insertBefore(span, form);
+                        }
+                        span.textContent = '👍 ' + count;
+                    } else if (span) {
+                        span.remove();
+                    }
+                })
+                .catch(function () { /* silencioso */ });
+        });
+        iniciarPolling();
+    }
 
     var btnInfo = document.getElementById('fc-btn-info');
     if (btnInfo) {
@@ -859,6 +1238,13 @@ $fmtDiaDivisor = static function (string $dt): string {
                 else limparAnexo();
                 pararTimer();
                 atualizarAcoes();
+                if (autoEnviarGravacao && !cancelarProximo && chunks.length) {
+                    autoEnviarGravacao = false;
+                    enviarMensagemAjax();
+                } else if (pendingSendAposGravacao && !cancelarProximo && chunks.length) {
+                    pendingSendAposGravacao = false;
+                    enviarMensagemAjax();
+                }
             };
             // timeslice evita blob vazio/mudo em alguns browsers
             mediaRecorder.start(250);
@@ -881,10 +1267,19 @@ $fmtDiaDivisor = static function (string $dt): string {
 
     btnMic.addEventListener('click', function () { if (!gravando) iniciarGravacao(); });
     btnCancelarGravacao.addEventListener('click', function () { pararGravacao(true); });
-    btnPararGravacao.addEventListener('click', function () { pararGravacao(false); });
+    btnPararGravacao.addEventListener('click', function () {
+        autoEnviarGravacao = true;
+        pararGravacao(false);
+    });
     form.addEventListener('submit', function (e) {
-        if (gravando) { e.preventDefault(); pararGravacao(false); return; }
-        if (!temConteudo()) e.preventDefault();
+        e.preventDefault();
+        if (gravando) {
+            pendingSendAposGravacao = true;
+            pararGravacao(false);
+            return;
+        }
+        if (!temConteudo()) return;
+        enviarMensagemAjax();
     });
 
     atualizarAcoes();

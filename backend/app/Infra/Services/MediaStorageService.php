@@ -28,6 +28,7 @@ class MediaStorageService
         'dashboard_sliders' => 'dashboard/sliders',
         'professores' => 'professores',
         'avatars' => 'avatars',
+        'fale_com_escola' => 'fale-com-escola',
         'provas_questoes' => 'provas/questoes',
         'chat' => 'chat',
         'jornadas_exercicios' => 'jornadas/exercicios',

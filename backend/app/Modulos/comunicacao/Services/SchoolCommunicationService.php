@@ -3,6 +3,7 @@
 namespace App\Modulos\Comunicacao\Services;
 
 use App\Core\Database;
+use App\Infra\Services\MediaStorageService;
 use App\Models\PushNotifications\PushNotification;
 use App\Services\FirebaseMessagingService;
 use App\Services\MobileDeviceService;
@@ -16,6 +17,7 @@ class SchoolCommunicationService
     private PushNotification $notifications;
     private FirebaseMessagingService $firebase;
     private MobileDeviceService $devices;
+    private array $config;
 
     public function __construct($db = null)
     {
@@ -23,6 +25,7 @@ class SchoolCommunicationService
         $this->notifications = new PushNotification();
         $this->firebase = new FirebaseMessagingService();
         $this->devices = new MobileDeviceService();
+        $this->config = $this->resolverConfig();
     }
 
     public function parentIds(string $audience, array $classIds = [], array $studentIds = [], array $serieIds = [], array $cursoIds = []): array
@@ -222,25 +225,69 @@ class SchoolCommunicationService
                 default => 'audio/webm',
             };
         }
-        $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'default';
-        $pasta = preg_replace('/[^a-z0-9_-]/i', '', $pasta) ?: 'comunicacao';
-        $relative = 'storage/uploads/' . $pasta . '/' . ($tenant !== '' ? $tenant : 'default');
-        $absolute = dirname(__DIR__, 4) . '/' . $relative;
-        if (!is_dir($absolute) && !@mkdir($absolute, 0775, true) && !is_dir($absolute)) {
-            return null;
-        }
+        $pastaNormalizada = preg_replace('/[^a-z0-9_-]/i', '', $pasta) ?: 'comunicacao';
         $filename = bin2hex(random_bytes(16)) . '.' . $meta['ext'];
-        if (!move_uploaded_file($tmp, $absolute . '/' . $filename)) {
-            return null;
+        $path = '';
+
+        if (in_array($pastaNormalizada, ['fale-com-a-escola', 'school-communications'], true)) {
+            $key = 'familia/' . $filename;
+            $config = $this->config;
+            // Isolamento multi-tenant obrigatório no S3/local para este tipo
+            $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
+            $media = new MediaStorageService($config);
+            if (!$media->put('fale_com_escola', $key, $tmp, $mimeCanonico)) {
+                return null;
+            }
+            $tenant = $this->tenantSlug();
+            $path = '/media/serve?type=fale_com_escola&key=' . rawurlencode($key) . '&tenant=' . rawurlencode($tenant);
+        } else {
+            $tenant = $this->tenantSlug();
+            $relative = 'storage/uploads/' . $pastaNormalizada . '/' . $tenant;
+            $root = defined('BASE_PATH') ? (string) BASE_PATH : dirname(__DIR__, 4);
+            $absolute = rtrim($root, '/') . '/' . $relative;
+            if (!is_dir($absolute) && !@mkdir($absolute, 0775, true) && !is_dir($absolute)) {
+                return null;
+            }
+            if (!move_uploaded_file($tmp, $absolute . '/' . $filename)) {
+                return null;
+            }
+            $path = '/' . $relative . '/' . $filename;
         }
+
         $nome = basename((string) ($file['name'] ?? $meta['tipo']));
 
         return [
-            'path' => '/' . $relative . '/' . $filename,
+            'path' => $path,
             'name' => $nome !== '' ? $nome : $meta['tipo'],
             'tipo' => $meta['tipo'],
             'mime' => $mimeCanonico,
         ];
+    }
+
+    private function resolverConfig(): array
+    {
+        if (isset($GLOBALS['config']) && is_array($GLOBALS['config'])) {
+            return $GLOBALS['config'];
+        }
+
+        return require dirname(__DIR__, 4) . '/config/app.php';
+    }
+
+    private function tenantSlug(): string
+    {
+        $slug = '';
+        if (defined('TENANT_SLUG')) {
+            $slug = (string) TENANT_SLUG;
+        }
+        if ($slug === '') {
+            $slug = (string) ($this->config['tenant']['slug'] ?? '');
+        }
+        if ($slug === '') {
+            $slug = (string) ($this->config['school']['code'] ?? '');
+        }
+
+        $slug = preg_replace('/[^a-z0-9_-]/i', '', $slug) ?? '';
+        return $slug !== '' ? $slug : 'default';
     }
 
     /**

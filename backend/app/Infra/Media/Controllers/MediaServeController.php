@@ -22,6 +22,7 @@ class MediaServeController extends BaseController
         'dashboard_sliders' => 'dashboard/sliders',
         'professores' => 'professores',
         'avatars' => 'avatars',
+        'fale_com_escola' => 'fale-com-escola',
         'essays_proposals' => 'redacoes_propostas',
         'redacoes' => 'redacoes',
         'provas_questoes' => 'provas/questoes',
@@ -60,7 +61,7 @@ class MediaServeController extends BaseController
         $allowedTypes = [
             'layout', 'dashboard_sliders', 'professores', 'avatars', 'essays_proposals',
             'redacoes', 'provas_questoes', 'chat', 'jornadas_exercicios', 'jornadas_documentos',
-            'jornadas_videos', 'arquivos', 'apostilas', 'tickets', 'notifications',
+            'jornadas_videos', 'arquivos', 'apostilas', 'tickets', 'notifications', 'fale_com_escola',
         ];
         if ($type === '' || $key === '' || !in_array($type, $allowedTypes, true)) {
             http_response_code(400);
@@ -77,7 +78,8 @@ class MediaServeController extends BaseController
 
         $isMaster = !empty($_SESSION['master_user_id']);
         $isLoggedIn = $isMaster
-            || (!empty($_SESSION['user_id']) && !empty($_SESSION['user_type']));
+            || (!empty($_SESSION['user_id']) && !empty($_SESSION['user_type']))
+            || !empty($_SESSION['parent_id']);
 
         // Tipos privados: exige sessão autenticada (cookie enviado pelo <img>/<a>).
         if (!in_array($type, self::PUBLIC_TYPES, true) && !$isLoggedIn) {
@@ -90,6 +92,9 @@ class MediaServeController extends BaseController
         }
 
         $config = $this->config;
+        if ($type === 'fale_com_escola') {
+            $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
+        }
         $resolvedTenant = strtolower(trim((string) (
             (defined('TENANT_SLUG') ? TENANT_SLUG : '')
             ?: ($config['tenant']['slug'] ?? '')
