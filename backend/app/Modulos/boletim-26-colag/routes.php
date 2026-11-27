@@ -12,5 +12,6 @@ $router->post('/admin/boletim-26-colag/homologar', 'Modulos/boletim-26-colag/Bol
 $router->get('/admin/boletim-26-colag/exportar', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@exportar');
 $router->get('/admin/boletim-26-colag/exportar-prova-final', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@exportarProvaFinal');
 $router->get('/admin/boletim-26-colag/exportar-medias-bimestrais', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@exportarMediasBimestrais');
+$router->get('/admin/boletim-26-colag/exportar-medias-bimestrais-pdf', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@exportarMediasBimestraisPdf');
 
 $router->post('/admin/boletim-26-colag/publicacao', 'Modulos/boletim-26-colag/Boletim26ColagAdminController@publicarPortal');

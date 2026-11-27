@@ -236,6 +236,46 @@ class Boletim26ColagAdminController extends BaseController
         exit;
     }
 
+    /**
+     * ZIP com 1 PDF por professor (médias bimestrais das matérias dele).
+     */
+    public function exportarMediasBimestraisPdf(): void
+    {
+        $filtro = $this->filtroDaRequisicao();
+        $limiar = $filtro['nota_minima'] ?? 6.5;
+        $painel = $this->servico->montarPainel(
+            $filtro['turma_id'],
+            $filtro['aluno_id'],
+            $filtro['ano'],
+            $filtro['serie'],
+            0,
+            null,
+            true,
+            $filtro['nota_campo'],
+            true,
+            [1, 2, 3, 4],
+            $filtro['jornada_ate']
+        );
+        $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
+        $ano = (int) ($painel['ano'] ?? date('Y'));
+        try {
+            $zip = $this->servico->zipPdfsMediasPorProfessor($relatorios, (float) $limiar, $ano);
+        } catch (\Throwable $e) {
+            http_response_code(422);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo $e->getMessage();
+            exit;
+        }
+        $nome = 'boletim-colag-medias-por-professor-' . $ano . '.zip';
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        header('Content-Length: ' . strlen($zip));
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        echo $zip;
+        exit;
+    }
+
     public function parcial(): void
     {
         $filtro = $this->filtroDaRequisicao();

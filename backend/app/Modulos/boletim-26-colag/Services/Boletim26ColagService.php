@@ -4,6 +4,7 @@ namespace App\Modulos\Boletim26Colag\Services;
 
 require_once __DIR__ . '/../Models/Boletim26ColagHomologacao.php';
 
+use App\Core\Database;
 use App\Core\PeriodoLetivo;
 use App\Helpers\AlunoLancamentoNotaHelper;
 use App\Dominio\Escola\Models\ComponenteCurricular;
@@ -2775,11 +2776,13 @@ class Boletim26ColagService
      * Uma planilha por matéria (e turma): notas dos 4 bimestres + médias.
      *
      * @param list<array<string,mixed>> $relatorios
-     * @return list<array{turma:string,materia:string,alunos:list<array<string,mixed>>}>
+     * @return list<array{turma:string,turma_id:int,materia:string,materia_id:int,alunos:list<array<string,mixed>>}>
      */
     public function planilhaMediasBimestrais(array $relatorios, float $limiar = 6.5): array
     {
+        $mapaMateriaId = $this->mapaIdPorNomeMateria();
         $porTurma = [];
+        $materiaIds = [];
         foreach ($relatorios as $relatorio) {
             $aluno = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : [];
             $turma = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : [];
@@ -2797,10 +2800,17 @@ class Boletim26ColagService
             if (!isset($porTurma[$chaveTurma])) {
                 $porTurma[$chaveTurma] = [
                     'turma' => $nomeTurma,
+                    'turma_id' => $turmaId,
                     'materias' => [],
                 ];
             }
-            foreach ($porMateria as $materia => $bimestres) {
+            foreach ($porMateria as $materia => $info) {
+                $bimestres = is_array($info['bimestres'] ?? null) ? $info['bimestres'] : [];
+                $materiaId = (int) ($info['materia_id'] ?? 0);
+                if ($materiaId <= 0) {
+                    $chaveMateria = $this->chaveOrdem((string) $materia);
+                    $materiaId = (int) ($mapaMateriaId[$chaveMateria] ?? $mapaMateriaId[(string) $materia] ?? 0);
+                }
                 $soma = 0.0;
                 $quantidade = 0;
                 $bimNormalizados = [];
@@ -2822,6 +2832,9 @@ class Boletim26ColagService
                 if (!isset($porTurma[$chaveTurma]['materias'][$materia])) {
                     $porTurma[$chaveTurma]['materias'][$materia] = [];
                 }
+                if ($materiaId > 0) {
+                    $materiaIds[$materia] = $materiaId;
+                }
                 $porTurma[$chaveTurma]['materias'][$materia][] = [
                     'nome' => $nomeAluno,
                     'bimestres' => $bimNormalizados,
@@ -2835,14 +2848,18 @@ class Boletim26ColagService
         $saida = [];
         foreach ($porTurma as $grupo) {
             $nomeTurma = (string) ($grupo['turma'] ?? '');
+            $turmaId = (int) ($grupo['turma_id'] ?? 0);
             $materias = is_array($grupo['materias'] ?? null) ? $grupo['materias'] : [];
             $nomesMaterias = $this->ordenarNomesMaterias(array_keys($materias));
             foreach ($nomesMaterias as $materia) {
                 $alunos = is_array($materias[$materia] ?? null) ? $materias[$materia] : [];
                 usort($alunos, static fn (array $a, array $b): int => strcasecmp((string) $a['nome'], (string) $b['nome']));
+                $chaveMateria = $this->chaveOrdem((string) $materia);
                 $saida[] = [
                     'turma' => $nomeTurma,
+                    'turma_id' => $turmaId,
                     'materia' => (string) $materia,
+                    'materia_id' => (int) ($materiaIds[$materia] ?? $mapaMateriaId[$chaveMateria] ?? $mapaMateriaId[(string) $materia] ?? 0),
                     'alunos' => $alunos,
                 ];
             }
@@ -2852,10 +2869,361 @@ class Boletim26ColagService
     }
 
     /**
+     * ZIP com 1 PDF por professor (matérias vinculadas na turma).
+     *
+     * @param list<array<string,mixed>> $relatorios
+     */
+    public function zipPdfsMediasPorProfessor(array $relatorios, float $limiar, int $ano): string
+    {
+        $pacotes = $this->pdfsMediasPorProfessor($relatorios, $limiar, $ano);
+        if ($pacotes === []) {
+            throw new \RuntimeException('Sem dados para gerar PDF com o filtro atual.');
+        }
+        $dir = sys_get_temp_dir() . '/boletim-colag-pdf-' . uniqid('', true);
+        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
+            throw new \RuntimeException('Não foi possível criar pasta temporária para os PDFs.');
+        }
+        $arquivos = [];
+        try {
+            foreach ($pacotes as $pacote) {
+                $nome = $this->nomeArquivoPdfProfessor(
+                    (string) ($pacote['nome_arquivo'] ?? 'professor'),
+                    (int) ($pacote['professor_id'] ?? 0)
+                );
+                $path = $dir . '/' . $nome;
+                if (file_put_contents($path, (string) ($pacote['pdf'] ?? '')) === false) {
+                    throw new \RuntimeException('Falha ao gravar PDF temporário de ' . $nome);
+                }
+                $arquivos[] = ['nome' => $nome, 'path' => $path];
+            }
+            if ($arquivos === []) {
+                throw new \RuntimeException('Nenhum PDF foi gerado.');
+            }
+            $zipPath = $dir . '/medias-por-professor.zip';
+            $this->empacotarZipSimples($zipPath, $arquivos);
+            $binario = (string) file_get_contents($zipPath);
+            if ($binario === '') {
+                throw new \RuntimeException('O ZIP dos PDFs ficou vazio.');
+            }
+
+            return $binario;
+        } finally {
+            foreach (glob($dir . '/*') ?: [] as $arquivoTmp) {
+                @unlink($arquivoTmp);
+            }
+            @rmdir($dir);
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array{professor_id:int,professor_nome:string,nome_arquivo:string,pdf:string}>
+     */
+    public function pdfsMediasPorProfessor(array $relatorios, float $limiar, int $ano): array
+    {
+        $blocos = $this->planilhaMediasBimestrais($relatorios, $limiar);
+        if ($blocos === []) {
+            return [];
+        }
+        $turmaIds = [];
+        foreach ($blocos as $bloco) {
+            $turmaId = (int) ($bloco['turma_id'] ?? 0);
+            if ($turmaId > 0) {
+                $turmaIds[$turmaId] = $turmaId;
+            }
+        }
+        $vinculos = [];
+        foreach ($turmaIds as $turmaId) {
+            $vinculos[$turmaId] = $this->professoresPorMateriaNaTurma($turmaId, $ano);
+        }
+        $professorIds = [];
+        foreach ($vinculos as $porMateria) {
+            foreach ($porMateria as $ids) {
+                foreach ($ids as $pid) {
+                    $professorIds[(int) $pid] = (int) $pid;
+                }
+            }
+        }
+        $nomes = $this->nomesProfessores(array_values($professorIds));
+        $porProfessor = [];
+        $semProfessor = [];
+        foreach ($blocos as $bloco) {
+            $turmaId = (int) ($bloco['turma_id'] ?? 0);
+            $materiaId = (int) ($bloco['materia_id'] ?? 0);
+            $profs = ($turmaId > 0 && $materiaId > 0)
+                ? array_values($vinculos[$turmaId][$materiaId] ?? [])
+                : [];
+            if ($profs === []) {
+                $semProfessor[] = $bloco;
+                continue;
+            }
+            foreach ($profs as $professorId) {
+                $professorId = (int) $professorId;
+                if ($professorId <= 0) {
+                    continue;
+                }
+                if (!isset($porProfessor[$professorId])) {
+                    $porProfessor[$professorId] = [];
+                }
+                $porProfessor[$professorId][] = $bloco;
+            }
+        }
+        ksort($porProfessor, SORT_NUMERIC);
+        $saida = [];
+        foreach ($porProfessor as $professorId => $blocosProf) {
+            $nome = trim((string) ($nomes[$professorId] ?? ''));
+            if ($nome === '') {
+                $nome = 'Professor ' . $professorId;
+            }
+            $saida[] = [
+                'professor_id' => (int) $professorId,
+                'professor_nome' => $nome,
+                'nome_arquivo' => $nome,
+                'pdf' => $this->pdfMediasProfessor($nome, $blocosProf, $limiar, $ano),
+            ];
+        }
+        if ($semProfessor !== []) {
+            $saida[] = [
+                'professor_id' => 0,
+                'professor_nome' => 'Sem professor vinculado',
+                'nome_arquivo' => 'Sem professor vinculado',
+                'pdf' => $this->pdfMediasProfessor('Sem professor vinculado', $semProfessor, $limiar, $ano),
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function mapaIdPorNomeMateria(): array
+    {
+        $mapa = [];
+        foreach ($this->catalogoMaterias() as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            $nome = trim((string) ($materia['nome'] ?? ''));
+            if ($id <= 0 || $nome === '' || (int) ($materia['pai_id'] ?? 0) > 0) {
+                continue;
+            }
+            $mapa[$nome] = $id;
+            $mapa[$this->chaveOrdem($nome)] = $id;
+        }
+
+        return $mapa;
+    }
+
+    /**
+     * @return array<int, list<int>> materia_id => professor_ids
+     */
+    private function professoresPorMateriaNaTurma(int $turmaId, int $ano): array
+    {
+        if ($turmaId <= 0 || $ano < 2000) {
+            return [];
+        }
+        $blocoIds = [];
+        for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
+            foreach ($this->leitura->provasDoBimestre($turmaId, $bimestre, $ano) as $prova) {
+                $id = (int) ($prova['id'] ?? 0);
+                if ($id > 0) {
+                    $blocoIds[$id] = $id;
+                }
+            }
+        }
+        if ($blocoIds === []) {
+            return [];
+        }
+        $porMateria = [];
+        foreach ($this->leitura->professoresDaMateriaNaTurma(array_values($blocoIds), $turmaId) as $ligacao) {
+            $materiaId = (int) ($ligacao['materia_id'] ?? 0);
+            $professorId = (int) ($ligacao['professor_id'] ?? 0);
+            if ($materiaId <= 0 || $professorId <= 0) {
+                continue;
+            }
+            $porMateria[$materiaId][$professorId] = $professorId;
+        }
+        $saida = [];
+        foreach ($porMateria as $materiaId => $ids) {
+            $saida[(int) $materiaId] = array_values($ids);
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int, string>
+     */
+    private function nomesProfessores(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $rows = Database::getInstance()->fetchAll(
+                "SELECT id, nome FROM professores WHERE id IN ($ph)",
+                $ids
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $saida = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $nome = trim((string) ($row['nome'] ?? ''));
+            if ($id > 0 && $nome !== '') {
+                $saida[$id] = $nome;
+            }
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $blocos
+     */
+    private function pdfMediasProfessor(string $professorNome, array $blocos, float $limiar, int $ano): string
+    {
+        $html = $this->htmlMediasProfessor($professorNome, $blocos, $limiar, $ano);
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        return (string) $dompdf->output();
+    }
+
+    /**
+     * @param list<array<string,mixed>> $blocos
+     */
+    private function htmlMediasProfessor(string $professorNome, array $blocos, float $limiar, int $ano): string
+    {
+        $limiarTexto = htmlspecialchars(number_format($limiar, 1, ',', ''), ENT_QUOTES, 'UTF-8');
+        $professorEsc = htmlspecialchars($professorNome, ENT_QUOTES, 'UTF-8');
+        $anoEsc = (int) $ano;
+        $gerado = htmlspecialchars(date('d/m/Y H:i'), ENT_QUOTES, 'UTF-8');
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+            body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#111;margin:16px}
+            h1{font-size:14px;margin:0 0 4px;text-align:center}
+            h2{font-size:12px;margin:0 0 10px;text-align:center;color:#334155}
+            .meta{font-size:9px;color:#64748b;text-align:center;margin-bottom:14px}
+            .materia{background:#93C5FD;font-weight:bold;text-align:center;padding:6px;margin:16px 0 6px;border:1px solid #64748b}
+            table{width:100%;border-collapse:collapse;margin-bottom:8px}
+            th,td{border:1px solid #6B7280;padding:3px 4px;vertical-align:middle}
+            th{background:#E5E7EB;font-size:9px}
+            th.bege{background:#E7D3A5}
+            th.num,td.num{background:#FED7AA;width:22px;text-align:center}
+            td{text-align:center}
+            td.nome{text-align:left;white-space:nowrap}
+            td.bege{background:#F5E6C8}
+            td.baixa{color:#DC2626;font-weight:bold;background:#F5E6C8}
+            .page-break{page-break-after:always}
+        </style></head><body>';
+        $html .= '<h1>RELATÓRIO GERAL DAS MÉDIAS BIMESTRAIS</h1>';
+        $html .= '<h2>Professor(a): ' . $professorEsc . ' · ' . $anoEsc . '</h2>';
+        $html .= '<div class="meta">APRO se média arredondada ≥ ' . $limiarTexto . ' · Gerado em ' . $gerado . '</div>';
+        $total = count($blocos);
+        foreach ($blocos as $indice => $bloco) {
+            $materia = htmlspecialchars((string) ($bloco['materia'] ?? 'Matéria'), ENT_QUOTES, 'UTF-8');
+            $turma = trim((string) ($bloco['turma'] ?? ''));
+            $titulo = $materia . ($turma !== '' ? ' — ' . htmlspecialchars($turma, ENT_QUOTES, 'UTF-8') : '');
+            $html .= '<div class="materia">' . $titulo . '</div>';
+            $html .= '<table><thead><tr>';
+            $html .= '<th class="num">#</th><th>NOME DO ALUNO</th><th>1º BIM</th><th>2º BIM</th><th>3º BIM</th><th>4º BIM</th>';
+            $html .= '<th class="bege">MÉDIA</th><th class="bege">MÉDIA ARRED</th><th class="bege">SITUAÇÃO</th><th class="bege">NOTA RECUP</th><th class="bege">MÉDIA FINAL</th><th class="bege"></th>';
+            $html .= '</tr></thead><tbody>';
+            $alunos = is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [];
+            foreach ($alunos as $i => $aluno) {
+                $bimestres = is_array($aluno['bimestres'] ?? null) ? $aluno['bimestres'] : [];
+                $aprovado = !empty($aluno['aprovado']);
+                $arred = (string) ($aluno['media_arred_texto'] ?? '');
+                $html .= '<tr>';
+                $html .= '<td class="num">' . ($i + 1) . '</td>';
+                $html .= '<td class="nome">' . htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+                for ($b = 1; $b <= 4; $b++) {
+                    $nota = $bimestres[$b] ?? null;
+                    $txt = is_numeric($nota) ? number_format((float) $nota, 1, ',', '') : '';
+                    $html .= '<td>' . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                $html .= '<td class="bege">' . htmlspecialchars((string) ($aluno['media_texto'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+                $html .= '<td class="bege">' . htmlspecialchars($arred, ENT_QUOTES, 'UTF-8') . '</td>';
+                $html .= '<td class="bege">' . ($aprovado ? 'APRO' : '') . '</td>';
+                $html .= '<td class="bege"></td><td class="bege"></td>';
+                if ($aprovado) {
+                    $html .= '<td class="bege">APRO</td>';
+                } else {
+                    $html .= '<td class="baixa">' . htmlspecialchars($arred, ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            $html .= '</tbody></table>';
+            if ($indice < $total - 1) {
+                $html .= '<div class="page-break"></div>';
+            }
+        }
+        $html .= '</body></html>';
+
+        return $html;
+    }
+
+    private function nomeArquivoPdfProfessor(string $nome, int $professorId = 0): string
+    {
+        $slug = preg_replace('/[^A-Za-z0-9_-]+/', '-', @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nome) ?: $nome) ?: 'professor';
+        $slug = trim((string) $slug, '-_');
+        if ($slug === '') {
+            $slug = 'professor';
+        }
+        if (function_exists('mb_substr')) {
+            $slug = mb_substr($slug, 0, 50, 'UTF-8');
+        } else {
+            $slug = substr($slug, 0, 50);
+        }
+        $prefixo = $professorId > 0 ? ('medias-' . $professorId . '-') : 'medias-0-';
+
+        return $prefixo . $slug . '.pdf';
+    }
+
+    /**
+     * @param list<array{nome:string,path:string}> $arquivos
+     */
+    private function empacotarZipSimples(string $destino, array $arquivos): void
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new \RuntimeException('Extensão ZipArchive indisponível no servidor.');
+        }
+        $zip = new \ZipArchive();
+        $flags = \ZipArchive::CREATE;
+        if (defined('\ZipArchive::OVERWRITE')) {
+            $flags |= \ZipArchive::OVERWRITE;
+        }
+        if ($zip->open($destino, $flags) !== true) {
+            throw new \RuntimeException('Não foi possível criar o ZIP dos PDFs.');
+        }
+        foreach ($arquivos as $arquivo) {
+            $nome = (string) ($arquivo['nome'] ?? '');
+            $path = (string) ($arquivo['path'] ?? '');
+            if ($nome === '' || $path === '' || !is_file($path)) {
+                continue;
+            }
+            $zip->addFile($path, $nome);
+        }
+        $zip->close();
+        if (!is_file($destino) || filesize($destino) < 22) {
+            throw new \RuntimeException('O ZIP dos PDFs ficou vazio.');
+        }
+    }
+
+    /**
      * Resultado por bimestre de cada matéria-pai.
      *
      * @param array<string,mixed> $relatorio
-     * @return array<string, array<int, float>>
+     * @return array<string, array{materia_id:int,bimestres:array<int, float>}>
      */
     private function resultadosBimestraisDoRelatorio(array $relatorio): array
     {
@@ -2877,7 +3245,15 @@ class Boletim26ColagService
                     if ($nome === '' || !is_numeric($linha['resultado'] ?? null)) {
                         continue;
                     }
-                    $porMateria[$nome][$bimestre] = (float) $linha['resultado'];
+                    if (!isset($porMateria[$nome])) {
+                        $porMateria[$nome] = [
+                            'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                            'bimestres' => [],
+                        ];
+                    } elseif ((int) ($porMateria[$nome]['materia_id'] ?? 0) <= 0 && (int) ($linha['materia_id'] ?? 0) > 0) {
+                        $porMateria[$nome]['materia_id'] = (int) $linha['materia_id'];
+                    }
+                    $porMateria[$nome]['bimestres'][$bimestre] = (float) $linha['resultado'];
                 }
             }
         }

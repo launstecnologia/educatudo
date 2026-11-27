@@ -162,6 +162,10 @@ $rotuloSerie = static function (int $serie): string {
             <i class="fa-solid fa-chalkboard-user mr-2 text-gray-500"></i>
             Exportar Médias por Matéria
         </button>
+        <button type="submit" form="boletim-filtros" formmethod="get" formaction="<?= URL ?>/admin/boletim-26-colag/exportar-medias-bimestrais-pdf" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" title="ZIP com 1 PDF por professor, com as matérias vinculadas a ele na turma">
+            <i class="fa-solid fa-file-pdf mr-2 text-gray-500"></i>
+            PDF por Professor
+        </button>
         <button type="submit" form="boletim-filtros" formmethod="post" formaction="<?= URL ?>/admin/boletim-26-colag/homologar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <i class="fa-solid fa-stamp mr-2 text-gray-500"></i>
             Homologar
