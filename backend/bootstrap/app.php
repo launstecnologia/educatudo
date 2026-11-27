@@ -872,6 +872,7 @@ if (
                 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
                 'gif' => 'image/gif', 'webp' => 'image/webp',
                 'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+                'ogg' => 'audio/ogg', 'mp3' => 'audio/mpeg', 'm4a' => 'audio/mp4', 'wav' => 'audio/wav', 'weba' => 'audio/webm',
             ];
             if (!isset($mimes[$ext])) {
                 http_response_code(403);

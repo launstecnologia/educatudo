@@ -133,13 +133,13 @@ class SchoolCommunicationService
     }
 
     /**
-     * Salva imagem, vídeo ou PDF do chat família↔escola.
+     * Salva imagem, vídeo, PDF ou áudio do chat família↔escola.
      *
      * @param array<string,mixed> $file
-     * @param list<string> $tiposPermitidos imagem|video|arquivo
+     * @param list<string> $tiposPermitidos imagem|video|arquivo|audio
      * @return array{path:string,name:string,tipo:string,mime:string}|null
      */
-    public function guardarAnexo(array $file, string $pasta, array $tiposPermitidos = ['imagem', 'video', 'arquivo']): ?array
+    public function guardarAnexo(array $file, string $pasta, array $tiposPermitidos = ['imagem', 'video', 'arquivo', 'audio']): ?array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             return null;
@@ -156,8 +156,19 @@ class SchoolCommunicationService
             'video/mp4' => ['ext' => 'mp4', 'tipo' => 'video', 'max' => 40 * 1024 * 1024],
             'video/webm' => ['ext' => 'webm', 'tipo' => 'video', 'max' => 40 * 1024 * 1024],
             'application/pdf' => ['ext' => 'pdf', 'tipo' => 'arquivo', 'max' => 12 * 1024 * 1024],
+            'audio/webm' => ['ext' => 'webm', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/ogg' => ['ext' => 'ogg', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/mpeg' => ['ext' => 'mp3', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/mp4' => ['ext' => 'm4a', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/x-m4a' => ['ext' => 'm4a', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/wav' => ['ext' => 'wav', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
         ];
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
+        $nomeHint = strtolower((string) ($file['name'] ?? ''));
+        $pareceAudio = str_contains($nomeHint, 'audio') || str_ends_with($nomeHint, '.weba') || str_ends_with($nomeHint, '.ogg') || str_ends_with($nomeHint, '.m4a') || str_ends_with($nomeHint, '.mp3');
+        if ($pareceAudio && in_array($mime, ['video/webm', 'application/octet-stream', 'application/ogg'], true)) {
+            $mapa[$mime] = ['ext' => str_ends_with($nomeHint, '.ogg') ? 'ogg' : 'webm', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024];
+        }
         if (!isset($mapa[$mime])) {
             return null;
         }

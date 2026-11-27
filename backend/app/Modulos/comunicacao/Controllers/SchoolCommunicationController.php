@@ -328,7 +328,7 @@ class SchoolCommunicationController extends BaseController
         $file = $_FILES['anexo'] ?? ($_FILES['imagem'] ?? []);
         $anexo = $this->service->guardarAnexo(is_array($file) ? $file : [], 'fale-com-a-escola');
         if (($message === '' && $anexo === null) || mb_strlen($message) > 4000) {
-            $this->setFlashMessage('Escreva uma mensagem ou envie imagem, vídeo ou PDF.', 'error');
+            $this->setFlashMessage('Escreva uma mensagem ou envie foto, vídeo, PDF ou áudio.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         $user = $this->auth->getUser();

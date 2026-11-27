@@ -160,6 +160,10 @@ $urlMidia = static function (string $path): string {
                                         <video controls class="mt-2 max-h-56 w-full rounded-lg bg-black" preload="metadata">
                                             <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars((string) ($mensagem['anexo_mime'] ?? 'video/mp4')) ?>">
                                         </video>
+                                    <?php elseif ($anexoUrl !== '' && $anexoTipo === 'audio'): ?>
+                                        <audio controls class="mt-2 w-full max-w-xs" preload="metadata">
+                                            <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars((string) ($mensagem['anexo_mime'] ?? 'audio/webm')) ?>">
+                                        </audio>
                                     <?php elseif ($anexoUrl !== '' && $anexoTipo === 'arquivo'): ?>
                                         <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener"
                                            class="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100">
@@ -210,25 +214,75 @@ $urlMidia = static function (string $path): string {
                     <?php endforeach; ?>
                 </div>
 
-                <form method="post"
+                <form id="fale-chat-form"
+                      method="post"
                       enctype="multipart/form-data"
                       action="<?= $baseUrl ?>/<?= $conversaId ?>/responder"
-                      class="border-t border-gray-200 px-4 py-3 bg-white">
+                      class="border-t border-gray-200 px-3 py-2.5 bg-[#f0f2f5]">
                     <input type="hidden" name="_token" value="<?= $csrf ?>">
-                    <div class="flex flex-col gap-3">
-                        <label class="text-sm text-gray-700">
-                            <span class="sr-only">Mensagem</span>
-                            <textarea name="mensagem" rows="2" class="w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent" placeholder="Escreva para a família…"></textarea>
-                        </label>
-                        <div class="flex flex-wrap items-end gap-3">
-                            <label class="text-sm text-gray-600 flex-1 min-w-[12rem]">
-                                <span class="block mb-1">Anexo (imagem, vídeo ou PDF)</span>
-                                <input type="file" name="anexo" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf" class="block w-full text-sm">
-                            </label>
-                            <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-xl text-sm font-semibold shrink-0">
-                                Enviar
+                    <input type="file" id="fale-anexo-input" name="anexo" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf,audio/*" class="hidden">
+
+                    <div id="fale-anexo-preview" class="hidden mb-2 mx-1 rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm text-gray-700 flex items-center justify-between gap-2">
+                        <span id="fale-anexo-nome" class="truncate"></span>
+                        <button type="button" id="fale-anexo-remover" class="text-gray-500 hover:text-red-600 shrink-0" title="Remover anexo" aria-label="Remover anexo">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div id="fale-gravando" class="hidden mb-2 mx-1 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 flex items-center justify-between gap-3">
+                        <span class="inline-flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                            Gravando <strong id="fale-gravando-timer">0:00</strong>
+                        </span>
+                        <span class="inline-flex items-center gap-2">
+                            <button type="button" id="fale-gravando-cancelar" class="text-red-700 hover:underline text-xs font-semibold">Cancelar</button>
+                            <button type="button" id="fale-gravando-parar" class="inline-flex items-center gap-1 rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold hover:bg-teal-700">
+                                <i class="fa-solid fa-check"></i> Pronto
                             </button>
+                        </span>
+                    </div>
+
+                    <div class="flex items-end gap-2">
+                        <div class="relative shrink-0">
+                            <button type="button" id="fale-btn-mais"
+                                    class="w-10 h-10 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center shadow-sm"
+                                    title="Anexar" aria-label="Anexar arquivo">
+                                <i class="fa-solid fa-plus text-lg"></i>
+                            </button>
+                            <div id="fale-menu-anexo" class="hidden absolute bottom-12 left-0 z-20 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 overflow-hidden">
+                                <button type="button" data-fale-attach="image/*" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                    <i class="fa-regular fa-image text-teal-600 w-4"></i> Foto
+                                </button>
+                                <button type="button" data-fale-attach="video/mp4,video/webm" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                    <i class="fa-solid fa-video text-purple-600 w-4"></i> Vídeo
+                                </button>
+                                <button type="button" data-fale-attach="application/pdf" class="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                    <i class="fa-regular fa-file-pdf text-red-600 w-4"></i> Documento
+                                </button>
+                            </div>
                         </div>
+
+                        <div class="flex-1 min-w-0">
+                            <label class="block">
+                                <span class="sr-only">Mensagem</span>
+                                <textarea id="fale-mensagem"
+                                          name="mensagem"
+                                          rows="1"
+                                          class="w-full resize-none rounded-3xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent max-h-32"
+                                          placeholder="Mensagem"></textarea>
+                            </label>
+                        </div>
+
+                        <button type="button" id="fale-btn-mic"
+                                class="w-10 h-10 rounded-full bg-teal-600 text-white hover:bg-teal-700 flex items-center justify-center shadow-sm shrink-0"
+                                title="Gravar áudio" aria-label="Gravar áudio">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                        <button type="submit" id="fale-btn-enviar"
+                                class="hidden w-10 h-10 rounded-full bg-teal-600 text-white hover:bg-teal-700 flex items-center justify-center shadow-sm shrink-0"
+                                title="Enviar" aria-label="Enviar">
+                            <i class="fa-solid fa-paper-plane text-sm"></i>
+                        </button>
                     </div>
                 </form>
             <?php endif; ?>
@@ -247,5 +301,197 @@ $urlMidia = static function (string $path): string {
             box.scrollTop = box.scrollHeight;
         }
     }
+
+    var form = document.getElementById('fale-chat-form');
+    if (!form) return;
+
+    var input = document.getElementById('fale-anexo-input');
+    var preview = document.getElementById('fale-anexo-preview');
+    var previewNome = document.getElementById('fale-anexo-nome');
+    var btnRemover = document.getElementById('fale-anexo-remover');
+    var btnMais = document.getElementById('fale-btn-mais');
+    var menuAnexo = document.getElementById('fale-menu-anexo');
+    var mensagem = document.getElementById('fale-mensagem');
+    var btnMic = document.getElementById('fale-btn-mic');
+    var btnEnviar = document.getElementById('fale-btn-enviar');
+    var gravandoBox = document.getElementById('fale-gravando');
+    var gravandoTimer = document.getElementById('fale-gravando-timer');
+    var btnCancelarGravacao = document.getElementById('fale-gravando-cancelar');
+    var btnPararGravacao = document.getElementById('fale-gravando-parar');
+
+    var mediaRecorder = null;
+    var chunks = [];
+    var gravando = false;
+    var cancelarProximo = false;
+    var timerId = null;
+    var segundos = 0;
+
+    function temConteudo() {
+        return (mensagem.value || '').trim() !== '' || (input.files && input.files.length > 0);
+    }
+
+    function atualizarAcoes() {
+        if (gravando) {
+            btnMic.classList.add('hidden');
+            btnEnviar.classList.add('hidden');
+            return;
+        }
+        if (temConteudo()) {
+            btnMic.classList.add('hidden');
+            btnEnviar.classList.remove('hidden');
+            btnEnviar.classList.add('flex');
+        } else {
+            btnEnviar.classList.add('hidden');
+            btnEnviar.classList.remove('flex');
+            btnMic.classList.remove('hidden');
+        }
+    }
+
+    function mostrarPreview(nome) {
+        previewNome.textContent = nome || 'Anexo selecionado';
+        preview.classList.remove('hidden');
+        preview.classList.add('flex');
+        atualizarAcoes();
+    }
+
+    function limparAnexo() {
+        input.value = '';
+        preview.classList.add('hidden');
+        preview.classList.remove('flex');
+        atualizarAcoes();
+    }
+
+    function autoResize() {
+        mensagem.style.height = 'auto';
+        mensagem.style.height = Math.min(mensagem.scrollHeight, 128) + 'px';
+    }
+
+    function formatarTempo(s) {
+        var m = Math.floor(s / 60);
+        var r = s % 60;
+        return m + ':' + String(r).padStart(2, '0');
+    }
+
+    function pararTimer() {
+        if (timerId) clearInterval(timerId);
+        timerId = null;
+        segundos = 0;
+    }
+
+    btnMais.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menuAnexo.classList.toggle('hidden');
+    });
+    document.addEventListener('click', function () {
+        menuAnexo.classList.add('hidden');
+    });
+    menuAnexo.addEventListener('click', function (e) { e.stopPropagation(); });
+
+    menuAnexo.querySelectorAll('[data-fale-attach]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            input.accept = btn.getAttribute('data-fale-attach') || 'image/*,video/*,application/pdf';
+            menuAnexo.classList.add('hidden');
+            input.click();
+        });
+    });
+
+    input.addEventListener('change', function () {
+        if (input.files && input.files[0]) {
+            mostrarPreview(input.files[0].name);
+        } else {
+            limparAnexo();
+        }
+    });
+    btnRemover.addEventListener('click', limparAnexo);
+    mensagem.addEventListener('input', function () {
+        autoResize();
+        atualizarAcoes();
+    });
+
+    function setArquivoAudio(blob) {
+        var file = new File([blob], 'audio-' + Date.now() + '.webm', { type: blob.type || 'audio/webm' });
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        mostrarPreview('Áudio gravado (' + formatarTempo(Math.max(segundos, 1)) + ')');
+    }
+
+    async function iniciarGravacao() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Seu navegador não permite gravar áudio.');
+            return;
+        }
+        try {
+            var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            chunks = [];
+            cancelarProximo = false;
+            var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+            mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = function (ev) {
+                if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+            };
+            mediaRecorder.onstop = function () {
+                stream.getTracks().forEach(function (t) { t.stop(); });
+                gravando = false;
+                gravandoBox.classList.add('hidden');
+                btnMais.disabled = false;
+                if (!cancelarProximo && chunks.length) {
+                    var blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                    setArquivoAudio(blob);
+                } else {
+                    limparAnexo();
+                }
+                pararTimer();
+                atualizarAcoes();
+            };
+            mediaRecorder.start();
+            gravando = true;
+            gravandoBox.classList.remove('hidden');
+            btnMais.disabled = true;
+            menuAnexo.classList.add('hidden');
+            segundos = 0;
+            gravandoTimer.textContent = '0:00';
+            timerId = setInterval(function () {
+                segundos += 1;
+                gravandoTimer.textContent = formatarTempo(segundos);
+            }, 1000);
+            atualizarAcoes();
+        } catch (err) {
+            alert('Não foi possível acessar o microfone. Verifique a permissão do navegador.');
+        }
+    }
+
+    function pararGravacao(cancelar) {
+        cancelarProximo = !!cancelar;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    }
+
+    btnMic.addEventListener('click', function () {
+        if (!gravando) iniciarGravacao();
+    });
+    btnCancelarGravacao.addEventListener('click', function () {
+        pararGravacao(true);
+    });
+    btnPararGravacao.addEventListener('click', function () {
+        pararGravacao(false);
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (gravando) {
+            e.preventDefault();
+            pararGravacao(false);
+            return;
+        }
+        if (!temConteudo()) {
+            e.preventDefault();
+        }
+    });
+
+    atualizarAcoes();
+    autoResize();
 })();
 </script>
