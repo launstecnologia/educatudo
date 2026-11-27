@@ -238,7 +238,8 @@ class SchoolCommunicationController extends BaseController
         try {
             $items = $this->db->fetchAll(
                 "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
-                        COALESCE(NULLIF(r.foto_url, ''), NULLIF(a.foto_url, ''), av.avatar_url) AS foto_url,
+                        NULLIF(r.foto_url, '') AS responsavel_foto_url,
+                        COALESCE(NULLIF(a.foto_url, ''), av.avatar_url) AS aluno_foto_url,
                         (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
                         (SELECT COALESCE(mensagem, CASE WHEN imagem IS NOT NULL THEN 'Anexo' ELSE '' END)
                            FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
@@ -427,7 +428,8 @@ class SchoolCommunicationController extends BaseController
         try {
             $conversa = $this->db->fetch(
                 "SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome,
-                        COALESCE(NULLIF(r.foto_url, ''), NULLIF(a.foto_url, ''), av.avatar_url) AS foto_url
+                        NULLIF(r.foto_url, '') AS responsavel_foto_url,
+                        COALESCE(NULLIF(a.foto_url, ''), av.avatar_url) AS aluno_foto_url
                  FROM familia_conversas c
                  INNER JOIN alunos a ON a.id = c.aluno_id
                  INNER JOIN responsaveis r ON r.id = c.responsavel_id

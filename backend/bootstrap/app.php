@@ -871,7 +871,9 @@ if (
             $mimes = [
                 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
                 'gif' => 'image/gif', 'webp' => 'image/webp',
-                'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+                'pdf' => 'application/pdf', 'mp4' => 'video/mp4',
+                // .webm do MediaRecorder (voz) precisa de audio/webm — video/webm deixa o <audio> mudo/quebrado
+                'webm' => 'audio/webm',
                 'ogg' => 'audio/ogg', 'mp3' => 'audio/mpeg', 'm4a' => 'audio/mp4', 'aac' => 'audio/aac',
                 'wav' => 'audio/wav', 'weba' => 'audio/webm',
             ];
@@ -880,7 +882,19 @@ if (
                 header('X-Content-Type-Options: nosniff');
                 exit;
             }
-            header('Content-Type: ' . $mimes[$ext]);
+            $contentType = $mimes[$ext];
+            // Se for vídeo webm de verdade, respeita o finfo
+            if ($ext === 'webm' && class_exists('finfo')) {
+                $detectado = (new \finfo(FILEINFO_MIME_TYPE))->file($storageComFile) ?: '';
+                if ($detectado === 'video/webm') {
+                    // Heurística: vídeos do chat tendem a ser bem maiores; voz fica como audio/webm
+                    if (filesize($storageComFile) > 3 * 1024 * 1024) {
+                        $contentType = 'video/webm';
+                    }
+                }
+            }
+            header('Content-Type: ' . $contentType);
+            header('Accept-Ranges: bytes');
             header('X-Content-Type-Options: nosniff');
             header('Cache-Control: private, max-age=3600');
             readfile($storageComFile);

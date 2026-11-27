@@ -19,7 +19,7 @@ $iniciais = static function (string $nome): string {
     return mb_strtoupper($a . $b);
 };
 
-$urlMidia = static function (string $path): string {
+$urlAnexo = static function (string $path): string {
     $path = trim($path);
     if ($path === '') {
         return '';
@@ -28,6 +28,42 @@ $urlMidia = static function (string $path): string {
         return $path;
     }
     return rtrim((string) URL, '/') . '/' . ltrim($path, '/');
+};
+
+$urlMidia = static function (string $path) use ($urlAnexo): string {
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+    // Fotos de perfil: normaliza caminho legado; anexos de chat NÃO passam por aqui
+    if (class_exists(\App\Helpers\AvatarUrlHelper::class) && !str_contains($path, 'storage/uploads/fale-com-a-escola') && !str_contains($path, 'storage/uploads/school-communications')) {
+        $normalizado = \App\Helpers\AvatarUrlHelper::normalizeAdminAvatarUrl($path);
+        if (is_string($normalizado) && $normalizado !== '') {
+            return $normalizado;
+        }
+    }
+    return $urlAnexo($path);
+};
+
+$renderAvatares = static function (string $fotoResp, string $fotoAluno, string $nomeResp, string $nomeAluno) use ($iniciais): void {
+    ?>
+    <div class="fc-avatars" title="<?= htmlspecialchars($nomeResp . ' · aluno ' . $nomeAluno, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="fc-avatar">
+            <?php if ($fotoResp !== ''): ?>
+                <img src="<?= htmlspecialchars($fotoResp) ?>" alt="" onerror="this.remove()">
+            <?php else: ?>
+                <?= htmlspecialchars($iniciais($nomeResp)) ?>
+            <?php endif; ?>
+        </div>
+        <div class="fc-avatar fc-avatar-aluno">
+            <?php if ($fotoAluno !== ''): ?>
+                <img src="<?= htmlspecialchars($fotoAluno) ?>" alt="" onerror="this.remove()">
+            <?php else: ?>
+                <?= htmlspecialchars($iniciais($nomeAluno)) ?>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
 };
 
 $fmtHoraLista = static function (?string $dt): string {
@@ -112,6 +148,18 @@ $fmtDiaDivisor = static function (string $dt): string {
   background:#dbeafe; color:#1e3a8a;
 }
 .fc-avatar img { width:100%; height:100%; object-fit:cover; }
+.fc-avatars { position:relative; width:48px; height:44px; flex-shrink:0; }
+.fc-avatars .fc-avatar { width:40px; height:40px; font-size:11px; }
+.fc-avatars .fc-avatar-aluno {
+  position:absolute; right:0; bottom:0; width:22px; height:22px; font-size:8px;
+  border:2px solid #f7f9fc; box-shadow:0 0 0 1px rgba(15,23,42,.06);
+  background:#e0e7ff; color:#3730a3;
+}
+.fc-head .fc-avatars { width:54px; height:46px; }
+.fc-head .fc-avatars .fc-avatar { width:46px; height:46px; }
+.fc-head .fc-avatars .fc-avatar-aluno {
+  width:24px; height:24px; border-color:#fff;
+}
 .fc-item-main { min-width:0; flex:1; }
 .fc-item-top { display:flex; justify-content:space-between; gap:8px; align-items:center; }
 .fc-item-name { font-size:14px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -235,6 +283,42 @@ $fmtDiaDivisor = static function (string $dt): string {
   border:0; background:transparent; font-size:18px; cursor:pointer; border-radius:8px; padding:4px;
 }
 .fc-emoji button:hover { background:#f1f5f9; }
+
+.fc-audio {
+  display:flex; align-items:center; gap:10px; margin-top:8px;
+  min-width:220px; max-width:280px; padding:8px 10px; border-radius:14px;
+  background:rgba(15,23,42,.04);
+}
+.fc-bubble.is-escola .fc-audio { background:rgba(22,163,74,.10); }
+.fc-audio-play {
+  width:36px; height:36px; border:0; border-radius:999px; flex-shrink:0;
+  background:#1e3a5f; color:#fff; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.fc-bubble.is-escola .fc-audio-play { background:#15803d; }
+.fc-audio-play:disabled { opacity:.45; cursor:not-allowed; }
+.fc-audio-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.fc-audio-track {
+  position:relative; height:22px; display:flex; align-items:center; cursor:pointer;
+}
+.fc-audio-bars {
+  display:flex; align-items:center; gap:2px; width:100%; height:100%;
+}
+.fc-audio-bars span {
+  flex:1; border-radius:2px; background:#94a3b8; min-width:2px;
+  transition:background .12s ease;
+}
+.fc-bubble.is-escola .fc-audio-bars span { background:#86efac; }
+.fc-audio-bars span.is-done { background:#1e3a5f; }
+.fc-bubble.is-escola .fc-audio-bars span.is-done { background:#166534; }
+.fc-audio-scrub {
+  position:absolute; left:0; top:50%; width:10px; height:10px; margin-top:-5px;
+  border-radius:999px; background:#1e3a5f; box-shadow:0 0 0 2px #fff;
+  pointer-events:none; transform:translateX(-50%);
+}
+.fc-bubble.is-escola .fc-audio-scrub { background:#166534; }
+.fc-audio-time { font-size:11px; color:#64748b; font-variant-numeric:tabular-nums; }
+.fc-audio audio { display:none; }
 </style>
 
 <div class="fc-shell">
@@ -280,26 +364,21 @@ $fmtDiaDivisor = static function (string $dt): string {
                         $naoLidas = (int) ($item['nao_lidas'] ?? 0);
                         $nomeAluno = (string) ($item['aluno_nome'] ?? 'Aluno');
                         $nomeResp = (string) ($item['responsavel_nome'] ?? 'Responsável');
-                        $foto = $urlMidia((string) ($item['foto_url'] ?? ''));
+                        $fotoResp = $urlMidia((string) ($item['responsavel_foto_url'] ?? ''));
+                        $fotoAluno = $urlMidia((string) ($item['aluno_foto_url'] ?? ($item['foto_url'] ?? '')));
                         $busca = mb_strtolower($nomeAluno . ' ' . $nomeResp . ' ' . (string) ($item['ultima'] ?? ''));
                         ?>
                         <a href="<?= $baseUrl ?>/<?= $id ?>"
                            class="fc-item <?= $ativa ? 'is-on' : '' ?>"
                            data-fc-item
                            data-fc-busca="<?= htmlspecialchars($busca) ?>">
-                            <div class="fc-avatar">
-                                <?php if ($foto !== ''): ?>
-                                    <img src="<?= htmlspecialchars($foto) ?>" alt="" onerror="this.remove()">
-                                <?php else: ?>
-                                    <?= htmlspecialchars($iniciais($nomeAluno)) ?>
-                                <?php endif; ?>
-                            </div>
+                            <?php $renderAvatares($fotoResp, $fotoAluno, $nomeResp, $nomeAluno); ?>
                             <div class="fc-item-main">
                                 <div class="fc-item-top">
-                                    <div class="fc-item-name"><?= htmlspecialchars($nomeAluno) ?></div>
+                                    <div class="fc-item-name"><?= htmlspecialchars($nomeResp) ?></div>
                                     <div class="fc-item-time"><?= htmlspecialchars($fmtHoraLista($item['updated_at'] ?? null)) ?></div>
                                 </div>
-                                <div class="fc-item-sub"><?= htmlspecialchars($nomeResp) ?></div>
+                                <div class="fc-item-sub">Aluno: <?= htmlspecialchars($nomeAluno) ?></div>
                                 <div class="fc-item-bottom">
                                     <div class="fc-item-last"><?= htmlspecialchars((string) (($item['ultima'] ?? '') !== '' ? $item['ultima'] : 'Anexo')) ?></div>
                                     <?php if ($naoLidas > 0): ?>
@@ -324,29 +403,24 @@ $fmtDiaDivisor = static function (string $dt): string {
                 </div>
             <?php else: ?>
                 <?php
-                $fotoConversa = $urlMidia((string) ($conversa['foto_url'] ?? ''));
-                $nomeConversa = (string) ($conversa['aluno_nome'] ?? 'Aluno');
-                $nomeResp = (string) ($conversa['responsavel_nome'] ?? '');
+                $nomeAluno = (string) ($conversa['aluno_nome'] ?? 'Aluno');
+                $nomeResp = (string) ($conversa['responsavel_nome'] ?? 'Responsável');
+                $fotoResp = $urlMidia((string) ($conversa['responsavel_foto_url'] ?? ''));
+                $fotoAluno = $urlMidia((string) ($conversa['aluno_foto_url'] ?? ($conversa['foto_url'] ?? '')));
                 ?>
                 <div class="fc-head">
                     <div class="fc-head-left">
-                        <div class="fc-avatar" style="width:46px;height:46px;">
-                            <?php if ($fotoConversa !== ''): ?>
-                                <img src="<?= htmlspecialchars($fotoConversa) ?>" alt="" onerror="this.remove()">
-                            <?php else: ?>
-                                <?= htmlspecialchars($iniciais($nomeConversa)) ?>
-                            <?php endif; ?>
-                        </div>
+                        <?php $renderAvatares($fotoResp, $fotoAluno, $nomeResp, $nomeAluno); ?>
                         <div class="min-w-0">
-                            <p class="font-bold text-slate-900 truncate"><?= htmlspecialchars($nomeConversa) ?></p>
-                            <p class="text-xs text-slate-500 truncate">Responsável: <?= htmlspecialchars($nomeResp) ?></p>
+                            <p class="font-bold text-slate-900 truncate"><?= htmlspecialchars($nomeResp) ?></p>
+                            <p class="text-xs text-slate-500 truncate">Aluno: <?= htmlspecialchars($nomeAluno) ?></p>
                         </div>
                     </div>
                     <div class="fc-head-actions">
                         <button type="button" class="fc-round" disabled title="Em breve"><i class="fa-solid fa-video"></i></button>
                         <button type="button" class="fc-round" disabled title="Em breve"><i class="fa-solid fa-phone"></i></button>
                         <button type="button" id="fc-btn-info" class="fc-round" title="Informações"
-                                data-aluno="<?= htmlspecialchars($nomeConversa, ENT_QUOTES, 'UTF-8') ?>"
+                                data-aluno="<?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>"
                                 data-responsavel="<?= htmlspecialchars($nomeResp, ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fa-solid fa-circle-info"></i>
                         </button>
@@ -369,14 +443,28 @@ $fmtDiaDivisor = static function (string $dt): string {
                         $dia = $created !== '' ? date('Y-m-d', strtotime($created)) : '';
                         $anexoTipo = (string) ($mensagem['anexo_tipo'] ?? (!empty($mensagem['imagem']) ? 'imagem' : ''));
                         $anexoMime = (string) ($mensagem['anexo_mime'] ?? '');
-                        if ($anexoTipo === '' && str_starts_with($anexoMime, 'audio/')) {
-                            $anexoTipo = 'audio';
-                        }
-                        if ($anexoTipo === 'arquivo' && str_starts_with($anexoMime, 'audio/')) {
-                            $anexoTipo = 'audio';
-                        }
-                        $anexoUrl = $urlMidia((string) ($mensagem['imagem'] ?? ''));
+                        $anexoPath = (string) ($mensagem['imagem'] ?? '');
                         $anexoNome = (string) ($mensagem['imagem_nome'] ?? 'arquivo');
+                        $anexoExt = strtolower(pathinfo($anexoPath !== '' ? $anexoPath : $anexoNome, PATHINFO_EXTENSION));
+                        $extAudio = in_array($anexoExt, ['webm', 'weba', 'ogg', 'mp3', 'm4a', 'aac', 'wav'], true);
+                        if ($anexoTipo === '' && (str_starts_with($anexoMime, 'audio/') || $extAudio)) {
+                            $anexoTipo = 'audio';
+                        }
+                        if ($anexoTipo === 'arquivo' && (str_starts_with($anexoMime, 'audio/') || $extAudio)) {
+                            $anexoTipo = 'audio';
+                        }
+                        if ($anexoTipo === 'audio' && $anexoMime === '') {
+                            $anexoMime = match ($anexoExt) {
+                                'm4a', 'mp4' => 'audio/mp4',
+                                'mp3' => 'audio/mpeg',
+                                'ogg' => 'audio/ogg',
+                                'wav' => 'audio/wav',
+                                'aac' => 'audio/aac',
+                                'weba', 'webm' => 'audio/webm',
+                                default => 'audio/webm',
+                            };
+                        }
+                        $anexoUrl = $urlAnexo($anexoPath);
                         $curtidas = (int) ($mensagem['curtidas'] ?? 0);
                         $euCurti = !empty($mensagem['eu_curti']);
                         $lidaFamilia = !empty($mensagem['lido_familia_em']);
@@ -402,9 +490,26 @@ $fmtDiaDivisor = static function (string $dt): string {
                                         <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'video/mp4') ?>">
                                     </video>
                                 <?php elseif ($anexoUrl !== '' && $anexoTipo === 'audio'): ?>
-                                    <audio controls style="margin-top:8px;width:100%;max-width:260px;" preload="metadata">
-                                        <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm') ?>">
-                                    </audio>
+                                    <?php
+                                    $barras = [8,14,10,18,12,16,9,15,11,17,13,10,16,12,14,9,18,11,15,10,13,17,12,16,9,14,11,15];
+                                    ?>
+                                    <div class="fc-audio" data-fc-audio data-src="<?= htmlspecialchars($anexoUrl, ENT_QUOTES, 'UTF-8') ?>" data-mime="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm', ENT_QUOTES, 'UTF-8') ?>">
+                                        <button type="button" class="fc-audio-play" aria-label="Reproduzir áudio"><i class="fa-solid fa-play"></i></button>
+                                        <div class="fc-audio-body">
+                                            <div class="fc-audio-track" data-fc-seek>
+                                                <div class="fc-audio-bars">
+                                                    <?php foreach ($barras as $h): ?>
+                                                        <span style="height:<?= (int) $h ?>px"></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                                <div class="fc-audio-scrub" style="left:0%"></div>
+                                            </div>
+                                            <span class="fc-audio-time">0:00</span>
+                                        </div>
+                                        <audio preload="metadata" playsinline>
+                                            <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm') ?>">
+                                        </audio>
+                                    </div>
                                 <?php elseif ($anexoUrl !== ''): ?>
                                     <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener"
                                        style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;color:#1e293b;text-decoration:none;">
@@ -495,12 +600,108 @@ $fmtDiaDivisor = static function (string $dt): string {
         else box.scrollTop = box.scrollHeight;
     }
 
+    function fmtAudio(s) {
+        s = Math.max(0, Math.floor(s || 0));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
+    var audioAtual = null;
+    function pararAudio(exceto) {
+        document.querySelectorAll('[data-fc-audio]').forEach(function (wrap) {
+            if (exceto && wrap === exceto) return;
+            var a = wrap.querySelector('audio');
+            var btn = wrap.querySelector('.fc-audio-play');
+            if (a && !a.paused) a.pause();
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        });
+    }
+    function atualizarPlayer(wrap) {
+        var audio = wrap.querySelector('audio');
+        var timeEl = wrap.querySelector('.fc-audio-time');
+        var scrub = wrap.querySelector('.fc-audio-scrub');
+        var bars = wrap.querySelectorAll('.fc-audio-bars span');
+        if (!audio || !timeEl) return;
+        var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+        var cur = audio.currentTime || 0;
+        var pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+        if (scrub) scrub.style.left = pct + '%';
+        var done = bars.length ? Math.round((pct / 100) * bars.length) : 0;
+        bars.forEach(function (bar, i) {
+            if (i < done) bar.classList.add('is-done');
+            else bar.classList.remove('is-done');
+        });
+        if (dur > 0 && !audio.paused) timeEl.textContent = fmtAudio(cur);
+        else if (dur > 0) timeEl.textContent = fmtAudio(dur);
+        else timeEl.textContent = fmtAudio(cur);
+    }
+    document.querySelectorAll('[data-fc-audio]').forEach(function (wrap) {
+        var audio = wrap.querySelector('audio');
+        var btn = wrap.querySelector('.fc-audio-play');
+        var track = wrap.querySelector('[data-fc-seek]');
+        if (!audio || !btn) return;
+
+        // Fallback: alguns browsers travam no type errado — tenta src direto
+        if (!audio.getAttribute('src')) {
+            var src = wrap.getAttribute('data-src') || '';
+            if (src) audio.src = src;
+        }
+
+        audio.addEventListener('loadedmetadata', function () { atualizarPlayer(wrap); });
+        audio.addEventListener('durationchange', function () { atualizarPlayer(wrap); });
+        audio.addEventListener('timeupdate', function () { atualizarPlayer(wrap); });
+        audio.addEventListener('ended', function () {
+            btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+            audio.currentTime = 0;
+            atualizarPlayer(wrap);
+            if (audioAtual === audio) audioAtual = null;
+        });
+        audio.addEventListener('error', function () {
+            btn.disabled = true;
+            btn.title = 'Não foi possível reproduzir este áudio';
+            var timeEl = wrap.querySelector('.fc-audio-time');
+            if (timeEl) timeEl.textContent = 'erro';
+        });
+
+        btn.addEventListener('click', function () {
+            if (audio.paused) {
+                pararAudio(wrap);
+                var playPromise = audio.play();
+                if (playPromise && typeof playPromise.then === 'function') {
+                    playPromise.then(function () {
+                        audioAtual = audio;
+                        btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                    }).catch(function () {
+                        btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                        alert('Não foi possível tocar o áudio. Tente de novo ou use outro navegador.');
+                    });
+                } else {
+                    audioAtual = audio;
+                    btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                }
+            } else {
+                audio.pause();
+                btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                atualizarPlayer(wrap);
+            }
+        });
+
+        if (track) {
+            track.addEventListener('click', function (e) {
+                if (!isFinite(audio.duration) || audio.duration <= 0) return;
+                var rect = track.getBoundingClientRect();
+                var ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0;
+                ratio = Math.max(0, Math.min(1, ratio));
+                audio.currentTime = audio.duration * ratio;
+                atualizarPlayer(wrap);
+            });
+        }
+    });
+
     var btnInfo = document.getElementById('fc-btn-info');
     if (btnInfo) {
         btnInfo.addEventListener('click', function () {
             var aluno = btnInfo.getAttribute('data-aluno') || 'Aluno';
             var resp = btnInfo.getAttribute('data-responsavel') || 'Responsável';
-            alert('Conversa com ' + aluno + ' — responsável ' + resp);
+            alert('Conversa com ' + resp + ' — aluno ' + aluno);
         });
     }
 
@@ -653,12 +854,14 @@ $fmtDiaDivisor = static function (string $dt): string {
                 gravando = false;
                 gravandoBox.classList.remove('is-on');
                 btnMais.disabled = false;
-                if (!cancelarProximo && chunks.length) setArquivoAudio(new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' }));
+                var blobType = (mediaRecorder.mimeType || mime || 'audio/webm').split(';')[0];
+                if (!cancelarProximo && chunks.length) setArquivoAudio(new Blob(chunks, { type: blobType }));
                 else limparAnexo();
                 pararTimer();
                 atualizarAcoes();
             };
-            mediaRecorder.start();
+            // timeslice evita blob vazio/mudo em alguns browsers
+            mediaRecorder.start(250);
             gravando = true;
             gravandoBox.classList.add('is-on');
             btnMais.disabled = true;
