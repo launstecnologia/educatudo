@@ -204,6 +204,38 @@ class Boletim26ColagAdminController extends BaseController
         exit;
     }
 
+    /**
+     * Excel por matéria (bateria): 1º–4º bim, média, média arredondada e situação.
+     */
+    public function exportarMediasBimestrais(): void
+    {
+        $filtro = $this->filtroDaRequisicao();
+        $limiar = $filtro['nota_minima'] ?? 6.5;
+        $painel = $this->servico->montarPainel(
+            $filtro['turma_id'],
+            $filtro['aluno_id'],
+            $filtro['ano'],
+            $filtro['serie'],
+            0,
+            null,
+            true,
+            $filtro['nota_campo'],
+            true,
+            [1, 2, 3, 4],
+            $filtro['jornada_ate']
+        );
+        $relatorios = is_array($painel['relatorios'] ?? null) ? $painel['relatorios'] : [];
+        $xml = $this->servico->excelMediasBimestrais($relatorios, (float) $limiar);
+        $ano = (int) ($painel['ano'] ?? date('Y'));
+        $nome = 'boletim-colag-medias-bimestrais-' . $ano . '.xls';
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        echo $xml;
+        exit;
+    }
+
     public function parcial(): void
     {
         $filtro = $this->filtroDaRequisicao();

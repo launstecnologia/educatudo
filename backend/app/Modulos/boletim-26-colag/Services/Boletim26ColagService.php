@@ -2675,6 +2675,254 @@ class Boletim26ColagService
     }
 
     /**
+     * Excel SpreadsheetML: uma aba por matéria (bateria), no estilo do relatório geral de médias.
+     *
+     * @param list<array<string,mixed>> $relatorios
+     */
+    public function excelMediasBimestrais(array $relatorios, float $limiar = 6.5): string
+    {
+        $blocos = $this->planilhaMediasBimestrais($relatorios, $limiar);
+        $limiarTexto = number_format($limiar, 1, ',', '');
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
+        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+        $borda = '<Borders>'
+            . '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#6B7280"/>'
+            . '<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#6B7280"/>'
+            . '<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#6B7280"/>'
+            . '<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#6B7280"/>'
+            . '</Borders>';
+        $xml .= '<Styles>';
+        $xml .= '<Style ss:ID="Default"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>';
+        $xml .= '<Style ss:ID="TituloPagina"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="13" ss:Bold="1" ss:Color="#111827"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="TituloMateria"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="12" ss:Bold="1" ss:Color="#0F172A"/><Interior ss:Color="#93C5FD" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Subtitulo"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="9" ss:Color="#4B5563"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="CabecaNum"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1"/><Interior ss:Color="#FDBA74" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Cabeca"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1"/><Interior ss:Color="#E5E7EB" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="CabecaBege"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1"/><Interior ss:Color="#E7D3A5" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Num"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10"/><Interior ss:Color="#FED7AA" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Nome"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Nota"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="Bege"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10"/><Interior ss:Color="#F5E6C8" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="BegeBold"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1"/><Interior ss:Color="#F5E6C8" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '<Style ss:ID="BegeNota"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#DC2626"/><Interior ss:Color="#F5E6C8" ss:Pattern="Solid"/>' . $borda . '</Style>';
+        $xml .= '</Styles>';
+
+        if ($blocos === []) {
+            $xml .= '<Worksheet ss:Name="Medias"><Table>';
+            $xml .= '<Row><Cell ss:StyleID="Subtitulo"><Data ss:Type="String">Sem dados para exportar com o filtro atual.</Data></Cell></Row>';
+            $xml .= '</Table></Worksheet></Workbook>';
+
+            return $xml;
+        }
+
+        $abasUsadas = [];
+        $cabecalhos = ['#', 'NOME DO ALUNO', '1º BIM', '2º BIM', '3º BIM', '4º BIM', 'MÉDIA', 'MÉDIA ARRED', 'SITUAÇÃO', 'NOTA RECUP', 'MÉDIA FINAL', ''];
+        foreach ($blocos as $bloco) {
+            $turma = (string) ($bloco['turma'] ?? '');
+            $materia = (string) ($bloco['materia'] ?? 'Matéria');
+            $alunos = is_array($bloco['alunos'] ?? null) ? $bloco['alunos'] : [];
+            $tituloAba = $turma !== '' ? ($this->siglaDaMateria($materia) . ' ' . $turma) : $materia;
+            $aba = $this->nomeAbaExcel($tituloAba, $abasUsadas);
+            $xml .= '<Worksheet ss:Name="' . $this->xmlAttr($aba) . '"><Table>';
+            $xml .= '<Column ss:Width="28"/><Column ss:Width="260"/>';
+            $xml .= '<Column ss:Width="52" ss:Span="9"/>';
+            $xml .= '<Row ss:Height="22"><Cell ss:StyleID="TituloPagina" ss:MergeAcross="11"><Data ss:Type="String">'
+                . $this->xmlTexto('RELATÓRIO GERAL DAS MÉDIAS BIMESTRAIS') . '</Data></Cell></Row>';
+            $xml .= '<Row ss:Height="22"><Cell ss:StyleID="TituloMateria" ss:MergeAcross="11"><Data ss:Type="String">'
+                . $this->xmlTexto(mb_strtoupper($materia, 'UTF-8') . ($turma !== '' ? ' — ' . $turma : '')) . '</Data></Cell></Row>';
+            $xml .= '<Row ss:Height="16"><Cell ss:StyleID="Subtitulo" ss:MergeAcross="11"><Data ss:Type="String">'
+                . $this->xmlTexto('APRO se média arredondada ≥ ' . $limiarTexto . ' · NOTA RECUP / MÉDIA FINAL ficam em branco (recuperação já entra no resultado do bimestre)') . '</Data></Cell></Row>';
+            $xml .= '<Row ss:Height="20">';
+            foreach ($cabecalhos as $indiceCabeca => $rotulo) {
+                $estiloCabeca = $indiceCabeca === 0 ? 'CabecaNum' : ($indiceCabeca >= 6 ? 'CabecaBege' : 'Cabeca');
+                $xml .= '<Cell ss:StyleID="' . $estiloCabeca . '"><Data ss:Type="String">' . $this->xmlTexto($rotulo) . '</Data></Cell>';
+            }
+            $xml .= '</Row>';
+            foreach ($alunos as $indice => $aluno) {
+                $numero = $indice + 1;
+                $bimestres = is_array($aluno['bimestres'] ?? null) ? $aluno['bimestres'] : [];
+                $mediaTexto = (string) ($aluno['media_texto'] ?? '');
+                $arredTexto = (string) ($aluno['media_arred_texto'] ?? '');
+                $aprovado = !empty($aluno['aprovado']);
+                $situacao = $aprovado ? 'APRO' : '';
+                $resultado = $aprovado ? 'APRO' : $arredTexto;
+                $xml .= '<Row ss:Height="18">';
+                $xml .= '<Cell ss:StyleID="Num"><Data ss:Type="Number">' . $numero . '</Data></Cell>';
+                $xml .= '<Cell ss:StyleID="Nome"><Data ss:Type="String">' . $this->xmlTexto((string) ($aluno['nome'] ?? '')) . '</Data></Cell>';
+                for ($bimestre = 1; $bimestre <= 4; $bimestre++) {
+                    $nota = $bimestres[$bimestre] ?? null;
+                    $textoNota = is_numeric($nota) ? number_format((float) $nota, 1, ',', '') : '';
+                    $xml .= '<Cell ss:StyleID="Nota"><Data ss:Type="String">' . $this->xmlTexto($textoNota) . '</Data></Cell>';
+                }
+                $xml .= '<Cell ss:StyleID="Bege"><Data ss:Type="String">' . $this->xmlTexto($mediaTexto) . '</Data></Cell>';
+                $xml .= '<Cell ss:StyleID="BegeBold"><Data ss:Type="String">' . $this->xmlTexto($arredTexto) . '</Data></Cell>';
+                $xml .= '<Cell ss:StyleID="BegeBold"><Data ss:Type="String">' . $this->xmlTexto($situacao) . '</Data></Cell>';
+                $xml .= '<Cell ss:StyleID="Bege"><Data ss:Type="String"></Data></Cell>';
+                $xml .= '<Cell ss:StyleID="Bege"><Data ss:Type="String"></Data></Cell>';
+                $estiloFinal = $aprovado ? 'BegeBold' : 'BegeNota';
+                $xml .= '<Cell ss:StyleID="' . $estiloFinal . '"><Data ss:Type="String">' . $this->xmlTexto($resultado) . '</Data></Cell>';
+                $xml .= '</Row>';
+            }
+            $xml .= '</Table></Worksheet>';
+        }
+        $xml .= '</Workbook>';
+
+        return $xml;
+    }
+
+    /**
+     * Uma planilha por matéria (e turma): notas dos 4 bimestres + médias.
+     *
+     * @param list<array<string,mixed>> $relatorios
+     * @return list<array{turma:string,materia:string,alunos:list<array<string,mixed>>}>
+     */
+    public function planilhaMediasBimestrais(array $relatorios, float $limiar = 6.5): array
+    {
+        $porTurma = [];
+        foreach ($relatorios as $relatorio) {
+            $aluno = is_array($relatorio['aluno'] ?? null) ? $relatorio['aluno'] : [];
+            $turma = is_array($relatorio['turma'] ?? null) ? $relatorio['turma'] : [];
+            $nomeAluno = trim((string) ($aluno['nome'] ?? ''));
+            $nomeTurma = trim((string) ($turma['nome'] ?? ''));
+            $turmaId = (int) ($turma['id'] ?? 0);
+            $chaveTurma = $turmaId > 0 ? ('id:' . $turmaId) : ('nome:' . $nomeTurma);
+            if ($nomeAluno === '') {
+                continue;
+            }
+            $porMateria = $this->resultadosBimestraisDoRelatorio($relatorio);
+            if ($porMateria === []) {
+                continue;
+            }
+            if (!isset($porTurma[$chaveTurma])) {
+                $porTurma[$chaveTurma] = [
+                    'turma' => $nomeTurma,
+                    'materias' => [],
+                ];
+            }
+            foreach ($porMateria as $materia => $bimestres) {
+                $soma = 0.0;
+                $quantidade = 0;
+                $bimNormalizados = [];
+                foreach ([1, 2, 3, 4] as $bimestre) {
+                    $nota = $bimestres[$bimestre] ?? null;
+                    if (!is_numeric($nota)) {
+                        continue;
+                    }
+                    $valor = (float) $nota;
+                    $bimNormalizados[$bimestre] = $valor;
+                    $soma += $valor;
+                    $quantidade++;
+                }
+                if ($quantidade < 1) {
+                    continue;
+                }
+                $media = $soma / $quantidade;
+                $mediaArred = $this->meio($media);
+                if (!isset($porTurma[$chaveTurma]['materias'][$materia])) {
+                    $porTurma[$chaveTurma]['materias'][$materia] = [];
+                }
+                $porTurma[$chaveTurma]['materias'][$materia][] = [
+                    'nome' => $nomeAluno,
+                    'bimestres' => $bimNormalizados,
+                    'media_texto' => number_format(round($media, 1, PHP_ROUND_HALF_UP), 1, ',', ''),
+                    'media_arred_texto' => number_format($mediaArred, 1, ',', ''),
+                    'aprovado' => $mediaArred >= $limiar,
+                ];
+            }
+        }
+
+        $saida = [];
+        foreach ($porTurma as $grupo) {
+            $nomeTurma = (string) ($grupo['turma'] ?? '');
+            $materias = is_array($grupo['materias'] ?? null) ? $grupo['materias'] : [];
+            $nomesMaterias = $this->ordenarNomesMaterias(array_keys($materias));
+            foreach ($nomesMaterias as $materia) {
+                $alunos = is_array($materias[$materia] ?? null) ? $materias[$materia] : [];
+                usort($alunos, static fn (array $a, array $b): int => strcasecmp((string) $a['nome'], (string) $b['nome']));
+                $saida[] = [
+                    'turma' => $nomeTurma,
+                    'materia' => (string) $materia,
+                    'alunos' => $alunos,
+                ];
+            }
+        }
+
+        return $saida;
+    }
+
+    /**
+     * Resultado por bimestre de cada matéria-pai.
+     *
+     * @param array<string,mixed> $relatorio
+     * @return array<string, array<int, float>>
+     */
+    private function resultadosBimestraisDoRelatorio(array $relatorio): array
+    {
+        $porMateria = [];
+        foreach (is_array($relatorio['demonstrativos'] ?? null) ? $relatorio['demonstrativos'] : [] as $demo) {
+            if (!empty($demo['titulo'])) {
+                continue;
+            }
+            $bimestre = (int) ($demo['bimestre'] ?? 0);
+            if ($bimestre < 1 || $bimestre > 4) {
+                continue;
+            }
+            foreach (is_array($demo['blocos'] ?? null) ? $demo['blocos'] : [] as $bloco) {
+                foreach (is_array($bloco['linhas'] ?? null) ? $bloco['linhas'] : [] as $linha) {
+                    if ($this->frentePortuguesOculta($linha) || !empty($linha['filha'])) {
+                        continue;
+                    }
+                    $nome = trim((string) ($linha['nome'] ?? ''));
+                    if ($nome === '' || !is_numeric($linha['resultado'] ?? null)) {
+                        continue;
+                    }
+                    $porMateria[$nome][$bimestre] = (float) $linha['resultado'];
+                }
+            }
+        }
+
+        return $porMateria;
+    }
+
+    /**
+     * @param list<string> $nomes
+     * @return list<string>
+     */
+    private function ordenarNomesMaterias(array $nomes): array
+    {
+        $ordem = [
+            'lingua portuguesa' => 1,
+            'portugues' => 1,
+            'educacao fisica' => 2,
+            'arte' => 3,
+            'ingles' => 4,
+            'lingua inglesa' => 4,
+            'fisica' => 5,
+            'biologia' => 6,
+            'sociologia' => 7,
+            'matematica' => 8,
+            'historia' => 9,
+            'geografia' => 10,
+            'quimica' => 11,
+            'filosofia' => 12,
+        ];
+        usort($nomes, function (string $a, string $b) use ($ordem): int {
+            $ka = $this->chaveOrdem($a);
+            $kb = $this->chaveOrdem($b);
+            $oa = $ordem[$ka] ?? 100;
+            $ob = $ordem[$kb] ?? 100;
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+
+            return strcasecmp($a, $b);
+        });
+
+        return array_values($nomes);
+    }
+
+    /**
      * @param array<string, true> $usadas
      */
     private function nomeAbaExcel(string $nome, array &$usadas): string

@@ -158,6 +158,10 @@ $rotuloSerie = static function (int $serie): string {
             <i class="fa-solid fa-table mr-2 text-gray-500"></i>
             Exportar Prova Final
         </button>
+        <button type="submit" form="boletim-filtros" formmethod="get" formaction="<?= URL ?>/admin/boletim-26-colag/exportar-medias-bimestrais" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" title="Uma aba por matéria: bimestres, média, média arredondada e situação (padrão APRO ≥ 6,5)">
+            <i class="fa-solid fa-chalkboard-user mr-2 text-gray-500"></i>
+            Exportar Médias por Matéria
+        </button>
         <button type="submit" form="boletim-filtros" formmethod="post" formaction="<?= URL ?>/admin/boletim-26-colag/homologar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <i class="fa-solid fa-stamp mr-2 text-gray-500"></i>
             Homologar
