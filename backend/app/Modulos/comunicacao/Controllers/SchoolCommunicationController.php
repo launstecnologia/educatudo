@@ -326,50 +326,72 @@ class SchoolCommunicationController extends BaseController
         $conversa = $this->conversaDoAdmin((int) $id);
         $message = trim((string) ($_POST['mensagem'] ?? ''));
         $file = $_FILES['anexo'] ?? ($_FILES['imagem'] ?? []);
-        $anexo = $this->service->guardarAnexo(is_array($file) ? $file : [], 'fale-com-a-escola');
+        $uploadErro = is_array($file) ? (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+        $anexo = null;
+        if ($uploadErro === UPLOAD_ERR_OK) {
+            $anexo = $this->service->guardarAnexo($file, 'fale-com-a-escola');
+            if ($anexo === null) {
+                $this->setFlashMessage('Não foi possível enviar o anexo. Use foto, vídeo, PDF ou áudio compatível.', 'error');
+                $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
+            }
+        } elseif ($uploadErro !== UPLOAD_ERR_NO_FILE) {
+            $this->setFlashMessage('Falha no upload do anexo (código ' . $uploadErro . ').', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
+        }
         if (($message === '' && $anexo === null) || mb_strlen($message) > 4000) {
             $this->setFlashMessage('Escreva uma mensagem ou envie foto, vídeo, PDF ou áudio.', 'error');
             $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
         $user = $this->auth->getUser();
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
-        if ($temAnexo) {
-            $this->db->insert(
-                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
-                 VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
-                [
-                    'conversa' => (int) $conversa['id'],
-                    'autor' => (int) $user['id'],
-                    'mensagem' => $message !== '' ? $message : null,
-                    'imagem' => $anexo['path'] ?? null,
-                    'nome' => $anexo['name'] ?? null,
-                    'tipo' => $anexo['tipo'] ?? null,
-                    'mime' => $anexo['mime'] ?? null,
-                ]
-            );
-        } else {
-            $this->db->insert(
-                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
-                 VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
-                [
-                    'conversa' => (int) $conversa['id'],
-                    'autor' => (int) $user['id'],
-                    'mensagem' => $message !== '' ? $message : null,
-                    'imagem' => $anexo['path'] ?? null,
-                    'nome' => $anexo['name'] ?? null,
-                ]
-            );
+        $tipoAnexo = $this->service->normalizarTipoAnexo($anexo['tipo'] ?? null);
+        try {
+            if ($temAnexo) {
+                $this->db->insert(
+                    "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
+                     VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
+                    [
+                        'conversa' => (int) $conversa['id'],
+                        'autor' => (int) $user['id'],
+                        'mensagem' => $message !== '' ? $message : null,
+                        'imagem' => $anexo['path'] ?? null,
+                        'nome' => $anexo['name'] ?? null,
+                        'tipo' => $tipoAnexo,
+                        'mime' => $anexo['mime'] ?? null,
+                    ]
+                );
+            } else {
+                $this->db->insert(
+                    "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
+                     VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
+                    [
+                        'conversa' => (int) $conversa['id'],
+                        'autor' => (int) $user['id'],
+                        'mensagem' => $message !== '' ? $message : null,
+                        'imagem' => $anexo['path'] ?? null,
+                        'nome' => $anexo['name'] ?? null,
+                    ]
+                );
+            }
+            $this->db->query('UPDATE familia_conversas SET updated_at = NOW() WHERE id = :id', ['id' => (int) $conversa['id']]);
+        } catch (\Throwable $e) {
+            error_log('FaleComEscola responderConversa: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível salvar a mensagem. Verifique se as migrations do chat foram aplicadas.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
         }
-        $this->db->query('UPDATE familia_conversas SET updated_at = NOW() WHERE id = :id', ['id' => (int) $conversa['id']]);
         $resumoPush = $message !== '' ? $message : ('A escola enviou um ' . ($anexo['tipo'] ?? 'anexo') . '.');
-        $this->service->push(
-            [(int) $conversa['responsavel_id']],
-            'Fale com a Escola',
-            $resumoPush,
-            '/school-communications',
-            ['type' => 'school_message', 'conversation_id' => (string) (int) $conversa['id']],
-            (int) $user['id']
-        );
+        try {
+            $this->service->push(
+                [(int) $conversa['responsavel_id']],
+                'Fale com a Escola',
+                $resumoPush,
+                '/school-communications',
+                ['type' => 'school_message', 'conversation_id' => (string) (int) $conversa['id']],
+                (int) $user['id']
+            );
+        } catch (\Throwable $e) {
+            error_log('FaleComEscola push: ' . $e->getMessage());
+        }
         $this->setFlashMessage('Resposta enviada para a família.', 'success');
         $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
     }

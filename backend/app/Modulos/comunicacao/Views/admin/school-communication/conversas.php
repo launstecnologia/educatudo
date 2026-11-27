@@ -434,8 +434,18 @@ $avatarHtml = static function (string $foto, string $iniciaisTxt, string $bg, st
         atualizarAcoes();
     });
 
+    function extensaoAudio(mimeType) {
+        var m = (mimeType || '').toLowerCase();
+        if (m.indexOf('mp4') !== -1 || m.indexOf('m4a') !== -1 || m.indexOf('aac') !== -1) return 'm4a';
+        if (m.indexOf('ogg') !== -1) return 'ogg';
+        if (m.indexOf('mpeg') !== -1 || m.indexOf('mp3') !== -1) return 'mp3';
+        return 'webm';
+    }
+
     function setArquivoAudio(blob) {
-        var file = new File([blob], 'audio-' + Date.now() + '.webm', { type: blob.type || 'audio/webm' });
+        var tipo = blob.type || 'audio/webm';
+        var ext = extensaoAudio(tipo);
+        var file = new File([blob], 'audio-' + Date.now() + '.' + ext, { type: tipo });
         var dt = new DataTransfer();
         dt.items.add(file);
         input.files = dt.files;
@@ -451,9 +461,14 @@ $avatarHtml = static function (string $foto, string $iniciaisTxt, string $bg, st
             var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             chunks = [];
             cancelarProximo = false;
-            var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+            // Safari prefere mp4; Chrome/Firefox webm
+            var mime = '';
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+                if (MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4';
+                else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
+                else if (MediaRecorder.isTypeSupported('audio/webm')) mime = 'audio/webm';
+                else if (MediaRecorder.isTypeSupported('audio/ogg')) mime = 'audio/ogg';
+            }
             mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
             mediaRecorder.ondataavailable = function (ev) {
                 if (ev.data && ev.data.size > 0) chunks.push(ev.data);

@@ -130,10 +130,11 @@ class MobileSchoolCommunicationController extends BaseController
         if(($message==='' && $anexo===null) || mb_strlen($message)>4000)$this->fail('invalid_message','Escreva uma mensagem ou envie imagem, vídeo ou PDF.',422);
         $conversa=$this->conversaDaFamilia((int)$student['id'], true);
         $temAnexo=$this->colunaFamilia('anexo_tipo');
+        $tipoAnexo=$service->normalizarTipoAnexo($anexo['tipo'] ?? null);
         if($temAnexo){
             $id=(int)$this->db->insert(
                 "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime) VALUES (:conversa, 'responsavel', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
-                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null,'tipo'=>$anexo['tipo'] ?? null,'mime'=>$anexo['mime'] ?? null]
+                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null,'tipo'=>$tipoAnexo,'mime'=>$anexo['mime'] ?? null]
             );
         } else {
             $id=(int)$this->db->insert(

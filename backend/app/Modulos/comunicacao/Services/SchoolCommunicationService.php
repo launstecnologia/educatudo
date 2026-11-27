@@ -161,13 +161,47 @@ class SchoolCommunicationService
             'audio/mpeg' => ['ext' => 'mp3', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
             'audio/mp4' => ['ext' => 'm4a', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
             'audio/x-m4a' => ['ext' => 'm4a', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/aac' => ['ext' => 'aac', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
             'audio/wav' => ['ext' => 'wav', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/x-wav' => ['ext' => 'wav', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
+            'audio/wave' => ['ext' => 'wav', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024],
         ];
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
+        $mimeDetectado = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
+        $mimeCliente = strtolower(trim((string) ($file['type'] ?? '')));
+        // Remove ";codecs=..." se vier no Content-Type
+        $mimeCliente = preg_replace('/;.*$/', '', $mimeCliente) ?: '';
+        $mime = $mimeDetectado !== '' ? $mimeDetectado : $mimeCliente;
         $nomeHint = strtolower((string) ($file['name'] ?? ''));
-        $pareceAudio = str_contains($nomeHint, 'audio') || str_ends_with($nomeHint, '.weba') || str_ends_with($nomeHint, '.ogg') || str_ends_with($nomeHint, '.m4a') || str_ends_with($nomeHint, '.mp3');
-        if ($pareceAudio && in_array($mime, ['video/webm', 'application/octet-stream', 'application/ogg'], true)) {
-            $mapa[$mime] = ['ext' => str_ends_with($nomeHint, '.ogg') ? 'ogg' : 'webm', 'tipo' => 'audio', 'max' => 12 * 1024 * 1024];
+        $pareceAudio = str_starts_with($nomeHint, 'audio')
+            || str_contains($nomeHint, 'audio')
+            || str_ends_with($nomeHint, '.weba')
+            || str_ends_with($nomeHint, '.m4a')
+            || str_ends_with($nomeHint, '.mp3')
+            || str_ends_with($nomeHint, '.aac')
+            || str_starts_with($mimeCliente, 'audio/')
+            || str_starts_with($mimeDetectado, 'audio/');
+
+        // Safari/Chrome: áudio pode chegar como video/webm, application/octet-stream ou mp4 genérico
+        if ($pareceAudio && in_array($mime, ['video/webm', 'video/mp4', 'application/octet-stream', 'application/ogg', ''], true)) {
+            $ext = 'webm';
+            if (str_ends_with($nomeHint, '.ogg') || $mimeCliente === 'audio/ogg') {
+                $ext = 'ogg';
+            } elseif (str_ends_with($nomeHint, '.m4a') || str_ends_with($nomeHint, '.mp4') || str_starts_with($mimeCliente, 'audio/mp4')) {
+                $ext = 'm4a';
+            } elseif (str_ends_with($nomeHint, '.mp3') || $mimeCliente === 'audio/mpeg') {
+                $ext = 'mp3';
+            }
+            $mapa[$mime !== '' ? $mime : 'application/octet-stream'] = [
+                'ext' => $ext,
+                'tipo' => 'audio',
+                'max' => 12 * 1024 * 1024,
+            ];
+            if ($mime === '') {
+                $mime = 'application/octet-stream';
+            }
+        }
+        if (!isset($mapa[$mime]) && $pareceAudio && isset($mapa[$mimeCliente])) {
+            $mime = $mimeCliente;
         }
         if (!isset($mapa[$mime])) {
             return null;
@@ -175,6 +209,18 @@ class SchoolCommunicationService
         $meta = $mapa[$mime];
         if (!in_array($meta['tipo'], $tiposPermitidos, true) || $size > $meta['max']) {
             return null;
+        }
+        // MIME canônico para gravar (não o genérico do finfo)
+        $mimeCanonico = $mime;
+        if ($meta['tipo'] === 'audio') {
+            $mimeCanonico = match ($meta['ext']) {
+                'm4a' => 'audio/mp4',
+                'mp3' => 'audio/mpeg',
+                'ogg' => 'audio/ogg',
+                'wav' => 'audio/wav',
+                'aac' => 'audio/aac',
+                default => 'audio/webm',
+            };
         }
         $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'default';
         $pasta = preg_replace('/[^a-z0-9_-]/i', '', $pasta) ?: 'comunicacao';
@@ -193,8 +239,59 @@ class SchoolCommunicationService
             'path' => '/' . $relative . '/' . $filename,
             'name' => $nome !== '' ? $nome : $meta['tipo'],
             'tipo' => $meta['tipo'],
-            'mime' => $mime,
+            'mime' => $mimeCanonico,
         ];
+    }
+
+    /**
+     * Garante que o valor cabe no ENUM anexo_tipo atual do tenant.
+     * Se 'audio' ainda não existe no ENUM, grava como 'arquivo' (UI usa mime).
+     */
+    public function normalizarTipoAnexo(?string $tipo): ?string
+    {
+        $tipo = trim((string) $tipo);
+        if ($tipo === '') {
+            return null;
+        }
+        $aceitos = $this->anexoTiposNoBanco();
+        if ($aceitos === []) {
+            return in_array($tipo, ['imagem', 'video', 'arquivo', 'audio'], true) ? $tipo : 'arquivo';
+        }
+        if (in_array($tipo, $aceitos, true)) {
+            return $tipo;
+        }
+        if ($tipo === 'audio' && in_array('arquivo', $aceitos, true)) {
+            return 'arquivo';
+        }
+        if (in_array('arquivo', $aceitos, true)) {
+            return 'arquivo';
+        }
+        return $aceitos[0] ?? null;
+    }
+
+    /** @return list<string> */
+    private function anexoTiposNoBanco(): array
+    {
+        static $lista = null;
+        if ($lista !== null) {
+            return $lista;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COLUMN_TYPE AS t FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'familia_mensagens' AND COLUMN_NAME = 'anexo_tipo'
+                 LIMIT 1"
+            );
+            $tipo = (string) ($row['t'] ?? '');
+            if (!preg_match_all("/'([^']+)'/", $tipo, $m)) {
+                $lista = [];
+                return $lista;
+            }
+            $lista = array_values($m[1]);
+        } catch (\Throwable $e) {
+            $lista = [];
+        }
+        return $lista;
     }
 
     public function tabelaReacoesPronta(): bool
