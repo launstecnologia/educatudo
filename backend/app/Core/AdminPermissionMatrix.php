@@ -117,6 +117,15 @@ class AdminPermissionMatrix
             'unidades' => ['label' => 'Unidades da Escola', 'prefixes' => ['/admin/unidades']],
             'almoxarifado' => ['label' => 'Almoxarifado', 'prefixes' => ['/admin/almoxarifado']],
             'patrimonio' => ['label' => 'Patrimônio', 'prefixes' => ['/admin/patrimonio']],
+            'biblioteca_acervo' => ['label' => 'Biblioteca — Acervo', 'prefixes' => ['/admin/biblioteca/acervo']],
+            'biblioteca_exemplares' => ['label' => 'Biblioteca — Exemplares', 'prefixes' => ['/admin/biblioteca/exemplares']],
+            'biblioteca_circulacao' => ['label' => 'Biblioteca — Circulação', 'prefixes' => ['/admin/biblioteca/emprestimos', '/admin/biblioteca/devolucoes']],
+            'biblioteca_reservas' => ['label' => 'Biblioteca — Reservas', 'prefixes' => ['/admin/biblioteca/reservas']],
+            'biblioteca_pendencias' => ['label' => 'Biblioteca — Pendências', 'prefixes' => ['/admin/biblioteca/pendencias']],
+            'biblioteca_inventario' => ['label' => 'Biblioteca — Inventário', 'prefixes' => ['/admin/biblioteca/inventario']],
+            'biblioteca_relatorios' => ['label' => 'Biblioteca — Relatórios', 'prefixes' => ['/admin/biblioteca/relatorios']],
+            'biblioteca_configuracoes' => ['label' => 'Biblioteca — Configurações', 'prefixes' => ['/admin/biblioteca/configuracoes']],
+            'biblioteca' => ['label' => 'Biblioteca', 'prefixes' => ['/admin/biblioteca']],
             'ocorrencias' => ['label' => 'Ocorrências', 'prefixes' => ['/admin/ocorrencias']],
             'conselho_classe' => ['label' => 'Conselho de Classe', 'prefixes' => ['/admin/conselhos']],
             'educasync' => ['label' => 'EducaSync', 'prefixes' => ['/admin/educasync']],
@@ -165,6 +174,7 @@ class AdminPermissionMatrix
                 '/admin/students/%id%/declaracoes',
                 '/admin/students/%id%/historico-escolar',
                 '/admin/paineis/documentos',
+                '/admin/documentos-familia',
             ]],
             'documentos_aluno' => ['label' => 'Documentos / Checklist do Aluno', 'prefixes' => ['/admin/students/%id%/documentos']],
 
@@ -210,6 +220,7 @@ class AdminPermissionMatrix
                 'censo_escolar', 'diario_classe', 'faltas', 'presenca', 'carteirinha',
                 'documentos_institucionais', 'modelos_documentos', 'documentos_professor',
                 'processos_matricula', 'transferencia', 'ocorrencias', 'almoxarifado', 'patrimonio',
+                'biblioteca', 'biblioteca_acervo', 'biblioteca_exemplares', 'biblioteca_circulacao', 'biblioteca_reservas', 'biblioteca_pendencias', 'biblioteca_inventario', 'biblioteca_relatorios', 'biblioteca_configuracoes',
                 'pacotes_creditos',
             ]],
             'paineis' => ['label' => 'Painéis', 'items' => [
@@ -263,7 +274,7 @@ class AdminPermissionMatrix
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
                     'configuracao_boletim', 'grupos_regras_notas', 'avatares_alunos',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
-                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'biblioteca', 'biblioteca_acervo', 'biblioteca_exemplares', 'biblioteca_circulacao', 'biblioteca_reservas', 'biblioteca_pendencias', 'biblioteca_inventario', 'biblioteca_relatorios', 'biblioteca_configuracoes', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',
                     'relatorios_gerais',
                     'administradores', 'professores', 'transferencia', 'lista_chamada',
@@ -286,7 +297,7 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
                     'configuracao_boletim', 'grupos_regras_notas', 'relatorios_gerais',
-                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'biblioteca', 'biblioteca_acervo', 'biblioteca_exemplares', 'biblioteca_circulacao', 'biblioteca_reservas', 'biblioteca_pendencias', 'biblioteca_inventario', 'biblioteca_relatorios', 'biblioteca_configuracoes', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',
                     'acao_rapida_ativar_desativar',
                     'responsaveis_vinculados', 'matriculas_aluno', 'processos_matricula', 'declaracoes_aluno', 'documentos_aluno',
@@ -373,6 +384,8 @@ class AdminPermissionMatrix
             '/logout',
             '/admin/ai-job',
             '/admin/boletim-26-colag',
+            // Sino pessoal (qualquer perfil admin lê as próprias notificações)
+            '/notifications',
         ];
     }
 
