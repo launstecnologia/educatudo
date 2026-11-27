@@ -271,7 +271,11 @@ class SchoolCommunicationController extends BaseController
     {
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
         $temReacoes = $this->service->tabelaReacoesPronta();
+        $temLido = $this->colunaMensagemExiste('lido_familia_em');
         $cols = 'm.id, m.autor_tipo, m.mensagem, m.imagem, m.imagem_nome, m.created_at';
+        if ($temLido) {
+            $cols .= ', m.lido_familia_em, m.lido_escola_em';
+        }
         if ($temAnexo) {
             $cols .= ', m.anexo_tipo, m.anexo_mime';
         }
