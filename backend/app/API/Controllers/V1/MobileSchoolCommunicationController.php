@@ -110,15 +110,21 @@ class MobileSchoolCommunicationController extends BaseController
         $service=new \App\Modulos\Comunicacao\Services\SchoolCommunicationService($this->db);
         $temAnexo=$this->colunaFamilia('anexo_tipo');
         $temReacoes=$service->tabelaReacoesPronta();
-        $cols='id, autor_tipo, mensagem, imagem, imagem_nome, created_at';
-        if($temAnexo)$cols.=', anexo_tipo, anexo_mime';
+        $temResposta=$this->colunaFamilia('resposta_a_mensagem_id');
+        $cols='m.id, m.autor_tipo, m.mensagem, m.imagem, m.imagem_nome, m.created_at';
+        if($temAnexo)$cols.=', m.anexo_tipo, m.anexo_mime';
+        if($temResposta){
+            $cols.=', m.resposta_a_mensagem_id, rm.mensagem AS resposta_mensagem, rm.autor_tipo AS resposta_autor_tipo, rm.imagem_nome AS resposta_imagem_nome';
+            if($temAnexo)$cols.=', rm.anexo_tipo AS resposta_anexo_tipo, rm.imagem AS resposta_imagem';
+        }
         if($temReacoes){
-            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = familia_mensagens.id AND r.reacao = 'curtir') AS curtidas";
-            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = familia_mensagens.id AND r.reacao = 'curtir' AND r.autor_tipo = 'responsavel' AND r.autor_id = :parent) AS eu_curti";
+            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir') AS curtidas";
+            $cols.=", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir' AND r.autor_tipo = 'responsavel' AND r.autor_id = :parent) AS eu_curti";
         }
         $params=['id'=>(int)$conversa['id']];
         if($temReacoes)$params['parent']=$this->parentId();
-        $rows=$this->db->fetchAll("SELECT {$cols} FROM familia_mensagens WHERE conversa_id=:id ORDER BY id", $params);
+        $joinResposta=$temResposta?' LEFT JOIN familia_mensagens rm ON rm.id = m.resposta_a_mensagem_id AND rm.conversa_id = m.conversa_id':'';
+        $rows=$this->db->fetchAll("SELECT {$cols} FROM familia_mensagens m{$joinResposta} WHERE m.conversa_id=:id ORDER BY m.id", $params);
         $data=array_map(fn($row)=>$this->mensagemFamilia(is_array($row)?$row:[]), is_array($rows)?$rows:[]);
         $this->json(['data'=>$data,'meta'=>['count'=>count($data),'available'=>true,'reactions'=>$temReacoes]]);
     }
@@ -135,11 +141,23 @@ class MobileSchoolCommunicationController extends BaseController
         if(($message==='' && $anexo===null) || mb_strlen($message)>4000)$this->fail('invalid_message','Escreva uma mensagem ou envie imagem, vídeo ou PDF.',422);
         $conversa=$this->conversaDaFamilia((int)$student['id'], true);
         $temAnexo=$this->colunaFamilia('anexo_tipo');
+        $temResposta=$this->colunaFamilia('resposta_a_mensagem_id');
         $tipoAnexo=$service->normalizarTipoAnexo($anexo['tipo'] ?? null);
-        if($temAnexo){
+        $respostaA=$this->validarMensagemCitadaFamilia((int)$conversa['id'], (int)($input['reply_to_message_id'] ?? $input['resposta_a_mensagem_id'] ?? 0));
+        if($temAnexo && $temResposta){
+            $id=(int)$this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, resposta_a_mensagem_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime) VALUES (:conversa, 'responsavel', :autor, :resposta, :mensagem, :imagem, :nome, :tipo, :mime)",
+                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'resposta'=>$respostaA,'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null,'tipo'=>$tipoAnexo,'mime'=>$anexo['mime'] ?? null]
+            );
+        } elseif($temAnexo){
             $id=(int)$this->db->insert(
                 "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime) VALUES (:conversa, 'responsavel', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
                 ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null,'tipo'=>$tipoAnexo,'mime'=>$anexo['mime'] ?? null]
+            );
+        } elseif($temResposta){
+            $id=(int)$this->db->insert(
+                "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, resposta_a_mensagem_id, mensagem, imagem, imagem_nome) VALUES (:conversa, 'responsavel', :autor, :resposta, :mensagem, :imagem, :nome)",
+                ['conversa'=>(int)$conversa['id'],'autor'=>$this->parentId(),'resposta'=>$respostaA,'mensagem'=>$message!==''?$message:null,'imagem'=>$anexo['path'] ?? null,'nome'=>$anexo['name'] ?? null]
             );
         } else {
             $id=(int)$this->db->insert(
@@ -155,7 +173,7 @@ class MobileSchoolCommunicationController extends BaseController
             $nome . ': ' . $resumo,
             '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']
         );
-        $this->json(['data'=>$this->mensagemFamilia([
+        $payloadEnvio=[
             'id'=>$id,
             'autor_tipo'=>'responsavel',
             'mensagem'=>$message,
@@ -166,7 +184,22 @@ class MobileSchoolCommunicationController extends BaseController
             'created_at'=>date('Y-m-d H:i:s'),
             'curtidas'=>0,
             'eu_curti'=>0,
-        ])],201);
+            'resposta_a_mensagem_id'=>$respostaA,
+        ];
+        if($respostaA){
+            $citada=$this->db->fetch(
+                'SELECT id, autor_tipo, mensagem, imagem, imagem_nome, anexo_tipo FROM familia_mensagens WHERE id=:id AND conversa_id=:conversa LIMIT 1',
+                ['id'=>$respostaA,'conversa'=>(int)$conversa['id']]
+            );
+            if(is_array($citada)){
+                $payloadEnvio['resposta_autor_tipo']=$citada['autor_tipo'] ?? '';
+                $payloadEnvio['resposta_mensagem']=$citada['mensagem'] ?? null;
+                $payloadEnvio['resposta_imagem']=$citada['imagem'] ?? null;
+                $payloadEnvio['resposta_imagem_nome']=$citada['imagem_nome'] ?? null;
+                $payloadEnvio['resposta_anexo_tipo']=$citada['anexo_tipo'] ?? null;
+            }
+        }
+        $this->json(['data'=>$this->mensagemFamilia($payloadEnvio)],201);
     }
 
     public function reactMessage($studentId, $mensagemId): void
@@ -340,7 +373,7 @@ class MobileSchoolCommunicationController extends BaseController
         if ($imagem !== '') {
             $url = $this->resolverUrlAnexoMensagem($imagem, (string) ($row['imagem_nome'] ?? 'arquivo'));
         }
-        return [
+        $payload = [
             'id'=>(int)($row['id'] ?? 0),
             'sender_type'=>($row['autor_tipo'] ?? '')==='escola' ? 'escola' : 'responsavel',
             'message'=>(string)($row['mensagem'] ?? ''),
@@ -352,7 +385,34 @@ class MobileSchoolCommunicationController extends BaseController
             'likes_count'=>(int)($row['curtidas'] ?? 0),
             'liked_by_me'=>((int)($row['eu_curti'] ?? 0)) > 0,
             'created_at'=>$this->iso($row['created_at'] ?? null),
+            'reply_to_message_id'=>(int)($row['resposta_a_mensagem_id'] ?? 0) ?: null,
+            'reply_to'=>null,
         ];
+        $respostaId=(int)($row['resposta_a_mensagem_id'] ?? 0);
+        if($respostaId>0){
+            $respTipo=trim((string)($row['resposta_anexo_tipo'] ?? ''));
+            if($respTipo==='' && !empty($row['resposta_imagem']))$respTipo='imagem';
+            $payload['reply_to']=[
+                'id'=>$respostaId,
+                'sender_type'=>($row['resposta_autor_tipo'] ?? '')==='escola' ? 'escola' : 'responsavel',
+                'message'=>(string)($row['resposta_mensagem'] ?? ''),
+                'attachment_type'=>$respTipo!=='' ? $respTipo : null,
+                'attachment_name'=>(string)($row['resposta_imagem_nome'] ?? ''),
+            ];
+        }
+        return $payload;
+    }
+
+    private function validarMensagemCitadaFamilia(int $conversaId, int $mensagemId): ?int
+    {
+        if ($mensagemId <= 0 || !$this->colunaFamilia('resposta_a_mensagem_id')) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            'SELECT id FROM familia_mensagens WHERE id = :id AND conversa_id = :conversa LIMIT 1',
+            ['id' => $mensagemId, 'conversa' => $conversaId]
+        );
+        return $row ? $mensagemId : null;
     }
 
     private function resolverUrlAnexoMensagem(string $path, string $nomeArquivo): ?string

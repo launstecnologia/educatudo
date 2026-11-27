@@ -136,6 +136,9 @@ class MediaServeController extends BaseController
         if (!$serveFromLocal && $media->isS3()) {
             $ext = strtolower(pathinfo($key, PATHINFO_EXTENSION));
             $contentType = $this->mimeForExtension($ext);
+            if ($type === 'fale_com_escola' && in_array($ext, ['webm', 'weba'], true)) {
+                $contentType = 'audio/webm';
+            }
             $inline = $this->shouldServeInline($ext);
 
             foreach ($candidateKeys as $candidateKey) {
@@ -208,7 +211,20 @@ class MediaServeController extends BaseController
     {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $disposition = $this->shouldServeInline($ext) ? 'inline' : 'attachment';
-        header('Content-Type: ' . $this->mimeForExtension($ext));
+        $contentType = $this->mimeForExtension($ext);
+        // Áudio do Fale com a Escola: se finfo disser audio/*, usa o detectado
+        if ($type === 'fale_com_escola' && class_exists('finfo')) {
+            $detectado = (new \finfo(FILEINFO_MIME_TYPE))->file($path) ?: '';
+            if (str_starts_with($detectado, 'audio/')) {
+                $contentType = $detectado;
+            } elseif ($ext === 'webm' || $ext === 'weba') {
+                $contentType = 'audio/webm';
+            } elseif ($ext === 'ogg' || $ext === 'oga') {
+                $contentType = 'audio/ogg';
+            }
+        }
+        header('Content-Type: ' . $contentType);
+        header('Accept-Ranges: bytes');
         header('Content-Disposition: ' . $disposition . '; filename="' . addslashes(basename($path)) . '"');
         header('Cache-Control: ' . (in_array($type, self::PUBLIC_TYPES, true) ? 'public, max-age=86400' : 'private, max-age=3600'));
         header('X-Content-Type-Options: nosniff');
@@ -222,7 +238,17 @@ class MediaServeController extends BaseController
             'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif',
             'webp' => 'image/webp', 'svg' => 'image/svg+xml',
             'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv',
-            'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogg' => 'video/ogg',
+            // Voz do chat (MediaRecorder) é webm/ogg/m4a — video/* deixa o <audio> mudo/"indisponível"
+            'mp4' => 'video/mp4',
+            'webm' => 'audio/webm',
+            'weba' => 'audio/webm',
+            'ogg' => 'audio/ogg',
+            'oga' => 'audio/ogg',
+            'mp3' => 'audio/mpeg',
+            'mpeg' => 'audio/mpeg',
+            'm4a' => 'audio/mp4',
+            'aac' => 'audio/aac',
+            'wav' => 'audio/wav',
             'doc' => 'application/msword',
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'xls' => 'application/vnd.ms-excel',

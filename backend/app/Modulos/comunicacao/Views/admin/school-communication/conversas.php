@@ -46,7 +46,8 @@ $urlMidia = static function (string $path) use ($urlAnexo): string {
     return $urlAnexo($path);
 };
 
-$renderAvatares = static function (string $fotoResp, string $fotoAluno, string $nomeResp, string $nomeAluno) use ($iniciais): void {
+$renderAvatares = static function (string $fotoResp, string $fotoAluno, string $nomeResp, string $nomeAluno, bool $expandirAluno = false) use ($iniciais): void {
+    $podeExpandir = $expandirAluno && $fotoAluno !== '';
     ?>
     <div class="fc-avatars" title="<?= htmlspecialchars($nomeResp . ' · aluno ' . $nomeAluno, ENT_QUOTES, 'UTF-8') ?>">
         <div class="fc-avatar">
@@ -56,11 +57,22 @@ $renderAvatares = static function (string $fotoResp, string $fotoAluno, string $
                 <?= htmlspecialchars($iniciais($nomeResp)) ?>
             <?php endif; ?>
         </div>
-        <div class="fc-avatar fc-avatar-aluno">
+        <div class="fc-avatar fc-avatar-aluno<?= $podeExpandir ? ' is-expandable' : '' ?>"
+            <?php if ($podeExpandir): ?>
+                role="button"
+                tabindex="0"
+                title="Ver foto do aluno"
+                aria-label="Ver foto de <?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>"
+                data-fc-expand-foto="<?= htmlspecialchars($fotoAluno, ENT_QUOTES, 'UTF-8') ?>"
+                data-fc-expand-nome="<?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>"
+            <?php endif; ?>>
             <?php if ($fotoAluno !== ''): ?>
                 <img src="<?= htmlspecialchars($fotoAluno) ?>" alt="" onerror="this.remove()">
             <?php else: ?>
                 <?= htmlspecialchars($iniciais($nomeAluno)) ?>
+            <?php endif; ?>
+            <?php if ($podeExpandir): ?>
+                <span class="fc-avatar-zoom" aria-hidden="true"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
             <?php endif; ?>
         </div>
     </div>
@@ -161,6 +173,49 @@ $fmtDiaDivisor = static function (string $dt): string {
 .fc-head .fc-avatars .fc-avatar-aluno {
   width:24px; height:24px; border-color:#fff;
 }
+.fc-avatar-aluno.is-expandable {
+  cursor:zoom-in; position:relative;
+}
+.fc-avatar-aluno.is-expandable:hover,
+.fc-avatar-aluno.is-expandable:focus {
+  outline:2px solid #2f6fed; outline-offset:1px;
+}
+.fc-avatar-zoom {
+  position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(15,23,42,.45); color:#fff; font-size:9px; border-radius:999px;
+}
+.fc-head .fc-avatar-aluno.is-expandable:hover .fc-avatar-zoom,
+.fc-head .fc-avatar-aluno.is-expandable:focus .fc-avatar-zoom { display:flex; }
+.fc-head-meta { min-width:0; }
+.fc-head-turma {
+  display:inline-flex; align-items:center; gap:5px; margin-top:3px;
+  font-size:11px; font-weight:600; color:#475569;
+  background:#eef2f7; border-radius:999px; padding:2px 8px; max-width:100%;
+}
+.fc-head-turma i { color:#64748b; font-size:10px; }
+.fc-lightbox {
+  display:none; position:fixed; inset:0; z-index:80;
+  align-items:center; justify-content:center; padding:24px;
+  background:rgba(15,23,42,.72);
+}
+.fc-lightbox.is-open { display:flex; }
+.fc-lightbox-card {
+  position:relative; max-width:min(92vw,420px); width:100%;
+  background:#fff; border-radius:18px; overflow:hidden;
+  box-shadow:0 24px 48px rgba(15,23,42,.28);
+}
+.fc-lightbox-card img {
+  display:block; width:100%; max-height:min(70vh,520px); object-fit:cover; background:#e2e8f0;
+}
+.fc-lightbox-caption {
+  padding:12px 16px; font-size:14px; font-weight:700; color:#0f172a;
+  border-top:1px solid #e6ebf2;
+}
+.fc-lightbox-close {
+  position:absolute; top:10px; right:10px; width:36px; height:36px;
+  border:0; border-radius:999px; background:rgba(15,23,42,.55); color:#fff;
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+}
 .fc-item-main { min-width:0; flex:1; }
 .fc-item-top { display:flex; justify-content:space-between; gap:8px; align-items:center; }
 .fc-item-name { font-size:14px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -218,7 +273,9 @@ $fmtDiaDivisor = static function (string $dt): string {
 .fc-text { font-size:14px; line-height:1.45; color:#0f172a; white-space:pre-wrap; word-break:break-word; }
 .fc-meta { display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:6px; }
 .fc-time { font-size:11px; color:#94a3b8; }
-.fc-checks { color:#16a34a; font-size:12px; }
+.fc-checks { color:#94a3b8; font-size:13px; letter-spacing:-1px; }
+.fc-checks.is-read { color:#53bdeb; }
+.fc-checks i { font-size:13px; }
 .fc-react {
   display:inline-flex; align-items:center; gap:4px; margin-top:6px;
   background:#fff; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px; font-size:11px;
@@ -227,6 +284,37 @@ $fmtDiaDivisor = static function (string $dt): string {
   border:0; background:transparent; color:#64748b; cursor:pointer; padding:0; font-size:12px;
 }
 .fc-like.is-on { color:#0d9488; }
+.fc-quote {
+  display:block; width:100%; text-align:left; border:0; cursor:pointer;
+  margin:0 0 8px; padding:8px 10px; border-radius:10px;
+  border-left:3px solid #64748b; background:rgba(15,23,42,.06);
+}
+.fc-bubble.is-escola .fc-quote { border-left-color:#15803d; background:rgba(22,163,74,.12); }
+.fc-bubble.is-familia .fc-quote { border-left-color:#2563eb; background:rgba(37,99,235,.08); }
+.fc-quote-who { display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:2px; }
+.fc-quote-text {
+  display:block; font-size:12px; color:#475569; line-height:1.35;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.fc-reply {
+  border:0; background:transparent; color:#94a3b8; cursor:pointer; padding:0 2px;
+  font-size:11px; display:inline-flex; align-items:center; gap:4px;
+}
+.fc-reply:hover { color:#1e3a5f; }
+.fc-reply-bar {
+  display:none; margin:0 14px 8px; align-items:stretch; gap:10px;
+  background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;
+  border-left:3px solid #1e3a5f;
+}
+.fc-reply-bar.is-on { display:flex; }
+.fc-reply-bar-main { min-width:0; flex:1; }
+.fc-reply-bar-label { font-size:11px; font-weight:700; color:#1e3a5f; }
+.fc-reply-bar-text {
+  font-size:12px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;
+}
+.fc-reply-bar-close {
+  border:0; background:transparent; color:#94a3b8; cursor:pointer; padding:4px 6px; font-size:14px;
+}
 
 .fc-composer-wrap {
   flex-shrink:0; padding:12px 14px 14px; background:transparent;
@@ -254,6 +342,31 @@ $fmtDiaDivisor = static function (string $dt): string {
   cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .fc-send:hover, .fc-mic:hover { background:#16304f; }
+.fc-send:disabled, .fc-mic:disabled { opacity:.55; cursor:wait; }
+.fc-send.is-loading { pointer-events:none; }
+.fc-composer.is-sending { opacity:.92; }
+.fc-composer.is-sending .fc-input { background:#eef2f7; }
+.fc-composer.is-sending .fc-tool,
+.fc-composer.is-sending .fc-plus { opacity:.45; pointer-events:none; }
+@keyframes fc-spin { to { transform: rotate(360deg); } }
+.fc-spin { animation: fc-spin .7s linear infinite; }
+.fc-row.is-pending .fc-bubble { opacity:.88; }
+.fc-row.is-pending .fc-checks { color:#94a3b8; }
+.fc-row.is-failed .fc-bubble { outline:1px solid #fecaca; }
+.fc-send-status {
+  display:none; margin:0 14px 8px; align-items:center; gap:8px;
+  background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:8px 12px;
+  font-size:13px; color:#1d4ed8; font-weight:600;
+}
+.fc-send-status.is-on { display:flex; }
+.fc-send-fail {
+  margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  font-size:12px; color:#b91c1c;
+}
+.fc-send-fail button {
+  border:0; background:#fee2e2; color:#b91c1c; border-radius:999px;
+  padding:3px 10px; font-size:11px; font-weight:700; cursor:pointer;
+}
 .fc-menu {
   display:none; position:absolute; bottom:48px; left:0; z-index:40; width:190px;
   background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;
@@ -370,9 +483,10 @@ $fmtDiaDivisor = static function (string $dt): string {
                         $naoLidas = (int) ($item['nao_lidas'] ?? 0);
                         $nomeAluno = (string) ($item['aluno_nome'] ?? 'Aluno');
                         $nomeResp = (string) ($item['responsavel_nome'] ?? 'Responsável');
+                        $turmaNome = trim((string) ($item['turma_nome'] ?? ''));
                         $fotoResp = $urlMidia((string) ($item['responsavel_foto_url'] ?? ''));
                         $fotoAluno = $urlMidia((string) ($item['aluno_foto_url'] ?? ($item['foto_url'] ?? '')));
-                        $busca = mb_strtolower($nomeAluno . ' ' . $nomeResp . ' ' . (string) ($item['ultima'] ?? ''));
+                        $busca = mb_strtolower($nomeAluno . ' ' . $nomeResp . ' ' . $turmaNome . ' ' . (string) ($item['ultima'] ?? ''));
                         ?>
                         <a href="<?= $baseUrl ?>/<?= $id ?>"
                            class="fc-item <?= $ativa ? 'is-on' : '' ?>"
@@ -384,7 +498,7 @@ $fmtDiaDivisor = static function (string $dt): string {
                                     <div class="fc-item-name"><?= htmlspecialchars($nomeResp) ?></div>
                                     <div class="fc-item-time"><?= htmlspecialchars($fmtHoraLista($item['updated_at'] ?? null)) ?></div>
                                 </div>
-                                <div class="fc-item-sub">Aluno: <?= htmlspecialchars($nomeAluno) ?></div>
+                                <div class="fc-item-sub">Aluno: <?= htmlspecialchars($nomeAluno) ?><?= $turmaNome !== '' ? ' · ' . htmlspecialchars($turmaNome) : '' ?></div>
                                 <div class="fc-item-bottom">
                                     <div class="fc-item-last"><?= htmlspecialchars((string) (($item['ultima'] ?? '') !== '' ? $item['ultima'] : 'Anexo')) ?></div>
                                     <?php if ($naoLidas > 0): ?>
@@ -411,26 +525,43 @@ $fmtDiaDivisor = static function (string $dt): string {
                 <?php
                 $nomeAluno = (string) ($conversa['aluno_nome'] ?? 'Aluno');
                 $nomeResp = (string) ($conversa['responsavel_nome'] ?? 'Responsável');
+                $turmaNome = trim((string) ($conversa['turma_nome'] ?? ''));
                 $fotoResp = $urlMidia((string) ($conversa['responsavel_foto_url'] ?? ''));
                 $fotoAluno = $urlMidia((string) ($conversa['aluno_foto_url'] ?? ($conversa['foto_url'] ?? '')));
                 ?>
                 <div class="fc-head">
                     <div class="fc-head-left">
-                        <?php $renderAvatares($fotoResp, $fotoAluno, $nomeResp, $nomeAluno); ?>
-                        <div class="min-w-0">
+                        <?php $renderAvatares($fotoResp, $fotoAluno, $nomeResp, $nomeAluno, true); ?>
+                        <div class="fc-head-meta">
                             <p class="font-bold text-slate-900 truncate"><?= htmlspecialchars($nomeResp) ?></p>
                             <p class="text-xs text-slate-500 truncate">Aluno: <?= htmlspecialchars($nomeAluno) ?></p>
+                            <?php if ($turmaNome !== ''): ?>
+                                <span class="fc-head-turma" title="Turma do aluno">
+                                    <i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i>
+                                    <span class="truncate"><?= htmlspecialchars($turmaNome) ?></span>
+                                </span>
+                            <?php else: ?>
+                                <span class="fc-head-turma" title="Sem turma vinculada" style="color:#94a3b8;font-weight:500;">
+                                    <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
+                                    <span>Sem turma</span>
+                                </span>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="fc-head-actions">
-                        <button type="button" class="fc-round" disabled title="Em breve"><i class="fa-solid fa-video"></i></button>
-                        <button type="button" class="fc-round" disabled title="Em breve"><i class="fa-solid fa-phone"></i></button>
+                        <?php if ($fotoAluno !== ''): ?>
+                            <button type="button" class="fc-round" id="fc-btn-foto-aluno" title="Ver foto do aluno"
+                                    data-fc-expand-foto="<?= htmlspecialchars($fotoAluno, ENT_QUOTES, 'UTF-8') ?>"
+                                    data-fc-expand-nome="<?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>">
+                                <i class="fa-regular fa-image"></i>
+                            </button>
+                        <?php endif; ?>
                         <button type="button" id="fc-btn-info" class="fc-round" title="Informações"
                                 data-aluno="<?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>"
-                                data-responsavel="<?= htmlspecialchars($nomeResp, ENT_QUOTES, 'UTF-8') ?>">
+                                data-responsavel="<?= htmlspecialchars($nomeResp, ENT_QUOTES, 'UTF-8') ?>"
+                                data-turma="<?= htmlspecialchars($turmaNome, ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fa-solid fa-circle-info"></i>
                         </button>
-                        <button type="button" class="fc-round" disabled title="Mais opções"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                     </div>
                 </div>
 
@@ -474,15 +605,46 @@ $fmtDiaDivisor = static function (string $dt): string {
                         $curtidas = (int) ($mensagem['curtidas'] ?? 0);
                         $euCurti = !empty($mensagem['eu_curti']);
                         $lidaFamilia = !empty($mensagem['lido_familia_em']);
+                        $respostaId = (int) ($mensagem['resposta_a_mensagem_id'] ?? 0);
+                        $respostaAutor = (string) ($mensagem['resposta_autor_tipo'] ?? '');
+                        $respostaTexto = trim((string) ($mensagem['resposta_mensagem'] ?? ''));
+                        $respostaAnexo = (string) ($mensagem['resposta_anexo_tipo'] ?? (!empty($mensagem['resposta_imagem']) ? 'imagem' : ''));
+                        $respostaNome = (string) ($mensagem['resposta_imagem_nome'] ?? 'Anexo');
+                        if ($respostaTexto === '' && $respostaAnexo !== '') {
+                            $respostaTexto = match ($respostaAnexo) {
+                                'audio' => 'Áudio',
+                                'imagem' => 'Foto',
+                                'video' => 'Vídeo',
+                                default => $respostaNome !== '' ? $respostaNome : 'Anexo',
+                            };
+                        }
+                        $previewResponder = trim((string) ($mensagem['mensagem'] ?? ''));
+                        if ($previewResponder === '') {
+                            $previewResponder = match ($anexoTipo) {
+                                'audio' => 'Áudio',
+                                'imagem' => 'Foto',
+                                'video' => 'Vídeo',
+                                default => $anexoPath !== '' ? ($anexoNome !== '' ? $anexoNome : 'Anexo') : '',
+                            };
+                        }
                         ?>
                         <?php if ($dia !== '' && $dia !== $diaAtual): ?>
                             <?php $diaAtual = $dia; ?>
                             <div class="fc-day" data-fc-dia="<?= htmlspecialchars($dia, ENT_QUOTES, 'UTF-8') ?>"><span><?= htmlspecialchars($fmtDiaDivisor($created)) ?></span></div>
                         <?php endif; ?>
 
-                        <div id="msg-<?= $msgId ?>" class="fc-row <?= $daEscola ? 'is-escola' : 'is-familia' ?>">
+                        <div id="msg-<?= $msgId ?>" class="fc-row <?= $daEscola ? 'is-escola' : 'is-familia' ?>"
+                             data-fc-msg-id="<?= $msgId ?>"
+                             data-fc-autor="<?= $daEscola ? 'escola' : 'familia' ?>"
+                             data-fc-preview="<?= htmlspecialchars($previewResponder, ENT_QUOTES, 'UTF-8') ?>">
                             <div class="fc-bubble <?= $daEscola ? 'is-escola' : 'is-familia' ?>">
                                 <span class="fc-tag <?= $daEscola ? 'is-escola' : 'is-familia' ?>"><?= $daEscola ? 'Escola' : 'Família' ?></span>
+                                <?php if ($respostaId > 0): ?>
+                                    <button type="button" class="fc-quote" data-fc-goto="<?= $respostaId ?>" title="Ir para mensagem">
+                                        <span class="fc-quote-who"><?= $respostaAutor === 'escola' ? 'Escola' : 'Família' ?></span>
+                                        <span class="fc-quote-text"><?= htmlspecialchars($respostaTexto !== '' ? $respostaTexto : 'Mensagem') ?></span>
+                                    </button>
+                                <?php endif; ?>
                                 <?php if (trim((string) ($mensagem['mensagem'] ?? '')) !== ''): ?>
                                     <div class="fc-text"><?= nl2br(htmlspecialchars((string) $mensagem['mensagem'])) ?></div>
                                 <?php endif; ?>
@@ -499,7 +661,13 @@ $fmtDiaDivisor = static function (string $dt): string {
                                     <?php
                                     $barras = [8,14,10,18,12,16,9,15,11,17,13,10,16,12,14,9,18,11,15,10,13,17,12,16,9,14,11,15];
                                     ?>
-                                    <div class="fc-audio" data-fc-audio data-src="<?= htmlspecialchars($anexoUrl, ENT_QUOTES, 'UTF-8') ?>" data-mime="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm', ENT_QUOTES, 'UTF-8') ?>">
+                                    <?php
+                                    $audioMimeUi = $anexoMime !== '' ? $anexoMime : 'audio/webm';
+                                    if (str_starts_with(strtolower($audioMimeUi), 'video/')) {
+                                        $audioMimeUi = preg_replace('#^video/#', 'audio/', strtolower($audioMimeUi)) ?: 'audio/webm';
+                                    }
+                                    ?>
+                                    <div class="fc-audio" data-fc-audio data-src="<?= htmlspecialchars($anexoUrl, ENT_QUOTES, 'UTF-8') ?>" data-mime="<?= htmlspecialchars($audioMimeUi, ENT_QUOTES, 'UTF-8') ?>">
                                         <button type="button" class="fc-audio-play" aria-label="Reproduzir áudio"><i class="fa-solid fa-play"></i></button>
                                         <div class="fc-audio-body">
                                             <div class="fc-audio-track" data-fc-seek>
@@ -512,9 +680,7 @@ $fmtDiaDivisor = static function (string $dt): string {
                                             </div>
                                             <span class="fc-audio-time">0:00</span>
                                         </div>
-                                        <audio preload="metadata" playsinline>
-                                            <source src="<?= htmlspecialchars($anexoUrl) ?>" type="<?= htmlspecialchars($anexoMime !== '' ? $anexoMime : 'audio/webm') ?>">
-                                        </audio>
+                                        <audio preload="none" playsinline src="<?= htmlspecialchars($anexoUrl) ?>"></audio>
                                     </div>
                                 <?php elseif ($anexoUrl !== ''): ?>
                                     <a href="<?= htmlspecialchars($anexoUrl) ?>" target="_blank" rel="noopener"
@@ -538,10 +704,19 @@ $fmtDiaDivisor = static function (string $dt): string {
                                 <?php endif; ?>
 
                                 <div class="fc-meta">
+                                    <?php if ($msgId > 0): ?>
+                                        <button type="button" class="fc-reply" data-fc-reply="<?= $msgId ?>"
+                                                data-fc-reply-autor="<?= $daEscola ? 'escola' : 'familia' ?>"
+                                                data-fc-reply-preview="<?= htmlspecialchars($previewResponder, ENT_QUOTES, 'UTF-8') ?>"
+                                                title="Responder">
+                                            <i class="fa-solid fa-reply"></i> Responder
+                                        </button>
+                                    <?php endif; ?>
                                     <span class="fc-time"><?= $created !== '' ? date('H:i', strtotime($created)) : '' ?></span>
                                     <?php if ($daEscola): ?>
-                                        <span class="fc-checks" title="<?= $lidaFamilia ? 'Lida pela família' : 'Enviada' ?>">
-                                            <i class="fa-solid fa-check<?= $lidaFamilia ? '-double' : '' ?>"></i>
+                                        <span class="fc-checks<?= $lidaFamilia ? ' is-read' : '' ?>"
+                                              title="<?= $lidaFamilia ? 'Visualizada pela família' : 'Enviada' ?>">
+                                            <i class="fa-solid fa-check-double"></i>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -563,9 +738,23 @@ $fmtDiaDivisor = static function (string $dt): string {
                         </button>
                     </span>
                 </div>
+                <div id="fale-enviando" class="fc-send-status" aria-live="polite">
+                    <i class="fa-solid fa-spinner fc-spin" aria-hidden="true"></i>
+                    <span id="fale-enviando-texto">Enviando mensagem…</span>
+                </div>
+                <div id="fale-reply-bar" class="fc-reply-bar" aria-live="polite">
+                    <div class="fc-reply-bar-main">
+                        <div class="fc-reply-bar-label" id="fale-reply-label">Respondendo</div>
+                        <div class="fc-reply-bar-text" id="fale-reply-text"></div>
+                    </div>
+                    <button type="button" id="fale-reply-cancelar" class="fc-reply-bar-close" title="Cancelar resposta" aria-label="Cancelar resposta">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
 
                 <form id="fale-chat-form" method="post" enctype="multipart/form-data" action="<?= $baseUrl ?>/<?= $conversaId ?>/responder" class="fc-composer-wrap">
                     <input type="hidden" name="_token" value="<?= $csrf ?>">
+                    <input type="hidden" name="resposta_a_mensagem_id" id="fale-reply-id" value="">
                     <input type="file" id="fale-anexo-input" name="anexo" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf,audio/*" class="hidden">
 
                     <div class="fc-composer">
@@ -600,6 +789,193 @@ $fmtDiaDivisor = static function (string $dt): string {
             ?>
             <?php endif; ?>
         </section>
+    </div>
+</div>
+
+<?php if (is_array($conversa) && $conversa !== []): ?>
+<?php
+$infoAlunoNome = (string) ($conversa['aluno_nome'] ?? 'Aluno');
+$infoRespNome = (string) ($conversa['responsavel_nome'] ?? 'Responsável');
+$infoTurma = trim((string) ($conversa['turma_nome'] ?? ''));
+$infoAlunoId = (int) ($conversa['aluno_id'] ?? 0);
+$infoAlunoRa = trim((string) ($conversa['aluno_ra'] ?? ''));
+$infoAlunoEmail = trim((string) ($conversa['aluno_email'] ?? ''));
+$infoAlunoTel = trim((string) ($conversa['aluno_telefone'] ?? ''));
+$infoAlunoCel = trim((string) ($conversa['aluno_celular'] ?? ''));
+$infoFotoAluno = $urlMidia((string) ($conversa['aluno_foto_url'] ?? ($conversa['foto_url'] ?? '')));
+$infoFotoResp = $urlMidia((string) ($conversa['responsavel_foto_url'] ?? ''));
+$infoRespEmail = trim((string) ($conversa['responsavel_email'] ?? ''));
+$infoRespTel = trim((string) ($conversa['responsavel_telefone'] ?? ''));
+$infoRespCel = trim((string) ($conversa['responsavel_celular'] ?? ''));
+$infoParentesco = trim((string) ($conversa['responsavel_parentesco'] ?? ''));
+$infoIniciais = $iniciais;
+$digitosFone = static function (string $raw): string {
+    return preg_replace('/\D+/', '', $raw) ?: '';
+};
+$linkWhats = static function (string $raw) use ($digitosFone): string {
+    $d = $digitosFone($raw);
+    if ($d === '') {
+        return '';
+    }
+    if (strlen($d) <= 11) {
+        $d = '55' . $d;
+    }
+    return 'https://wa.me/' . $d;
+};
+$fonePrincipalResp = $infoRespCel !== '' ? $infoRespCel : $infoRespTel;
+$waResp = $fonePrincipalResp !== '' ? $linkWhats($fonePrincipalResp) : '';
+ob_start();
+?>
+<div class="flex-1 overflow-y-auto px-6 sm:px-8 py-5 space-y-6">
+    <section>
+        <div class="flex flex-col items-center text-center">
+            <?php if ($infoFotoAluno !== ''): ?>
+                <button type="button"
+                        class="relative group rounded-2xl overflow-hidden w-40 h-40 shadow-md border border-slate-200 bg-slate-100"
+                        data-fc-expand-foto="<?= htmlspecialchars($infoFotoAluno, ENT_QUOTES, 'UTF-8') ?>"
+                        data-fc-expand-nome="<?= htmlspecialchars($infoAlunoNome, ENT_QUOTES, 'UTF-8') ?>"
+                        title="Ampliar foto">
+                    <img src="<?= htmlspecialchars($infoFotoAluno) ?>" alt="Foto de <?= htmlspecialchars($infoAlunoNome) ?>" class="w-full h-full object-cover">
+                    <span class="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/35 transition flex items-center justify-center text-white opacity-0 group-hover:opacity-100">
+                        <i class="fa-solid fa-magnifying-glass-plus text-lg"></i>
+                    </span>
+                </button>
+            <?php else: ?>
+                <div class="w-40 h-40 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center text-3xl font-bold border border-blue-200">
+                    <?= htmlspecialchars($infoIniciais($infoAlunoNome)) ?>
+                </div>
+            <?php endif; ?>
+            <h3 class="mt-4 text-lg font-bold text-slate-900"><?= htmlspecialchars($infoAlunoNome) ?></h3>
+            <?php if ($infoTurma !== ''): ?>
+                <p class="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-full px-3 py-1">
+                    <i class="fa-solid fa-chalkboard-user text-slate-500"></i>
+                    Turma <?= htmlspecialchars($infoTurma) ?>
+                </p>
+            <?php endif; ?>
+        </div>
+
+        <dl class="mt-5 space-y-3 text-sm">
+            <?php if ($infoAlunoRa !== ''): ?>
+                <div class="flex justify-between gap-3 border-b border-slate-100 pb-2">
+                    <dt class="text-slate-500">RA</dt>
+                    <dd class="font-medium text-slate-900 text-right"><?= htmlspecialchars($infoAlunoRa) ?></dd>
+                </div>
+            <?php endif; ?>
+            <?php if ($infoAlunoEmail !== ''): ?>
+                <div class="flex justify-between gap-3 border-b border-slate-100 pb-2">
+                    <dt class="text-slate-500">E-mail</dt>
+                    <dd class="font-medium text-slate-900 text-right break-all">
+                        <a href="mailto:<?= htmlspecialchars($infoAlunoEmail) ?>" class="text-blue-700 hover:underline"><?= htmlspecialchars($infoAlunoEmail) ?></a>
+                    </dd>
+                </div>
+            <?php endif; ?>
+            <?php if ($infoAlunoCel !== '' || $infoAlunoTel !== ''): ?>
+                <div class="flex justify-between gap-3 border-b border-slate-100 pb-2">
+                    <dt class="text-slate-500">Telefone</dt>
+                    <dd class="font-medium text-slate-900 text-right">
+                        <?php $telAluno = $infoAlunoCel !== '' ? $infoAlunoCel : $infoAlunoTel; ?>
+                        <a href="tel:<?= htmlspecialchars($digitosFone($telAluno)) ?>" class="hover:underline"><?= htmlspecialchars($telAluno) ?></a>
+                    </dd>
+                </div>
+            <?php endif; ?>
+        </dl>
+
+        <?php if ($infoAlunoId > 0): ?>
+            <a href="<?= URL ?>/admin/students/<?= $infoAlunoId ?>"
+               class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <i class="fa-regular fa-id-card"></i> Abrir ficha do aluno
+            </a>
+        <?php endif; ?>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h4 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Responsável</h4>
+        <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-full overflow-hidden bg-blue-100 text-blue-800 flex items-center justify-center text-sm font-bold flex-shrink-0 border border-white shadow">
+                <?php if ($infoFotoResp !== ''): ?>
+                    <img src="<?= htmlspecialchars($infoFotoResp) ?>" alt="" class="w-full h-full object-cover" onerror="this.remove()">
+                <?php else: ?>
+                    <?= htmlspecialchars($infoIniciais($infoRespNome)) ?>
+                <?php endif; ?>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="font-bold text-slate-900 truncate"><?= htmlspecialchars($infoRespNome) ?></p>
+                <?php if ($infoParentesco !== ''): ?>
+                    <p class="text-xs text-slate-500 mt-0.5"><?= htmlspecialchars($infoParentesco) ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <dl class="mt-4 space-y-3 text-sm">
+            <?php if ($infoRespCel !== ''): ?>
+                <div class="flex items-center justify-between gap-3">
+                    <dt class="text-slate-500">Celular / WhatsApp</dt>
+                    <dd class="font-medium text-slate-900 text-right">
+                        <a href="tel:<?= htmlspecialchars($digitosFone($infoRespCel)) ?>" class="hover:underline"><?= htmlspecialchars($infoRespCel) ?></a>
+                    </dd>
+                </div>
+            <?php endif; ?>
+            <?php if ($infoRespTel !== '' && $infoRespTel !== $infoRespCel): ?>
+                <div class="flex items-center justify-between gap-3">
+                    <dt class="text-slate-500">Telefone</dt>
+                    <dd class="font-medium text-slate-900 text-right">
+                        <a href="tel:<?= htmlspecialchars($digitosFone($infoRespTel)) ?>" class="hover:underline"><?= htmlspecialchars($infoRespTel) ?></a>
+                    </dd>
+                </div>
+            <?php endif; ?>
+            <?php if ($infoRespEmail !== ''): ?>
+                <div class="flex items-start justify-between gap-3">
+                    <dt class="text-slate-500">E-mail</dt>
+                    <dd class="font-medium text-slate-900 text-right break-all">
+                        <a href="mailto:<?= htmlspecialchars($infoRespEmail) ?>" class="text-blue-700 hover:underline"><?= htmlspecialchars($infoRespEmail) ?></a>
+                    </dd>
+                </div>
+            <?php endif; ?>
+            <?php if ($infoRespCel === '' && $infoRespTel === '' && $infoRespEmail === ''): ?>
+                <p class="text-slate-500 text-sm">Nenhum contato cadastrado para este responsável.</p>
+            <?php endif; ?>
+        </dl>
+
+        <?php if ($waResp !== '' || $fonePrincipalResp !== '' || $infoRespEmail !== ''): ?>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <?php if ($fonePrincipalResp !== ''): ?>
+                    <a href="tel:<?= htmlspecialchars($digitosFone($fonePrincipalResp)) ?>"
+                       class="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                        <i class="fa-solid fa-phone text-emerald-600"></i> Ligar
+                    </a>
+                <?php endif; ?>
+                <?php if ($waResp !== ''): ?>
+                    <a href="<?= htmlspecialchars($waResp) ?>" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">
+                        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                    </a>
+                <?php endif; ?>
+                <?php if ($infoRespEmail !== ''): ?>
+                    <a href="mailto:<?= htmlspecialchars($infoRespEmail) ?>"
+                       class="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                        <i class="fa-regular fa-envelope text-blue-600"></i> E-mail
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </section>
+</div>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'fcInfo';
+$ui_offcanvas_titulo = 'Informações da conversa';
+$ui_offcanvas_max_w = 'max-w-md';
+include dirname(__DIR__, 5) . '/Views/admin/_partials/ui/offcanvas.php';
+?>
+<?php endif; ?>
+
+<div id="fc-lightbox" class="fc-lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Foto do aluno">
+    <div class="fc-lightbox-card">
+        <button type="button" class="fc-lightbox-close" id="fc-lightbox-close" title="Fechar" aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="fc-lightbox-img" src="" alt="">
+        <div class="fc-lightbox-caption" id="fc-lightbox-caption"></div>
     </div>
 </div>
 
@@ -686,9 +1062,15 @@ $fmtDiaDivisor = static function (string $dt): string {
         }
         if (anexoTipo === '' && (anexoMime.indexOf('audio/') === 0 || extAudio)) anexoTipo = 'audio';
         if (anexoTipo === 'arquivo' && (anexoMime.indexOf('audio/') === 0 || extAudio)) anexoTipo = 'audio';
-        if (anexoTipo === 'audio' && anexoMime === '') {
-            var mimeMap = { m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac', weba: 'audio/webm', webm: 'audio/webm' };
-            anexoMime = mimeMap[ext] || 'audio/webm';
+        // MediaRecorder/webm às vezes chega como video/webm — trata como áudio
+        if ((anexoTipo === 'video' || anexoTipo === '') && extAudio && (ext === 'webm' || ext === 'weba' || ext === 'm4a' || ext === 'ogg')) {
+            anexoTipo = 'audio';
+        }
+        if (anexoTipo === 'audio') {
+            if (anexoMime === '' || anexoMime.indexOf('video/') === 0) {
+                var mimeMap = { m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac', weba: 'audio/webm', webm: 'audio/webm' };
+                anexoMime = mimeMap[ext] || (anexoMime.indexOf('video/') === 0 ? anexoMime.replace('video/', 'audio/') : 'audio/webm');
+            }
         }
         var anexoUrl = urlAnexoJs(path);
         if (!anexoTipo && anexoUrl && anexoMime.indexOf('image/') === 0) anexoTipo = 'imagem';
@@ -730,11 +1112,53 @@ $fmtDiaDivisor = static function (string $dt): string {
         else if (dur > 0) timeEl.textContent = fmtAudio(dur);
         else timeEl.textContent = fmtAudio(cur);
     }
+    function mimeAudioBlob(mime, nome) {
+        var m = String(mime || '').toLowerCase().split(';')[0];
+        var n = String(nome || '').toLowerCase();
+        if (m === 'video/webm' || m === 'application/octet-stream' || m === '') {
+            if (n.indexOf('.m4a') !== -1 || n.indexOf('.mp4') !== -1) return 'audio/mp4';
+            if (n.indexOf('.mp3') !== -1) return 'audio/mpeg';
+            if (n.indexOf('.ogg') !== -1) return 'audio/ogg';
+            if (n.indexOf('.wav') !== -1) return 'audio/wav';
+            return 'audio/webm';
+        }
+        if (m.indexOf('video/') === 0 && (n.indexOf('.webm') !== -1 || n.indexOf('.ogg') !== -1)) {
+            return m.replace('video/', 'audio/');
+        }
+        return m || 'audio/webm';
+    }
     function garantirSrcAudio(wrap, audio) {
         var src = wrap.getAttribute('data-src') || '';
-        if (src && (!audio.src || audio.src.indexOf(src) === -1)) {
-            audio.src = src;
+        if (!src) return;
+        // Remove <source type="..."> errado que impede o decode
+        var sources = audio.querySelectorAll('source');
+        sources.forEach(function (s) { s.remove(); });
+        if (!audio.getAttribute('src') || audio.getAttribute('src') !== src) {
+            audio.setAttribute('src', src);
+            audio.load();
         }
+    }
+    function carregarAudioBlob(wrap, audio) {
+        var src = wrap.getAttribute('data-src') || '';
+        var mimeHint = wrap.getAttribute('data-mime') || '';
+        if (!src) return Promise.reject(new Error('sem src'));
+        if (wrap._fcBlobUrl) {
+            audio.src = wrap._fcBlobUrl;
+            return audio.play();
+        }
+        return fetch(src, { credentials: 'same-origin', headers: { 'Accept': 'audio/*,*/*' } })
+            .then(function (res) {
+                if (!res.ok) throw new Error('http ' + res.status);
+                var ct = res.headers.get('Content-Type') || mimeHint;
+                return res.blob().then(function (blob) {
+                    var tipo = mimeAudioBlob(ct || blob.type, src);
+                    var audioBlob = new Blob([blob], { type: tipo });
+                    if (wrap._fcBlobUrl) URL.revokeObjectURL(wrap._fcBlobUrl);
+                    wrap._fcBlobUrl = URL.createObjectURL(audioBlob);
+                    audio.src = wrap._fcBlobUrl;
+                    return audio.play();
+                });
+            });
     }
     function initAudioPlayer(wrap) {
         if (!wrap || wrap.getAttribute('data-fc-audio-init') === '1') return;
@@ -743,6 +1167,7 @@ $fmtDiaDivisor = static function (string $dt): string {
         var btn = wrap.querySelector('.fc-audio-play');
         var track = wrap.querySelector('[data-fc-seek]');
         if (!audio || !btn) return;
+        audio.setAttribute('preload', 'none');
         garantirSrcAudio(wrap, audio);
 
         audio.addEventListener('loadedmetadata', function () { atualizarPlayerAudio(wrap); });
@@ -754,37 +1179,44 @@ $fmtDiaDivisor = static function (string $dt): string {
             atualizarPlayerAudio(wrap);
             if (audioAtual === audio) audioAtual = null;
         });
-        audio.addEventListener('error', function () {
-            var timeEl = wrap.querySelector('.fc-audio-time');
-            if (timeEl) {
-                timeEl.textContent = 'indisponível';
-                timeEl.setAttribute('data-fc-indisp', '1');
-            }
-        });
+        // Não marca "indisponível" no preload — só após tentativa real de play
 
         btn.addEventListener('click', function () {
-            garantirSrcAudio(wrap, audio);
             var timeEl = wrap.querySelector('.fc-audio-time');
-            if (timeEl) timeEl.removeAttribute('data-fc-indisp');
+            if (timeEl) {
+                timeEl.removeAttribute('data-fc-indisp');
+                timeEl.textContent = '…';
+            }
             if (audio.paused) {
                 pararAudioTodos(wrap);
-                var playPromise = audio.play();
-                if (playPromise && typeof playPromise.then === 'function') {
-                    playPromise.then(function () {
+                btn.disabled = true;
+                var iniciar = function () {
+                    return audio.play().then(function () {
                         audioAtual = audio;
                         btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
                         atualizarPlayerAudio(wrap);
-                    }).catch(function () {
+                    });
+                };
+                Promise.resolve()
+                    .then(function () {
+                        garantirSrcAudio(wrap, audio);
+                        return iniciar();
+                    })
+                    .catch(function () {
+                        return carregarAudioBlob(wrap, audio).then(function () {
+                            audioAtual = audio;
+                            btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                            atualizarPlayerAudio(wrap);
+                        });
+                    })
+                    .catch(function () {
                         btn.innerHTML = '<i class="fa-solid fa-play"></i>';
                         if (timeEl) {
                             timeEl.textContent = 'indisponível';
                             timeEl.setAttribute('data-fc-indisp', '1');
                         }
-                    });
-                } else {
-                    audioAtual = audio;
-                    btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
-                }
+                    })
+                    .finally(function () { btn.disabled = false; });
             } else {
                 audio.pause();
                 btn.innerHTML = '<i class="fa-solid fa-play"></i>';
@@ -809,7 +1241,7 @@ $fmtDiaDivisor = static function (string $dt): string {
         var bars = AUDIO_BARS.map(function (h) {
             return '<span style="height:' + h + 'px"></span>';
         }).join('');
-        var mime = anexoMime || 'audio/webm';
+        var mime = mimeAudioBlob(anexoMime || 'audio/webm', anexoUrl);
         return '<div class="fc-audio" data-fc-audio data-src="' + escHtml(anexoUrl) + '" data-mime="' + escHtml(mime) + '">' +
             '<button type="button" class="fc-audio-play" aria-label="Reproduzir áudio"><i class="fa-solid fa-play"></i></button>' +
             '<div class="fc-audio-body">' +
@@ -817,7 +1249,29 @@ $fmtDiaDivisor = static function (string $dt): string {
             '<div class="fc-audio-bars">' + bars + '</div>' +
             '<div class="fc-audio-scrub" style="left:0%"></div></div>' +
             '<span class="fc-audio-time">0:00</span></div>' +
-            '<audio preload="metadata" playsinline src="' + escHtml(anexoUrl) + '"></audio></div>';
+            '<audio preload="none" playsinline src="' + escHtml(anexoUrl) + '"></audio></div>';
+    }
+
+    function previewTextoMensagem(m) {
+        var txt = ((m && m.mensagem) || '').toString().trim();
+        if (txt) return txt;
+        var tipo = ((m && m.anexo_tipo) || '').toString();
+        if (tipo === 'audio') return 'Áudio';
+        if (tipo === 'imagem') return 'Foto';
+        if (tipo === 'video') return 'Vídeo';
+        if ((m && (m.imagem || m.url))) return ((m.imagem_nome || 'Anexo') + '');
+        return 'Mensagem';
+    }
+
+    function htmlCitacao(m) {
+        var resp = m && m.resposta ? m.resposta : null;
+        var respId = parseInt((m && m.resposta_a_mensagem_id) || (resp && resp.id) || 0, 10) || 0;
+        if (respId <= 0) return '';
+        var autor = ((resp && resp.autor_tipo) || '') === 'escola' ? 'Escola' : 'Família';
+        var txt = previewTextoMensagem(resp || {});
+        return '<button type="button" class="fc-quote" data-fc-goto="' + respId + '" title="Ir para mensagem">' +
+            '<span class="fc-quote-who">' + escHtml(autor) + '</span>' +
+            '<span class="fc-quote-text">' + escHtml(txt) + '</span></button>';
     }
 
     function renderMensagem(m) {
@@ -829,10 +1283,15 @@ $fmtDiaDivisor = static function (string $dt): string {
         var curtidas = parseInt(m.curtidas, 10) || 0;
         var euCurti = !!m.eu_curti;
         var lidaFamilia = !!(m.lido_familia_em);
+        var preview = previewTextoMensagem(m);
 
-        var html = '<div id="msg-' + msgId + '" class="fc-row ' + (daEscola ? 'is-escola' : 'is-familia') + '">' +
+        var html = '<div id="msg-' + msgId + '" class="fc-row ' + (daEscola ? 'is-escola' : 'is-familia') + '"' +
+            ' data-fc-msg-id="' + msgId + '"' +
+            ' data-fc-autor="' + (daEscola ? 'escola' : 'familia') + '"' +
+            ' data-fc-preview="' + escHtml(preview) + '">' +
             '<div class="fc-bubble ' + (daEscola ? 'is-escola' : 'is-familia') + '">' +
-            '<span class="fc-tag ' + (daEscola ? 'is-escola' : 'is-familia') + '">' + (daEscola ? 'Escola' : 'Família') + '</span>';
+            '<span class="fc-tag ' + (daEscola ? 'is-escola' : 'is-familia') + '">' + (daEscola ? 'Escola' : 'Família') + '</span>' +
+            htmlCitacao(m);
 
         if ((m.mensagem || '').toString().trim() !== '') {
             html += '<div class="fc-text">' + textoHtml(m.mensagem) + '</div>';
@@ -864,10 +1323,18 @@ $fmtDiaDivisor = static function (string $dt): string {
             html += '</div>';
         }
 
-        html += '<div class="fc-meta"><span class="fc-time">' + escHtml(hora) + '</span>';
+        html += '<div class="fc-meta">';
+        if (msgId > 0) {
+            html += '<button type="button" class="fc-reply" data-fc-reply="' + msgId + '"' +
+                ' data-fc-reply-autor="' + (daEscola ? 'escola' : 'familia') + '"' +
+                ' data-fc-reply-preview="' + escHtml(preview) + '" title="Responder">' +
+                '<i class="fa-solid fa-reply"></i> Responder</button>';
+        }
+        html += '<span class="fc-time">' + escHtml(hora) + '</span>';
         if (daEscola) {
-            html += '<span class="fc-checks" title="' + (lidaFamilia ? 'Lida pela família' : 'Enviada') + '">' +
-                '<i class="fa-solid fa-check' + (lidaFamilia ? '-double' : '') + '"></i></span>';
+            html += '<span class="fc-checks' + (lidaFamilia ? ' is-read' : '') + '"' +
+                ' title="' + (lidaFamilia ? 'Visualizada pela família' : 'Enviada') + '">' +
+                '<i class="fa-solid fa-check-double"></i></span>';
         }
         html += '</div></div></div>';
         return html;
@@ -952,21 +1419,188 @@ $fmtDiaDivisor = static function (string $dt): string {
     function atualizarChecks(msgId, lido) {
         var row = document.getElementById('msg-' + msgId);
         if (!row) return;
-        var checks = row.querySelector('.fc-checks i');
-        if (!checks) return;
-        checks.className = 'fa-solid fa-check' + (lido ? '-double' : '');
-        row.querySelector('.fc-checks').title = lido ? 'Lida pela família' : 'Enviada';
+        var wrap = row.querySelector('.fc-checks');
+        if (!wrap) return;
+        var icon = wrap.querySelector('i');
+        if (icon) icon.className = 'fa-solid fa-check-double';
+        wrap.classList.toggle('is-read', !!lido);
+        wrap.title = lido ? 'Visualizada pela família' : 'Enviada';
+    }
+
+    function horaAgora() {
+        var d = new Date();
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function setEstadoEnvio(ativo, texto) {
+        enviando = !!ativo;
+        var formEl = document.getElementById('fale-chat-form');
+        var composer = formEl ? formEl.querySelector('.fc-composer') : null;
+        var chip = document.getElementById('fale-enviando');
+        var chipTxt = document.getElementById('fale-enviando-texto');
+        var btn = document.getElementById('fale-btn-enviar');
+        var mic = document.getElementById('fale-btn-mic');
+        var msg = document.getElementById('fale-mensagem');
+        if (composer) composer.classList.toggle('is-sending', enviando);
+        if (chip) chip.classList.toggle('is-on', enviando);
+        if (chipTxt && texto) chipTxt.textContent = texto;
+        if (msg) msg.disabled = enviando;
+        ['fale-btn-mais', 'fale-btn-clip', 'fale-btn-galeria', 'fale-btn-emoji', 'fale-anexo-remover'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = enviando;
+        });
+        if (mic) {
+            mic.disabled = enviando;
+            if (enviando) mic.style.display = 'none';
+        }
+        if (btn) {
+            btn.disabled = enviando;
+            btn.classList.toggle('is-loading', enviando);
+            btn.innerHTML = enviando
+                ? '<i class="fa-solid fa-spinner fc-spin" aria-hidden="true"></i>'
+                : '<i class="fa-solid fa-paper-plane"></i>';
+            if (enviando) {
+                btn.style.display = 'inline-flex';
+                btn.setAttribute('aria-label', 'Enviando');
+                btn.title = 'Enviando…';
+            } else {
+                btn.setAttribute('aria-label', 'Enviar');
+                btn.title = 'Enviar';
+                if (typeof atualizarAcoes === 'function') atualizarAcoes();
+            }
+        }
+    }
+
+    function criarBolhaPendente(texto, anexoNome) {
+        if (!box) return null;
+        removerVazio();
+        var pid = 'pending-' + Date.now();
+        var row = document.createElement('div');
+        row.id = pid;
+        row.className = 'fc-row is-escola is-pending';
+        row.setAttribute('data-fc-pending', '1');
+        var replyIdEl = document.getElementById('fale-reply-id');
+        var replyTextEl = document.getElementById('fale-reply-text');
+        var replyLabelEl = document.getElementById('fale-reply-label');
+        var replyId = parseInt((replyIdEl && replyIdEl.value) || '0', 10) || 0;
+        var citacao = '';
+        if (replyId > 0) {
+            citacao = '<button type="button" class="fc-quote" data-fc-goto="' + replyId + '" title="Ir para mensagem">' +
+                '<span class="fc-quote-who">' + escHtml((replyLabelEl && replyLabelEl.textContent) || 'Respondendo') + '</span>' +
+                '<span class="fc-quote-text">' + escHtml((replyTextEl && replyTextEl.textContent) || 'Mensagem') + '</span></button>';
+        }
+        var corpo = '';
+        if (texto) corpo += '<div class="fc-text">' + textoHtml(texto) + '</div>';
+        if (anexoNome) {
+            corpo += '<div style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(15,23,42,.06);font-size:13px;color:#1e293b;">' +
+                '<i class="fa-solid fa-paperclip"></i> ' + escHtml(anexoNome) + '</div>';
+        }
+        if (!corpo) corpo = '<div class="fc-text" style="color:#64748b;font-style:italic;">Enviando…</div>';
+        row.innerHTML =
+            '<div class="fc-bubble is-escola">' +
+            '<span class="fc-tag is-escola">Escola</span>' +
+            citacao +
+            corpo +
+            '<div class="fc-meta"><span class="fc-time">' + escHtml(horaAgora()) + '</span>' +
+            '<span class="fc-checks" title="Enviando"><i class="fa-solid fa-clock"></i></span></div>' +
+            '</div>';
+        box.appendChild(row);
+        scrollBottom();
+        return row;
+    }
+
+    function definirResposta(msgId, autor, preview) {
+        var idEl = document.getElementById('fale-reply-id');
+        var bar = document.getElementById('fale-reply-bar');
+        var label = document.getElementById('fale-reply-label');
+        var text = document.getElementById('fale-reply-text');
+        var msg = document.getElementById('fale-mensagem');
+        if (!idEl || !bar) return;
+        idEl.value = String(msgId || '');
+        if (label) label.textContent = 'Respondendo a ' + (autor === 'escola' ? 'Escola' : 'Família');
+        if (text) text.textContent = preview || 'Mensagem';
+        bar.classList.add('is-on');
+        if (msg) msg.focus();
+    }
+    function limparResposta() {
+        var idEl = document.getElementById('fale-reply-id');
+        var bar = document.getElementById('fale-reply-bar');
+        if (idEl) idEl.value = '';
+        if (bar) bar.classList.remove('is-on');
+    }
+
+    function marcarFalhaPendente(row, erro, restaurar) {
+        if (!row) return;
+        row.classList.remove('is-pending');
+        row.classList.add('is-failed');
+        var bubble = row.querySelector('.fc-bubble');
+        var checks = row.querySelector('.fc-checks');
+        if (checks) {
+            checks.title = 'Falha no envio';
+            checks.innerHTML = '<i class="fa-solid fa-exclamation-circle" style="color:#dc2626;"></i>';
+        }
+        if (!bubble || bubble.querySelector('.fc-send-fail')) return;
+        var fail = document.createElement('div');
+        fail.className = 'fc-send-fail';
+        fail.innerHTML = '<span>' + escHtml(erro || 'Não foi possível enviar.') + '</span>' +
+            '<button type="button" data-fc-retry>Tentar de novo</button>' +
+            '<button type="button" data-fc-descartar style="background:transparent;color:#64748b;">Descartar</button>';
+        bubble.appendChild(fail);
+        fail.querySelector('[data-fc-retry]').addEventListener('click', function () {
+            row.remove();
+            if (typeof restaurar === 'function') restaurar();
+        });
+        fail.querySelector('[data-fc-descartar]').addEventListener('click', function () {
+            row.remove();
+        });
     }
 
     function enviarMensagemAjax() {
         var form = document.getElementById('fale-chat-form');
+        var msgEl = document.getElementById('fale-mensagem');
+        var fileEl = document.getElementById('fale-anexo-input');
         if (!form || enviando) return Promise.resolve();
-        if (!temConteudo()) return Promise.resolve();
-        enviando = true;
-        if (btnEnviar) btnEnviar.disabled = true;
+        var texto = ((msgEl && msgEl.value) || '').trim();
+        var arquivo = (fileEl && fileEl.files && fileEl.files[0]) ? fileEl.files[0] : null;
+        if (!texto && !arquivo) return Promise.resolve();
 
         var fd = new FormData(form);
         fd.append('ajax', '1');
+        var anexoNome = arquivo ? arquivo.name : '';
+        var labelEnvio = arquivo
+            ? (arquivo.type && arquivo.type.indexOf('audio/') === 0 ? 'Enviando áudio…' : 'Enviando anexo…')
+            : 'Enviando mensagem…';
+
+        var pending = criarBolhaPendente(texto, anexoNome);
+        previewListaUltima({
+            mensagem: texto || (anexoNome ? 'Anexo' : ''),
+            created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        });
+
+        if (msgEl) {
+            msgEl.value = '';
+            if (typeof autoResize === 'function') autoResize();
+        }
+        if (typeof limparAnexo === 'function') limparAnexo();
+        setEstadoEnvio(true, labelEnvio);
+
+        function restaurarConteudo() {
+            if (msgEl && texto) {
+                msgEl.value = texto;
+                if (typeof autoResize === 'function') autoResize();
+            }
+            if (arquivo && fileEl) {
+                try {
+                    var dt = new DataTransfer();
+                    dt.items.add(arquivo);
+                    fileEl.files = dt.files;
+                    if (typeof mostrarPreview === 'function') mostrarPreview(arquivo.name);
+                } catch (e) { /* alguns browsers bloqueiam DataTransfer */ }
+            }
+            if (typeof atualizarAcoes === 'function') atualizarAcoes();
+            if (msgEl) msgEl.focus();
+        }
+
         return fetch(form.action, {
             method: 'POST',
             body: fd,
@@ -977,25 +1611,28 @@ $fmtDiaDivisor = static function (string $dt): string {
             credentials: 'same-origin'
         }).then(function (r) { return r.json(); })
             .then(function (data) {
-                enviando = false;
-                if (btnEnviar) btnEnviar.disabled = false;
+                setEstadoEnvio(false);
                 if (!data || !data.ok) {
-                    alert((data && data.erro) ? data.erro : 'Não foi possível enviar a mensagem.');
+                    marcarFalhaPendente(pending, (data && data.erro) ? data.erro : 'Não foi possível enviar a mensagem.', function () {
+                        restaurarConteudo();
+                        enviarMensagemAjax();
+                    });
                     return;
                 }
+                if (pending) pending.remove();
+                limparResposta();
                 if (data.mensagem) {
                     appendMensagem(data.mensagem, { highlightFamilia: false });
                     previewListaUltima(data.mensagem);
                 }
-                mensagem.value = '';
-                autoResize();
-                limparAnexo();
                 scrollBottom();
             })
             .catch(function () {
-                enviando = false;
-                if (btnEnviar) btnEnviar.disabled = false;
-                alert('Falha de rede ao enviar. Tente novamente.');
+                setEstadoEnvio(false);
+                marcarFalhaPendente(pending, 'Falha de rede ao enviar.', function () {
+                    restaurarConteudo();
+                    enviarMensagemAjax();
+                });
             });
     }
 
@@ -1007,7 +1644,13 @@ $fmtDiaDivisor = static function (string $dt): string {
             credentials: 'same-origin'
         }).then(function (r) { return r.json(); })
             .then(function (data) {
-                if (!data || !data.ok || !Array.isArray(data.mensagens)) return;
+                if (!data || !data.ok) return;
+                if (Array.isArray(data.lidas_escola)) {
+                    data.lidas_escola.forEach(function (id) {
+                        atualizarChecks(parseInt(id, 10) || 0, true);
+                    });
+                }
+                if (!Array.isArray(data.mensagens)) return;
                 var added = false;
                 var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
                 data.mensagens.forEach(function (m) {
@@ -1031,6 +1674,29 @@ $fmtDiaDivisor = static function (string $dt): string {
     });
 
     if (box && FC.conversaId) {
+        box.addEventListener('click', function (e) {
+            var replyBtn = e.target && e.target.closest ? e.target.closest('[data-fc-reply]') : null;
+            if (replyBtn) {
+                e.preventDefault();
+                definirResposta(
+                    parseInt(replyBtn.getAttribute('data-fc-reply'), 10) || 0,
+                    replyBtn.getAttribute('data-fc-reply-autor') || 'familia',
+                    replyBtn.getAttribute('data-fc-reply-preview') || 'Mensagem'
+                );
+                return;
+            }
+            var quoteBtn = e.target && e.target.closest ? e.target.closest('[data-fc-goto]') : null;
+            if (quoteBtn) {
+                e.preventDefault();
+                var gotoId = parseInt(quoteBtn.getAttribute('data-fc-goto'), 10) || 0;
+                var alvo = gotoId > 0 ? document.getElementById('msg-' + gotoId) : null;
+                if (alvo) {
+                    alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    alvo.classList.add('fc-new-in');
+                    setTimeout(function () { alvo.classList.remove('fc-new-in'); }, 1400);
+                }
+            }
+        });
         box.addEventListener('submit', function (e) {
             var form = e.target;
             if (!form || !form.classList || !form.classList.contains('fc-like-form')) return;
@@ -1075,12 +1741,64 @@ $fmtDiaDivisor = static function (string $dt): string {
         iniciarPolling();
     }
 
+    var lightbox = document.getElementById('fc-lightbox');
+    var lightboxImg = document.getElementById('fc-lightbox-img');
+    var lightboxCaption = document.getElementById('fc-lightbox-caption');
+    var lightboxClose = document.getElementById('fc-lightbox-close');
+
+    function abrirFotoAluno(src, nome) {
+        if (!lightbox || !lightboxImg || !src) return;
+        lightboxImg.src = src;
+        lightboxImg.alt = nome ? ('Foto de ' + nome) : 'Foto do aluno';
+        if (lightboxCaption) lightboxCaption.textContent = nome || 'Aluno';
+        lightbox.classList.add('is-open');
+        lightbox.setAttribute('aria-hidden', 'false');
+    }
+    function fecharFotoAluno() {
+        if (!lightbox) return;
+        lightbox.classList.remove('is-open');
+        lightbox.setAttribute('aria-hidden', 'true');
+        if (lightboxImg) lightboxImg.removeAttribute('src');
+    }
+    document.addEventListener('click', function (e) {
+        var trigger = e.target && e.target.closest ? e.target.closest('[data-fc-expand-foto]') : null;
+        if (!trigger) return;
+        e.preventDefault();
+        e.stopPropagation();
+        abrirFotoAluno(trigger.getAttribute('data-fc-expand-foto'), trigger.getAttribute('data-fc-expand-nome') || '');
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (lightbox && lightbox.classList.contains('is-open')) {
+                fecharFotoAluno();
+            } else if (typeof window.closeFcInfoDrawer === 'function') {
+                window.closeFcInfoDrawer();
+            }
+        }
+        var el = e.target && e.target.closest ? e.target.closest('[data-fc-expand-foto]') : null;
+        if (el && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            abrirFotoAluno(el.getAttribute('data-fc-expand-foto'), el.getAttribute('data-fc-expand-nome') || '');
+        }
+    });
+    if (lightbox) {
+        lightbox.addEventListener('click', function (e) {
+            if (e.target === lightbox) fecharFotoAluno();
+        });
+    }
+    if (lightboxClose) lightboxClose.addEventListener('click', fecharFotoAluno);
+
     var btnInfo = document.getElementById('fc-btn-info');
     if (btnInfo) {
         btnInfo.addEventListener('click', function () {
+            if (typeof window.openFcInfoDrawer === 'function') {
+                window.openFcInfoDrawer();
+                return;
+            }
             var aluno = btnInfo.getAttribute('data-aluno') || 'Aluno';
             var resp = btnInfo.getAttribute('data-responsavel') || 'Responsável';
-            alert('Conversa com ' + resp + ' — aluno ' + aluno);
+            var turma = (btnInfo.getAttribute('data-turma') || '').trim();
+            alert('Conversa com ' + resp + ' — aluno ' + aluno + (turma ? ' · turma ' + turma : ''));
         });
     }
 
@@ -1100,6 +1818,11 @@ $fmtDiaDivisor = static function (string $dt): string {
             btn.classList.add('is-on');
         });
     });
+
+    var btnCancelarResposta = document.getElementById('fale-reply-cancelar');
+    if (btnCancelarResposta) {
+        btnCancelarResposta.addEventListener('click', limparResposta);
+    }
 
     var form = document.getElementById('fale-chat-form');
     if (!form) return;
@@ -1128,9 +1851,15 @@ $fmtDiaDivisor = static function (string $dt): string {
         return (mensagem.value || '').trim() !== '' || (input.files && input.files.length > 0);
     }
     function atualizarAcoes() {
+        if (enviando) {
+            btnMic.style.display = 'none';
+            btnEnviar.style.display = 'inline-flex';
+            btnEnviar.disabled = true;
+            return;
+        }
         if (gravando) { btnMic.style.display = 'none'; btnEnviar.style.display = 'none'; return; }
-        if (temConteudo()) { btnMic.style.display = 'none'; btnEnviar.style.display = 'inline-flex'; }
-        else { btnEnviar.style.display = 'none'; btnMic.style.display = 'inline-flex'; }
+        if (temConteudo()) { btnMic.style.display = 'none'; btnEnviar.style.display = 'inline-flex'; btnEnviar.disabled = false; }
+        else { btnEnviar.style.display = 'none'; btnMic.style.display = 'inline-flex'; btnMic.disabled = false; }
     }
     function mostrarPreview(nome) {
         previewNome.textContent = nome || 'Anexo selecionado';

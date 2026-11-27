@@ -238,6 +238,7 @@ class SchoolCommunicationController extends BaseController
         try {
             $items = $this->db->fetchAll(
                 "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                        t.nome AS turma_nome,
                         NULLIF(r.foto_url, '') AS responsavel_foto_url,
                         COALESCE(NULLIF(a.foto_url, ''), av.avatar_url) AS aluno_foto_url,
                         (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
@@ -246,6 +247,7 @@ class SchoolCommunicationController extends BaseController
                  FROM familia_conversas c
                  INNER JOIN alunos a ON a.id = c.aluno_id
                  INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 LEFT JOIN turmas t ON t.id = a.turma_id
                  LEFT JOIN avatares_alunos av ON av.aluno_id = a.id
                  ORDER BY c.updated_at DESC
                  LIMIT 200"
@@ -253,11 +255,13 @@ class SchoolCommunicationController extends BaseController
         } catch (\Throwable $e) {
             $items = $this->db->fetchAll(
                 "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                        t.nome AS turma_nome,
                         (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
                         (SELECT mensagem FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
                  FROM familia_conversas c
                  INNER JOIN alunos a ON a.id = c.aluno_id
                  INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 LEFT JOIN turmas t ON t.id = a.turma_id
                  ORDER BY c.updated_at DESC
                  LIMIT 200"
             );
@@ -273,12 +277,20 @@ class SchoolCommunicationController extends BaseController
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
         $temReacoes = $this->service->tabelaReacoesPronta();
         $temLido = $this->colunaMensagemExiste('lido_familia_em');
+        $temResposta = $this->colunaMensagemExiste('resposta_a_mensagem_id');
         $cols = 'm.id, m.autor_tipo, m.mensagem, m.imagem, m.imagem_nome, m.created_at';
         if ($temLido) {
             $cols .= ', m.lido_familia_em, m.lido_escola_em';
         }
         if ($temAnexo) {
             $cols .= ', m.anexo_tipo, m.anexo_mime';
+        }
+        if ($temResposta) {
+            $cols .= ', m.resposta_a_mensagem_id, rm.mensagem AS resposta_mensagem, rm.autor_tipo AS resposta_autor_tipo,
+                        rm.imagem AS resposta_imagem, rm.imagem_nome AS resposta_imagem_nome';
+            if ($temAnexo) {
+                $cols .= ', rm.anexo_tipo AS resposta_anexo_tipo';
+            }
         }
         if ($temReacoes) {
             $cols .= ", (SELECT COUNT(*) FROM familia_mensagem_reacoes r WHERE r.mensagem_id = m.id AND r.reacao = 'curtir') AS curtidas";
@@ -293,8 +305,11 @@ class SchoolCommunicationController extends BaseController
             $where .= ' AND m.id > :depois_de';
             $params['depois_de'] = $depoisDe;
         }
+        $joinResposta = $temResposta
+            ? ' LEFT JOIN familia_mensagens rm ON rm.id = m.resposta_a_mensagem_id AND rm.conversa_id = m.conversa_id'
+            : '';
         $rows = $this->db->fetchAll(
-            "SELECT {$cols} FROM familia_mensagens m WHERE {$where} ORDER BY m.id",
+            "SELECT {$cols} FROM familia_mensagens m{$joinResposta} WHERE {$where} ORDER BY m.id",
             $params
         );
         if (!is_array($rows)) {
@@ -364,10 +379,27 @@ class SchoolCommunicationController extends BaseController
         }
         $user = $this->auth->getUser();
         $temAnexo = $this->colunaMensagemExiste('anexo_tipo');
+        $temResposta = $this->colunaMensagemExiste('resposta_a_mensagem_id');
         $tipoAnexo = $this->service->normalizarTipoAnexo($anexo['tipo'] ?? null);
+        $respostaA = $this->validarMensagemCitada((int) $conversa['id'], (int) ($_POST['resposta_a_mensagem_id'] ?? 0));
         $mensagemId = 0;
         try {
-            if ($temAnexo) {
+            if ($temAnexo && $temResposta) {
+                $mensagemId = (int) $this->db->insert(
+                    "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, resposta_a_mensagem_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
+                     VALUES (:conversa, 'escola', :autor, :resposta, :mensagem, :imagem, :nome, :tipo, :mime)",
+                    [
+                        'conversa' => (int) $conversa['id'],
+                        'autor' => (int) $user['id'],
+                        'resposta' => $respostaA,
+                        'mensagem' => $message !== '' ? $message : null,
+                        'imagem' => $anexo['path'] ?? null,
+                        'nome' => $anexo['name'] ?? null,
+                        'tipo' => $tipoAnexo,
+                        'mime' => $anexo['mime'] ?? null,
+                    ]
+                );
+            } elseif ($temAnexo) {
                 $mensagemId = (int) $this->db->insert(
                     "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome, anexo_tipo, anexo_mime)
                      VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome, :tipo, :mime)",
@@ -379,6 +411,19 @@ class SchoolCommunicationController extends BaseController
                         'nome' => $anexo['name'] ?? null,
                         'tipo' => $tipoAnexo,
                         'mime' => $anexo['mime'] ?? null,
+                    ]
+                );
+            } elseif ($temResposta) {
+                $mensagemId = (int) $this->db->insert(
+                    "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, resposta_a_mensagem_id, mensagem, imagem, imagem_nome)
+                     VALUES (:conversa, 'escola', :autor, :resposta, :mensagem, :imagem, :nome)",
+                    [
+                        'conversa' => (int) $conversa['id'],
+                        'autor' => (int) $user['id'],
+                        'resposta' => $respostaA,
+                        'mensagem' => $message !== '' ? $message : null,
+                        'imagem' => $anexo['path'] ?? null,
+                        'nome' => $anexo['name'] ?? null,
                     ]
                 );
             } else {
@@ -491,10 +536,25 @@ class SchoolCommunicationController extends BaseController
         $user = $this->auth->getUser();
         $mensagens = $this->mensagensDaConversa((int) $conversa['id'], (int) ($user['id'] ?? 0), $depoisDe);
         $payload = array_map(fn (array $mensagem): array => $this->montarPayloadMensagemJson($mensagem), $mensagens);
+        $lidasEscola = [];
+        if ($this->colunaMensagemExiste('lido_familia_em')) {
+            $lidas = $this->db->fetchAll(
+                "SELECT id FROM familia_mensagens
+                 WHERE conversa_id = :id AND autor_tipo = 'escola' AND lido_familia_em IS NOT NULL",
+                ['id' => (int) $conversa['id']]
+            );
+            foreach (is_array($lidas) ? $lidas : [] as $lida) {
+                $idLida = (int) ($lida['id'] ?? 0);
+                if ($idLida > 0) {
+                    $lidasEscola[] = $idLida;
+                }
+            }
+        }
         $this->responderJson([
             'ok' => true,
             'mensagens' => $payload,
             'conversa_id' => (int) $conversa['id'],
+            'lidas_escola' => $lidasEscola,
         ]);
     }
 
@@ -505,23 +565,34 @@ class SchoolCommunicationController extends BaseController
         }
         try {
             $conversa = $this->db->fetch(
-                "SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                "SELECT c.*, a.nome AS aluno_nome, a.ra AS aluno_ra,
+                        a.email AS aluno_email, a.telefone AS aluno_telefone, a.celular AS aluno_celular,
+                        r.nome AS responsavel_nome, r.email AS responsavel_email,
+                        r.telefone AS responsavel_telefone, r.celular AS responsavel_celular,
+                        t.nome AS turma_nome,
                         NULLIF(r.foto_url, '') AS responsavel_foto_url,
-                        COALESCE(NULLIF(a.foto_url, ''), av.avatar_url) AS aluno_foto_url
+                        COALESCE(NULLIF(a.foto_url, ''), av.avatar_url) AS aluno_foto_url,
+                        (SELECT ar.parentesco
+                           FROM alunos_responsaveis ar
+                          WHERE ar.aluno_id = a.id AND ar.responsavel_id = r.id
+                          ORDER BY ar.id DESC LIMIT 1) AS responsavel_parentesco
                  FROM familia_conversas c
                  INNER JOIN alunos a ON a.id = c.aluno_id
                  INNER JOIN responsaveis r ON r.id = c.responsavel_id
+                 LEFT JOIN turmas t ON t.id = a.turma_id
                  LEFT JOIN avatares_alunos av ON av.aluno_id = a.id
                  WHERE c.id = :id",
                 ['id' => $id]
             );
         } catch (\Throwable $e) {
             $conversa = $this->db->fetch(
-                'SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome
+                "SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome, t.nome AS turma_nome,
+                        r.telefone AS responsavel_telefone, r.celular AS responsavel_celular, r.email AS responsavel_email
                  FROM familia_conversas c
                  INNER JOIN alunos a ON a.id = c.aluno_id
                  INNER JOIN responsaveis r ON r.id = c.responsavel_id
-                 WHERE c.id = :id',
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 WHERE c.id = :id",
                 ['id' => $id]
             );
         }
@@ -780,7 +851,7 @@ class SchoolCommunicationController extends BaseController
         $tipo = $this->tipoAnexoParaUi($row);
         $imagem = isset($row['imagem']) ? trim((string) $row['imagem']) : '';
         $urlAbsoluta = $this->urlAbsolutaArquivo($imagem);
-        return [
+        $payload = [
             'id' => (int) ($row['id'] ?? 0),
             'autor_tipo' => (string) ($row['autor_tipo'] ?? ''),
             'mensagem' => $row['mensagem'] ?? null,
@@ -793,7 +864,32 @@ class SchoolCommunicationController extends BaseController
             'curtidas' => (int) ($row['curtidas'] ?? 0),
             'eu_curti' => (bool) ($row['eu_curti'] ?? false),
             'lido_familia_em' => $row['lido_familia_em'] ?? null,
+            'resposta_a_mensagem_id' => (int) ($row['resposta_a_mensagem_id'] ?? 0) ?: null,
+            'resposta' => null,
         ];
+        $respostaId = (int) ($row['resposta_a_mensagem_id'] ?? 0);
+        if ($respostaId > 0) {
+            $payload['resposta'] = [
+                'id' => $respostaId,
+                'autor_tipo' => (string) ($row['resposta_autor_tipo'] ?? ''),
+                'mensagem' => $row['resposta_mensagem'] ?? null,
+                'imagem_nome' => $row['resposta_imagem_nome'] ?? null,
+                'anexo_tipo' => $row['resposta_anexo_tipo'] ?? ((!empty($row['resposta_imagem'])) ? 'imagem' : null),
+            ];
+        }
+        return $payload;
+    }
+
+    private function validarMensagemCitada(int $conversaId, int $mensagemId): ?int
+    {
+        if ($mensagemId <= 0 || !$this->colunaMensagemExiste('resposta_a_mensagem_id')) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            'SELECT id FROM familia_mensagens WHERE id = :id AND conversa_id = :conversa LIMIT 1',
+            ['id' => $mensagemId, 'conversa' => $conversaId]
+        );
+        return $row ? $mensagemId : null;
     }
     /**
      * @param array<string,mixed> $row
